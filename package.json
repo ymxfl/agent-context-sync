@@ -8,9 +8,10 @@
   },
   "scripts": {
     "build": "esbuild src/main.ts --bundle --platform=node --format=esm --outfile=skill/agent-context-sync/scripts/acs.mjs",
+    "audit:engines": "node scripts/audit-lock-engines.mjs",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test -- --run && npm run build"
+    "verify": "npm run audit:engines && npm run typecheck && npm test -- --run && npm run build"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",
@@ -22,7 +23,9 @@
   "devDependencies": {
     "@types/node": "24.13.3",
     "esbuild": "0.25.12",
+    "semver": "7.7.4",
     "typescript": "5.9.3",
-    "vitest": "4.1.10"
+    "vite": "6.4.3",
+    "vitest": "3.2.7"
   }
 }
