@@ -32,7 +32,21 @@ describe('parseWorkspaceManifest', () => {
   });
 
   it.each([
+    'file:///private/platform-context',
+    'file:///C:/Users/alice/platform-context',
+  ])('rejects local file URL context remote %s', (contextRemote) => {
+    expect(() => parseWorkspaceManifest({
+      schema_version: 1,
+      workspace_id: workspaceId,
+      name: 'platform',
+      context_remote: contextRemote,
+      repositories: [],
+    })).toThrow();
+  });
+
+  it.each([
     'https://github.com/acme/platform-context.git',
+    'ssh://git@github.com/acme/platform-context.git',
     'git@github.com:acme/platform-context.git',
   ])('accepts Git context remote %s', (contextRemote) => {
     expect(parseWorkspaceManifest({

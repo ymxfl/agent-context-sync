@@ -20,7 +20,9 @@ const absolutePathSchema = z.string().refine(path.isAbsolute, {
 });
 
 const sharedRemoteSchema = z.string().trim().min(1).refine(
-  (value) => !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value),
+  (value) => !/^file:/i.test(value)
+    && !path.posix.isAbsolute(value)
+    && !path.win32.isAbsolute(value),
   { message: 'Shared remote must not be an absolute local path' },
 );
 
