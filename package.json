@@ -1,0 +1,28 @@
+{
+  "name": "agent-context-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --outfile=skill/agent-context-sync/scripts/acs.mjs",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test -- --run && npm run build"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.3",
+    "minimatch": "^10.0.3",
+    "smol-toml": "^1.4.2",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  }
+}
