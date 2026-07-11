@@ -19,6 +19,11 @@ const absolutePathSchema = z.string().refine(path.isAbsolute, {
   message: 'Path must be absolute',
 });
 
+const sharedRemoteSchema = z.string().trim().min(1).refine(
+  (value) => !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value),
+  { message: 'Shared remote must not be an absolute local path' },
+);
+
 const repositoryManifestSchema: z.ZodType<RepositoryManifest> = z.strictObject({
   schema_version: z.literal(1),
   repo_id: repositoryIdSchema,
@@ -29,7 +34,7 @@ const workspaceManifestSchema: z.ZodType<WorkspaceManifest> = z.strictObject({
   schema_version: z.literal(1),
   workspace_id: workspaceIdSchema,
   name: z.string().trim().min(1),
-  context_remote: z.string().trim().min(1),
+  context_remote: sharedRemoteSchema,
   repositories: z.array(repositoryManifestSchema),
 });
 

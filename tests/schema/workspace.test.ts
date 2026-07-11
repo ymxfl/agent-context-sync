@@ -18,6 +18,32 @@ describe('parseWorkspaceManifest', () => {
     })).toThrow(/unrecognized/i);
   });
 
+  it.each([
+    '/private/platform-context',
+    String.raw`C:\Users\alice\platform-context`,
+  ])('rejects absolute local context remote %s', (contextRemote) => {
+    expect(() => parseWorkspaceManifest({
+      schema_version: 1,
+      workspace_id: workspaceId,
+      name: 'platform',
+      context_remote: contextRemote,
+      repositories: [],
+    })).toThrow();
+  });
+
+  it.each([
+    'https://github.com/acme/platform-context.git',
+    'git@github.com:acme/platform-context.git',
+  ])('accepts Git context remote %s', (contextRemote) => {
+    expect(parseWorkspaceManifest({
+      schema_version: 1,
+      workspace_id: workspaceId,
+      name: 'platform',
+      context_remote: contextRemote,
+      repositories: [],
+    }).context_remote).toBe(contextRemote);
+  });
+
   it('accepts normalized repository IDs', () => {
     const manifest = parseWorkspaceManifest({
       schema_version: 1,
