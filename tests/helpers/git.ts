@@ -20,7 +20,7 @@ export async function fixtureGit(path: string, args: readonly string[]): Promise
 
 export async function initFixtureRepository(path: string, remote?: string): Promise<void> {
   await mkdir(path, { recursive: true });
-  await runGit(path, ['init']);
+  await runGit(path, ['init', '--initial-branch=main']);
   await runGit(path, ['config', 'user.name', 'Agent Context Sync Tests']);
   await runGit(path, ['config', 'user.email', 'tests@agent-context-sync.invalid']);
   await runGit(path, ['commit', '--allow-empty', '-m', 'Initial commit']);
@@ -31,6 +31,6 @@ export async function initFixtureRepository(path: string, remote?: string): Prom
 
 export async function createBareRemote(path: string): Promise<string> {
   await mkdir(path, { recursive: true });
-  await runGit(path, ['init', '--bare']);
+  await runGit(path, ['init', '--bare', '--initial-branch=main']);
   return path;
 }
