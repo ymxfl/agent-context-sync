@@ -15,6 +15,7 @@ import {
 } from '../../src/workspace/local-registry.js';
 
 const workspaceId = 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV';
+const otherWorkspaceId = 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAW';
 const repoId = 'github.com/acme/api';
 
 describe('local workspace registry', () => {
@@ -84,6 +85,71 @@ describe('local workspace registry', () => {
       expect(await fs.readdir(path.dirname(registryFile))).toEqual([
         `${workspaceId}.yaml`,
       ]);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects workspace IDs that could escape the registry directory', async () => {
+    const home = await fs.mkdtemp(path.join(tmpdir(), 'acs-registry-'));
+
+    try {
+      expect(() => registryPath(home, '../../outside')).toThrow(/workspace id/i);
+      await expect(readLocalWorkspace(home, '../../outside')).rejects.toThrow(
+        /workspace id/i,
+      );
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects registry content for a different workspace ID', async () => {
+    const home = await fs.mkdtemp(path.join(tmpdir(), 'acs-registry-'));
+    const contextPath = await fs.mkdtemp(path.join(home, 'context-'));
+
+    try {
+      await writeLocalWorkspace(home, {
+        schema_version: 1,
+        workspace_id: otherWorkspaceId,
+        context_path: contextPath,
+        repository_paths: {},
+      });
+      await fs.copyFile(
+        registryPath(home, otherWorkspaceId),
+        registryPath(home, workspaceId),
+      );
+
+      await expect(readLocalWorkspace(home, workspaceId)).rejects.toThrow(
+        /does not match/i,
+      );
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('forces exact mode 0600 even under a restrictive umask', async () => {
+    const home = await fs.mkdtemp(path.join(tmpdir(), 'acs-registry-'));
+    const contextPath = await fs.mkdtemp(path.join(home, 'context-'));
+    const local: LocalWorkspace = {
+      schema_version: 1,
+      workspace_id: workspaceId,
+      context_path: contextPath,
+      repository_paths: {},
+    };
+    const previousUmask = process.umask(0o777);
+
+    try {
+      await writeLocalWorkspace(home, local);
+    } finally {
+      process.umask(previousUmask);
+    }
+
+    try {
+      const registryFile = registryPath(home, workspaceId);
+      expect((await fs.stat(registryFile)).mode & 0o777).toBe(0o600);
+      await expect(fs.readFile(registryFile, 'utf8')).resolves.toContain(
+        workspaceId,
+      );
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

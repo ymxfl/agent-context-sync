@@ -6,7 +6,10 @@ import type {
   WorkspaceManifest,
 } from '../domain/model.js';
 
-const workspaceIdSchema = z.string().regex(/^ws_[0-9A-HJKMNP-TV-Z]{26}$/);
+const workspaceIdSchema = z.string().regex(
+  /^ws_[0-9A-HJKMNP-TV-Z]{26}$/,
+  'Workspace ID must use the ws_ prefix and 26 Crockford Base32 characters',
+);
 
 const repositoryIdSchema = z.string().regex(
   /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/[^\s/?#]+(?:\/[^\s/?#]+)*$/,
@@ -49,6 +52,10 @@ const localWorkspaceSchema: z.ZodType<LocalWorkspace> = z.strictObject({
 
 export function parseWorkspaceManifest(value: unknown): WorkspaceManifest {
   return workspaceManifestSchema.parse(value);
+}
+
+export function parseWorkspaceId(value: unknown): string {
+  return workspaceIdSchema.parse(value);
 }
 
 export function parseLocalWorkspace(value: unknown): LocalWorkspace {

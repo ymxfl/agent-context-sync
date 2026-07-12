@@ -4,6 +4,7 @@ import path from 'node:path';
 
 export interface AtomicWriteFileHandle {
   writeFile(data: string, options: { encoding: BufferEncoding }): Promise<void>;
+  chmod(mode: number): Promise<void>;
   sync(): Promise<void>;
   close(): Promise<void>;
 }
@@ -13,6 +14,7 @@ export interface AtomicWriteAdapter {
     directory: string,
     options: { recursive: true; mode: number },
   ): Promise<string | undefined>;
+  chmod(file: string, mode: number): Promise<void>;
   open(file: string, flags: string, mode?: number): Promise<AtomicWriteFileHandle>;
   rename(oldPath: string, newPath: string): Promise<void>;
   unlink(file: string): Promise<void>;
@@ -20,6 +22,7 @@ export interface AtomicWriteAdapter {
 
 export const nodeAtomicWriteAdapter: AtomicWriteAdapter = {
   mkdir: (directory, options) => fs.mkdir(directory, options),
+  chmod: (file, mode) => fs.chmod(file, mode),
   open: (file, flags, mode) => fs.open(file, flags, mode),
   rename: (oldPath, newPath) => fs.rename(oldPath, newPath),
   unlink: (file) => fs.unlink(file),
@@ -83,12 +86,17 @@ export async function atomicWriteFile(
     `.${path.basename(file)}.${randomUUID()}.tmp`,
   );
 
-  await adapter.mkdir(directory, { recursive: true, mode: 0o700 });
+  const createdDirectory = await adapter.mkdir(
+    directory,
+    { recursive: true, mode: 0o700 },
+  );
+  if (createdDirectory) await adapter.chmod(directory, 0o700);
 
   let handle: AtomicWriteFileHandle | undefined;
   let renamed = false;
   try {
     handle = await adapter.open(temporaryPath, 'wx', 0o600);
+    await handle.chmod(0o600);
     await handle.writeFile(contents, { encoding: 'utf8' });
     await handle.sync();
     await handle.close();
