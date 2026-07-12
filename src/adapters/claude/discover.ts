@@ -1,4 +1,10 @@
-import { readdir, readFile, realpath, stat } from 'node:fs/promises';
+import type { Dirent, Stats } from 'node:fs';
+import {
+  readdir as nodeReaddir,
+  readFile as nodeReadFile,
+  realpath as nodeRealpath,
+  stat as nodeStat,
+} from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { minimatch } from 'minimatch';
@@ -32,6 +38,20 @@ interface FoundInstruction {
   loading: 'eager' | 'on-demand' | 'reported-only';
 }
 
+export interface ClaudeFileSystem {
+  readFile(path: string): Promise<string>;
+  readdir(path: string, options: { withFileTypes: true }): Promise<Dirent[]>;
+  realpath(path: string): Promise<string>;
+  stat(path: string): Promise<Stats>;
+}
+
+const defaultFileSystem: ClaudeFileSystem = {
+  readFile: (path) => nodeReadFile(path, 'utf8'),
+  readdir: (path, options) => nodeReaddir(path, options),
+  realpath: (path) => nodeRealpath(path),
+  stat: (path) => nodeStat(path),
+};
+
 const AGENT = 'claude-code' as const;
 
 function isInside(parent: string, child: string): boolean {
@@ -52,25 +72,45 @@ function coverage(
   return { id, status, detail, ...(locator === undefined ? {} : { locator }) };
 }
 
-async function readableFile(path: string): Promise<'file' | 'missing' | 'inaccessible'> {
+async function readableFile(
+  fs: ClaudeFileSystem,
+  path: string,
+): Promise<'file' | 'missing' | 'inaccessible'> {
   try {
-    return (await stat(path)).isFile() ? 'file' : 'missing';
+    if (!(await fs.stat(path)).isFile()) return 'missing';
+    await fs.readFile(path);
+    return 'file';
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'inaccessible';
   }
 }
 
-async function walkMarkdown(root: string): Promise<{ files: string[]; inaccessible: string[] }> {
+async function walkMarkdown(
+  fs: ClaudeFileSystem,
+  root: string,
+): Promise<{ files: string[]; inaccessible: string[]; escapes: string[] }> {
   const files: string[] = [];
   const inaccessible: string[] = [];
+  const escapes: string[] = [];
   const visited = new Set<string>();
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = await fs.realpath(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') inaccessible.push(root);
+    return { files, inaccessible, escapes };
+  }
 
   async function visit(directory: string): Promise<void> {
     let canonical: string;
     try {
-      canonical = await realpath(directory);
+      canonical = await fs.realpath(directory);
     } catch {
       inaccessible.push(directory);
+      return;
+    }
+    if (!isInside(canonicalRoot, canonical)) {
+      escapes.push(directory);
       return;
     }
     if (visited.has(canonical)) return;
@@ -78,7 +118,7 @@ async function walkMarkdown(root: string): Promise<{ files: string[]; inaccessib
 
     let entries;
     try {
-      entries = await readdir(directory, { withFileTypes: true });
+      entries = await fs.readdir(directory, { withFileTypes: true });
     } catch {
       inaccessible.push(directory);
       return;
@@ -90,27 +130,37 @@ async function walkMarkdown(root: string): Promise<{ files: string[]; inaccessib
       if (entry.isDirectory() || entry.isSymbolicLink()) {
         let target;
         try {
-          target = await stat(path);
+          target = await fs.stat(path);
         } catch {
           inaccessible.push(path);
           continue;
         }
         if (target.isDirectory()) await visit(path);
-        else if (target.isFile() && entry.name.endsWith('.md')) files.push(path);
+        else if (target.isFile() && entry.name.endsWith('.md')) {
+          try {
+            const canonicalFile = await fs.realpath(path);
+            if (isInside(canonicalRoot, canonicalFile)) files.push(path);
+            else escapes.push(path);
+          } catch {
+            inaccessible.push(path);
+          }
+        }
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
         files.push(path);
       }
     }
   }
 
-  if ((await readableFile(root)) === 'missing') {
-    try {
-      if ((await stat(root)).isDirectory()) await visit(root);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') inaccessible.push(root);
-    }
+  try {
+    if ((await fs.stat(root)).isDirectory()) await visit(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') inaccessible.push(root);
   }
-  return { files: uniqueSorted(files), inaccessible: uniqueSorted(inaccessible) };
+  return {
+    files: uniqueSorted(files),
+    inaccessible: uniqueSorted(inaccessible),
+    escapes: uniqueSorted(escapes),
+  };
 }
 
 function stripCode(markdown: string): string {
@@ -125,9 +175,44 @@ function stripCode(markdown: string): string {
       continue;
     }
     if (fence !== undefined) continue;
-    visible.push(line.replace(/`[^`\n]*`/g, ''));
+    visible.push(line);
   }
-  return visible.join('\n');
+  const withoutFences = visible.join('\n');
+  let output = '';
+  let index = 0;
+  while (index < withoutFences.length) {
+    if (withoutFences[index] !== '`') {
+      output += withoutFences[index];
+      index += 1;
+      continue;
+    }
+    let openingEnd = index;
+    while (withoutFences[openingEnd] === '`') openingEnd += 1;
+    const delimiterLength = openingEnd - index;
+    let search = openingEnd;
+    let closingEnd = -1;
+    while (search < withoutFences.length) {
+      if (withoutFences[search] !== '`') {
+        search += 1;
+        continue;
+      }
+      let runEnd = search;
+      while (withoutFences[runEnd] === '`') runEnd += 1;
+      if (runEnd - search === delimiterLength) {
+        closingEnd = runEnd;
+        break;
+      }
+      search = runEnd;
+    }
+    if (closingEnd === -1) {
+      output += withoutFences.slice(index, openingEnd);
+      index = openingEnd;
+    } else {
+      output += ' '.repeat(closingEnd - index);
+      index = closingEnd;
+    }
+  }
+  return output;
 }
 
 function importedPaths(markdown: string): string[] {
@@ -162,6 +247,12 @@ function rulePaths(markdown: string): string[] | undefined {
 }
 
 export class ClaudeAdapter implements AgentAdapter {
+  private readonly fs: ClaudeFileSystem;
+
+  constructor(fs: Partial<ClaudeFileSystem> = {}) {
+    this.fs = { ...defaultFileSystem, ...fs };
+  }
+
   async discover(input: DiscoveryInput): Promise<CoverageReport> {
     const repositoryRoot = resolve(input.repositoryRoot);
     const cwd = resolve(input.cwd);
@@ -169,6 +260,25 @@ export class ClaudeAdapter implements AgentAdapter {
     const sources: ContextSource[] = [];
     const coverageItems: CoverageItem[] = [];
     const foundInstructions: FoundInstruction[] = [];
+    let canonicalRepositoryRoot = repositoryRoot;
+    try {
+      canonicalRepositoryRoot = await this.fs.realpath(repositoryRoot);
+    } catch {
+      coverageItems.push(coverage(
+        'claude-repository-root-inaccessible',
+        'inaccessible',
+        'The repository root could not be canonicalized.',
+        repositoryRoot,
+      ));
+    }
+    const safeShareability = async (path: string, intended: Shareability): Promise<Shareability> => {
+      if (intended !== 'team') return intended;
+      try {
+        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path)) ? 'team' : 'personal';
+      } catch {
+        return 'personal';
+      }
+    };
 
     if (!isInside(repositoryRoot, cwd)) {
       coverageItems.push(coverage(
@@ -189,7 +299,7 @@ export class ClaudeAdapter implements AgentAdapter {
     const parsedLayers: Array<SettingsLayer & { settings: ClaudeSettings }> = [];
     for (const layer of layers) {
       try {
-        const text = await readFile(layer.locator, 'utf8');
+        const text = await this.fs.readFile(layer.locator);
         const settings = JSON.parse(text) as ClaudeSettings;
         if (settings === null || Array.isArray(settings) || typeof settings !== 'object') throw new Error('not an object');
         parsedLayers.push({ ...layer, settings });
@@ -202,7 +312,11 @@ export class ClaudeAdapter implements AgentAdapter {
             ? 'claude-settings-inaccessible'
             : 'claude-settings-invalid',
           code === 'ENOENT' || code === 'EACCES' || code === 'EPERM' ? 'inaccessible' : 'unknown',
-          code === 'ENOENT' ? 'Configured settings path does not exist.' : `Settings could not be parsed: ${(error as Error).message}`,
+          code === 'ENOENT'
+            ? 'Configured settings path does not exist.'
+            : code === 'EACCES' || code === 'EPERM'
+              ? 'Configured settings path is unreadable.'
+              : 'Settings JSON is invalid.',
           layer.locator,
         ));
       }
@@ -218,7 +332,7 @@ export class ClaudeAdapter implements AgentAdapter {
     );
 
     for (const path of uniqueSorted(input.managedInstructionPaths ?? [])) {
-      const status = await readableFile(path);
+      const status = await readableFile(this.fs, path);
       if (status === 'file') {
         foundInstructions.push({
           locator: path,
@@ -226,8 +340,13 @@ export class ClaudeAdapter implements AgentAdapter {
           shareability: 'managed',
           loading: 'reported-only',
         });
-      } else if (status === 'inaccessible') {
-        coverageItems.push(coverage('claude-managed-inaccessible', 'inaccessible', 'Managed instructions are unreadable.', path));
+      } else {
+        coverageItems.push(coverage(
+          'claude-managed-inaccessible',
+          status === 'inaccessible' ? 'inaccessible' : 'unknown',
+          status === 'inaccessible' ? 'Managed instructions are unreadable.' : 'Managed instructions do not exist.',
+          path,
+        ));
       }
     }
     for (const { locator, settings } of parsedLayers.filter((layer) => layer.kind === 'managed')) {
@@ -242,13 +361,16 @@ export class ClaudeAdapter implements AgentAdapter {
     }
 
     const userInstruction = join(homeDir, '.claude/CLAUDE.md');
-    if ((await readableFile(userInstruction)) === 'file') {
+    const userInstructionStatus = await readableFile(this.fs, userInstruction);
+    if (userInstructionStatus === 'file') {
       foundInstructions.push({
         locator: userInstruction,
         sourceType: 'user-instructions',
         shareability: 'personal',
         loading: 'eager',
       });
+    } else if (userInstructionStatus === 'inaccessible') {
+      coverageItems.push(coverage('claude-instruction-inaccessible', 'inaccessible', 'User instructions are unreadable.', userInstruction));
     }
 
     const ancestorDirectories: string[] = [];
@@ -270,23 +392,39 @@ export class ClaudeAdapter implements AgentAdapter {
       ];
       for (const candidate of candidates) {
         if (candidate.path === userInstruction) continue;
-        if ((await readableFile(candidate.path)) !== 'file') continue;
+        const candidateStatus = await readableFile(this.fs, candidate.path);
+        if (candidateStatus !== 'file') {
+          if (candidateStatus === 'inaccessible') {
+            coverageItems.push(coverage('claude-instruction-inaccessible', 'inaccessible', 'Instruction file is unreadable.', candidate.path));
+          }
+          continue;
+        }
         eager.add(candidate.path);
         if (isExcluded(candidate.path)) {
           coverageItems.push(coverage('claude-excluded', 'partial', 'Instruction file matched claudeMdExcludes.', candidate.path));
           continue;
         }
-        foundInstructions.push({ ...candidate, locator: candidate.path, loading: 'eager' });
+        foundInstructions.push({
+          ...candidate,
+          locator: candidate.path,
+          shareability: await safeShareability(candidate.path, candidate.shareability),
+          loading: 'eager',
+        });
       }
     }
 
-    const descendants = await walkMarkdown(repositoryRoot);
+    const descendants = await walkMarkdown(this.fs, repositoryRoot);
     for (const path of descendants.files) {
       const name = path.slice(path.lastIndexOf(sep) + 1);
       if (name !== 'CLAUDE.md' && name !== 'CLAUDE.local.md') continue;
       if (path.includes(`${sep}.claude${sep}rules${sep}`) || eager.has(path) || path === join(repositoryRoot, '.claude/CLAUDE.md')) continue;
       if (isExcluded(path)) {
         coverageItems.push(coverage('claude-excluded', 'partial', 'Instruction file matched claudeMdExcludes.', path));
+        continue;
+      }
+      const descendantStatus = await readableFile(this.fs, path);
+      if (descendantStatus !== 'file') {
+        coverageItems.push(coverage('claude-instruction-inaccessible', 'inaccessible', 'Instruction file is unreadable.', path));
         continue;
       }
       foundInstructions.push({
@@ -298,6 +436,9 @@ export class ClaudeAdapter implements AgentAdapter {
     }
     for (const path of descendants.inaccessible) {
       coverageItems.push(coverage('claude-path-inaccessible', 'inaccessible', 'A repository path could not be inspected.', path));
+    }
+    for (const path of descendants.escapes) {
+      coverageItems.push(coverage('claude-root-escape', 'partial', 'A repository symlink resolves outside the repository root.', path));
     }
 
     const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path) => resolve(path)));
@@ -315,7 +456,13 @@ export class ClaudeAdapter implements AgentAdapter {
           join(directory, '.claude/CLAUDE.md'),
           join(directory, 'CLAUDE.local.md'),
         ]) {
-          if ((await readableFile(candidate)) !== 'file') continue;
+          const candidateStatus = await readableFile(this.fs, candidate);
+          if (candidateStatus !== 'file') {
+            if (candidateStatus === 'inaccessible') {
+              coverageItems.push(coverage('claude-instruction-inaccessible', 'inaccessible', 'Additional-directory instructions are unreadable.', candidate));
+            }
+            continue;
+          }
           if (isExcluded(candidate)) {
             coverageItems.push(coverage('claude-excluded', 'partial', 'Additional-directory instruction matched claudeMdExcludes.', candidate));
             continue;
@@ -342,7 +489,7 @@ export class ClaudeAdapter implements AgentAdapter {
         : []),
     ];
     for (const ruleRoot of ruleRoots) {
-      const walked = await walkMarkdown(ruleRoot.path);
+      const walked = await walkMarkdown(this.fs, ruleRoot.path);
       for (const path of walked.files) {
         if (isExcluded(path)) {
           coverageItems.push(coverage('claude-excluded', 'partial', 'Rule matched claudeMdExcludes.', path));
@@ -350,7 +497,7 @@ export class ClaudeAdapter implements AgentAdapter {
         }
         let paths: string[] | undefined;
         try {
-          paths = rulePaths(await readFile(path, 'utf8'));
+          paths = rulePaths(await this.fs.readFile(path));
         } catch {
           coverageItems.push(coverage('claude-rule-inaccessible', 'inaccessible', 'Rule could not be read.', path));
           continue;
@@ -359,13 +506,16 @@ export class ClaudeAdapter implements AgentAdapter {
           agent: AGENT,
           sourceType: ruleRoot.sourceType,
           locator: path,
-          shareability: ruleRoot.shareability,
+          shareability: await safeShareability(path, ruleRoot.shareability),
           status: 'available',
           ...(paths === undefined ? {} : { pathScope: paths }),
         });
       }
       for (const path of walked.inaccessible) {
         coverageItems.push(coverage('claude-rule-inaccessible', 'inaccessible', 'Rule path could not be inspected.', path));
+      }
+      for (const path of walked.escapes) {
+        coverageItems.push(coverage('claude-root-escape', 'partial', 'A rule symlink resolves outside its explicit rule root.', path));
       }
     }
 
@@ -379,11 +529,23 @@ export class ClaudeAdapter implements AgentAdapter {
       ancestors: readonly string[],
       inheritedShareability: Shareability,
     ): Promise<void> => {
+      let canonicalPath: string;
+      try {
+        canonicalPath = await this.fs.realpath(path);
+      } catch (error) {
+        coverageItems.push(coverage(
+          'claude-import-inaccessible',
+          (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'unknown' : 'inaccessible',
+          'Import source could not be canonicalized.',
+          path,
+        ));
+        return;
+      }
       let text: string;
       try {
-        text = await readFile(path, 'utf8');
+        text = await this.fs.readFile(canonicalPath);
       } catch {
-        coverageItems.push(coverage('claude-import-inaccessible', 'inaccessible', 'Imported file could not be read.', path));
+        coverageItems.push(coverage('claude-import-inaccessible', 'inaccessible', 'Imported file could not be read.', canonicalPath));
         return;
       }
       for (const imported of importedPaths(text)) {
@@ -392,40 +554,57 @@ export class ClaudeAdapter implements AgentAdapter {
           coverageItems.push(coverage('claude-import-depth', 'partial', 'Import exceeds the maximum depth of four hops.', candidate));
           continue;
         }
-        if (ancestors.includes(candidate) || candidate === path) {
-          coverageItems.push(coverage('claude-import-cycle', 'partial', 'Recursive import cycle detected.', candidate));
-          continue;
-        }
         if (isExcluded(candidate)) {
           coverageItems.push(coverage('claude-excluded', 'partial', 'Imported file matched claudeMdExcludes.', candidate));
           continue;
         }
-        const fileStatus = await readableFile(candidate);
+        let canonicalCandidate: string;
+        try {
+          canonicalCandidate = await this.fs.realpath(candidate);
+        } catch (error) {
+          coverageItems.push(coverage(
+            'claude-import-inaccessible',
+            (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'unknown' : 'inaccessible',
+            'Imported path could not be canonicalized.',
+            candidate,
+          ));
+          continue;
+        }
+        if (ancestors.includes(canonicalCandidate) || canonicalCandidate === canonicalPath) {
+          coverageItems.push(coverage('claude-import-cycle', 'partial', 'Recursive import cycle detected.', canonicalCandidate));
+          continue;
+        }
+        if (isExcluded(canonicalCandidate)) {
+          coverageItems.push(coverage('claude-excluded', 'partial', 'Imported file matched claudeMdExcludes.', canonicalCandidate));
+          continue;
+        }
+        const fileStatus = await readableFile(this.fs, canonicalCandidate);
         if (fileStatus !== 'file') {
           coverageItems.push(coverage(
             'claude-import-inaccessible',
             fileStatus === 'inaccessible' ? 'inaccessible' : 'unknown',
             fileStatus === 'inaccessible' ? 'Imported file is unreadable.' : 'Imported file does not exist.',
-            candidate,
+            canonicalCandidate,
           ));
           continue;
         }
-        const candidateShareability = inheritedShareability === 'personal' || candidate.startsWith(homeDir)
-          ? 'personal'
-          : inheritedShareability;
-        const existing = importSources.get(candidate);
+        const candidateShareability = inheritedShareability === 'team'
+          && isInside(canonicalRepositoryRoot, canonicalCandidate)
+          ? 'team'
+          : 'personal';
+        const existing = importSources.get(canonicalCandidate);
         if (existing === undefined) {
-          importSources.set(candidate, {
+          importSources.set(canonicalCandidate, {
             agent: AGENT,
             sourceType: 'import',
-            locator: candidate,
+            locator: canonicalCandidate,
             shareability: candidateShareability,
             status: 'available',
           });
         } else if (candidateShareability === 'personal') {
           existing.shareability = 'personal';
         }
-        await visitImports(candidate, depth + 1, [...ancestors, path], candidateShareability);
+        await visitImports(candidate, depth + 1, [...ancestors, canonicalPath], candidateShareability);
       }
     };
     for (const instruction of foundInstructions.filter((item) => item.loading !== 'reported-only')) {
@@ -446,7 +625,7 @@ export class ClaudeAdapter implements AgentAdapter {
     } else {
       const encodedRepository = repositoryRoot.replace(/[^A-Za-z0-9_-]/g, '-');
       const derived = join(homeDir, '.claude/projects', encodedRepository, 'memory');
-      if ((await readableFile(join(derived, 'MEMORY.md'))) === 'file') memoryRoot = derived;
+      if ((await readableFile(this.fs, join(derived, 'MEMORY.md'))) === 'file') memoryRoot = derived;
       else coverageItems.push(coverage(
         'claude-auto-memory-layout',
         'partial',
@@ -456,7 +635,7 @@ export class ClaudeAdapter implements AgentAdapter {
     }
     if (memoryRoot !== undefined) {
       const memoryEntry = join(memoryRoot, 'MEMORY.md');
-      const memoryStatus = await readableFile(memoryEntry);
+      const memoryStatus = await readableFile(this.fs, memoryEntry);
       if (memoryStatus === 'file') {
         sources.push({
           agent: AGENT,

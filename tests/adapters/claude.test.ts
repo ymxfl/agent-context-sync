@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,9 +90,10 @@ describe('ClaudeAdapter', () => {
 
   it('parses imports outside code, stops after four hops, and reports cycles', async () => {
     const report = await new ClaudeAdapter().discover(input);
+    const canonicalRepositoryRoot = await realpath(repositoryRoot);
     const imports = report.sources
       .filter((source) => source.sourceType === 'import')
-      .map((source) => source.locator.slice(repositoryRoot.length + 1));
+      .map((source) => relative(canonicalRepositoryRoot, source.locator));
 
     expect(imports).toEqual(expect.arrayContaining([
       'docs/shared.md',
@@ -127,6 +128,106 @@ describe('ClaudeAdapter', () => {
     ]));
   });
 
+  it('never exposes malformed settings contents through diagnostics', async () => {
+    const secret = 'settings-secret-must-not-leak';
+    await writeFile(input.explicitSettingsPaths![0], `{"token":${secret}}`);
+
+    const report = await new ClaudeAdapter().discover(input);
+
+    expect(JSON.stringify(report)).not.toContain(secret);
+    expect(report.coverage).toContainEqual(expect.objectContaining({
+      id: 'claude-settings-invalid',
+      status: 'unknown',
+      detail: 'Settings JSON is invalid.',
+    }));
+  });
+
+  it('does not follow repository symlinks outside the root and treats import escapes as personal', async () => {
+    const external = join(root, 'external');
+    await mkdir(external);
+    await writeFile(join(external, 'CLAUDE.md'), '# Must not be repository-discovered\n');
+    await writeFile(join(external, 'imported.md'), '# External import\n');
+    await symlink(external, join(repositoryRoot, 'linked'));
+    await symlink(join(repositoryRoot, 'docs/shared.md'), join(repositoryRoot, 'docs/shared-alias.md'));
+    await writeFile(
+      join(repositoryRoot, 'CLAUDE.md'),
+      `${await readFile(join(repositoryRoot, 'CLAUDE.md'), 'utf8')}\n@linked/imported.md\n@docs/shared-alias.md\n`,
+    );
+
+    const report = await new ClaudeAdapter().discover(input);
+    const canonicalExternalImport = await realpath(join(external, 'imported.md'));
+
+    expect(report.sources).not.toContainEqual(expect.objectContaining({
+      locator: join(repositoryRoot, 'linked/CLAUDE.md'),
+    }));
+    expect(report.sources).toContainEqual(expect.objectContaining({
+      sourceType: 'import',
+      locator: canonicalExternalImport,
+      shareability: 'personal',
+    }));
+    expect(report.coverage).toContainEqual(expect.objectContaining({
+      id: 'claude-root-escape',
+      status: 'partial',
+      locator: join(repositoryRoot, 'linked'),
+    }));
+    const canonicalShared = await realpath(join(repositoryRoot, 'docs/shared.md'));
+    expect(report.sources.filter((source) => source.locator === canonicalShared)).toHaveLength(1);
+  });
+
+  it('keeps unverifiable external imports coverage-only', async () => {
+    const external = join(root, 'blocked.md');
+    await writeFile(external, '# Inaccessible external import\n');
+    const canonicalExternal = await realpath(external);
+    await writeFile(
+      join(repositoryRoot, 'CLAUDE.md'),
+      `${await readFile(join(repositoryRoot, 'CLAUDE.md'), 'utf8')}\n@../blocked.md\n`,
+    );
+    const denied = Object.assign(new Error('denied'), { code: 'EACCES' });
+    const adapter = new ClaudeAdapter({
+      readFile: async (path) => {
+        if (path === canonicalExternal) throw denied;
+        return readFile(path, 'utf8');
+      },
+    });
+
+    const report = await adapter.discover(input);
+
+    expect(report.sources).not.toContainEqual(expect.objectContaining({ locator: canonicalExternal }));
+    expect(report.coverage).toContainEqual(expect.objectContaining({
+      id: 'claude-import-inaccessible',
+      locator: canonicalExternal,
+      status: 'inaccessible',
+    }));
+  });
+
+  it('reports injected inaccessible instruction, rule, and rule-root reads', async () => {
+    const instruction = join(repositoryRoot, 'CLAUDE.md');
+    const rule = join(repositoryRoot, '.claude/rules/api.md');
+    const userRuleRoot = join(homeDir, '.claude/rules');
+    const denied = (): NodeJS.ErrnoException => Object.assign(new Error('secret OS diagnostic'), { code: 'EACCES' });
+    const adapter = new ClaudeAdapter({
+      readFile: async (path) => {
+        if (path === instruction || path === rule) throw denied();
+        return readFile(path, 'utf8');
+      },
+      readdir: async (path, options) => {
+        if (path === userRuleRoot) throw denied();
+        return import('node:fs/promises').then((fs) => fs.readdir(path, options));
+      },
+    });
+
+    const report = await adapter.discover(input);
+
+    expect(report.sources).not.toContainEqual(expect.objectContaining({ locator: instruction }));
+    expect(report.sources).not.toContainEqual(expect.objectContaining({ locator: rule }));
+    expect(report.coverage).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'claude-instruction-inaccessible', locator: instruction, status: 'inaccessible' }),
+      expect.objectContaining({ id: 'claude-rule-inaccessible', locator: rule, status: 'inaccessible' }),
+      expect.objectContaining({ id: 'claude-rule-inaccessible', locator: userRuleRoot, status: 'inaccessible' }),
+    ]));
+    expect(JSON.stringify(report)).not.toContain('secret OS diagnostic');
+  });
+
   it('discovers enabled additional-directory instructions and rules distinctly', async () => {
     const report = await new ClaudeAdapter().discover(input);
 
@@ -155,5 +256,26 @@ describe('ClaudeAdapter', () => {
     expect(second).toEqual(first);
     expect(await readFile(watched)).toEqual(before.bytes);
     expect((await stat(watched)).mtimeMs).toBe(before.modified);
+  });
+
+  it('ignores imports inside code spans with arbitrary backtick delimiters', async () => {
+    await writeFile(
+      join(repositoryRoot, 'CLAUDE.md'),
+      [
+        '``@docs/multi-fake.md with ` embedded``',
+        'Text ```@docs/triple-fake.md with `` embedded``` after.',
+        '@docs/shared.md',
+      ].join('\n'),
+    );
+
+    const report = await new ClaudeAdapter().discover(input);
+    const canonicalRepositoryRoot = await realpath(repositoryRoot);
+    const imports = report.sources
+      .filter((source) => source.sourceType === 'import')
+      .map((source) => source.locator);
+
+    expect(imports).toContain(join(canonicalRepositoryRoot, 'docs/shared.md'));
+    expect(imports).not.toContain(join(canonicalRepositoryRoot, 'docs/multi-fake.md'));
+    expect(imports).not.toContain(join(canonicalRepositoryRoot, 'docs/triple-fake.md'));
   });
 });
