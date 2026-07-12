@@ -257,7 +257,9 @@ async function readAuthenticatedPreview(
   }
   const validated = storedCapturePreviewSchema.safeParse(parsed);
   if (!validated.success) throw appError('INVALID_PREVIEW', 'Stored capture preview is invalid');
-  const stored = validated.data;
+  // Authenticate the raw JSON object so MAC matches save-time field order.
+  // Zod only validates shape; rebuilding would reorder keys and break HMAC.
+  const stored = parsed as StoredCapturePreview;
   const key = await previewKey(home);
   const expected = Buffer.from(
     macFor(
@@ -266,15 +268,15 @@ async function readAuthenticatedPreview(
       stored.packet_hash,
       stored.context_head,
       stored.files_hash,
-      stored.preview as CapturePreview,
+      stored.preview,
     ),
     'hex',
   );
-  const actual = Buffer.from(stored.mac, 'hex');
+  const actual = typeof stored.mac === 'string' ? Buffer.from(stored.mac, 'hex') : Buffer.alloc(0);
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
     throw appError('INVALID_PREVIEW', 'Stored capture preview authentication failed');
   }
-  const digest = filesHash(stored.preview as CapturePreview);
+  const digest = filesHash(stored.preview);
   if (
     stored.files_hash !== digest
     || stored.packet_hash !== stored.preview.packet_hash
@@ -286,7 +288,7 @@ async function readAuthenticatedPreview(
   if (now > stored.expires_at) {
     throw appError('PREVIEW_EXPIRED', 'Capture preview approval has expired');
   }
-  return stored.preview as CapturePreview;
+  return stored.preview;
 }
 
 /** Read a pending capture preview without consuming it. */
