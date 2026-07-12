@@ -20,6 +20,7 @@ import {
   repositoryManifestFile,
   repositoryBindingHash,
   repositoryDisplayName,
+  workspaceManifestHash,
   writeSharedManifests,
   type NormalizedAddRepositoryInput,
   type PreviewRepository,
@@ -32,6 +33,7 @@ import {
   writeLocalWorkspace,
 } from '../workspace/local-registry.js';
 import { scanRepositories } from '../workspace/scanner.js';
+import { canonicalRemote } from '../workspace/repository-id.js';
 import { claimPreview, peekPreview, savePreview } from '../workspace/preview-store.js';
 import { withWorkspaceLock } from '../workspace/workspace-lock.js';
 
@@ -43,7 +45,7 @@ export interface AddRepositoryInput {
 
 async function normalizeInput(
   input: AddRepositoryInput,
-): Promise<NormalizedAddRepositoryInput> {
+): Promise<Pick<NormalizedAddRepositoryInput, 'workspace_id' | 'repository_path' | 'home'>> {
   return {
     workspace_id: input.workspaceId,
     repository_path: await fs.realpath(path.resolve(input.repositoryPath)),
@@ -65,21 +67,39 @@ async function repositoryAt(repositoryPath: string): Promise<PreviewRepository> 
   };
 }
 
+function approvedContextManifestMatches(
+  workspace: WorkspaceManifest,
+  input: Pick<NormalizedAddRepositoryInput, 'workspace_id' | 'context_remote' | 'workspace_manifest_hash'>,
+): boolean {
+  try {
+    return workspace.workspace_id === input.workspace_id
+      && canonicalRemote(workspace.context_remote) === input.context_remote
+      && workspaceManifestHash(workspace) === input.workspace_manifest_hash;
+  } catch {
+    return false;
+  }
+}
+
 export async function addRepository(
   input: AddRepositoryInput,
 ): Promise<WorkspacePreview> {
-  const normalized = await normalizeInput(input);
-  const local = await readLocalWorkspace(normalized.home, normalized.workspace_id);
+  const baseInput = await normalizeInput(input);
+  const local = await readLocalWorkspace(baseInput.home, baseInput.workspace_id);
   const contextPath = await assertLocalContextCheckout(
-    normalized.home,
-    normalized.workspace_id,
+    baseInput.home,
+    baseInput.workspace_id,
     local.context_path,
   );
   const localWorkspace = await readWorkspaceManifest(contextPath);
-  const contextHead = await remoteHead(localWorkspace.context_remote);
+  const approvedRemote = canonicalRemote(localWorkspace.context_remote);
+  const approvedManifestHash = workspaceManifestHash(localWorkspace);
+  if (localWorkspace.workspace_id !== baseInput.workspace_id) {
+    throw appError('STALE_PREVIEW', 'Local Context manifest identity does not match the registry');
+  }
+  const contextHead = await remoteHead(approvedRemote);
   const transaction = await createContextTransaction(
-    normalized.home,
-    localWorkspace.context_remote,
+    baseInput.home,
+    approvedRemote,
     contextHead,
   );
   let workspace;
@@ -88,9 +108,18 @@ export async function addRepository(
   } finally {
     await fs.rm(transaction.root, { recursive: true, force: true });
   }
-  if (workspace.workspace_id !== normalized.workspace_id) {
-    throw new Error('Workspace ID does not match the local registry');
+  if (
+    workspace.workspace_id !== baseInput.workspace_id
+    || canonicalRemote(workspace.context_remote) !== approvedRemote
+    || workspaceManifestHash(workspace) !== approvedManifestHash
+  ) {
+    throw appError('STALE_PREVIEW', 'Local and remote Context manifests do not match');
   }
+  const normalized: NormalizedAddRepositoryInput = {
+    ...baseInput,
+    context_remote: approvedRemote,
+    workspace_manifest_hash: approvedManifestHash,
+  };
   const added = await repositoryAt(normalized.repository_path);
   const repositories: PreviewRepository[] = [];
   for (const repository of workspace.repositories) {
@@ -158,18 +187,34 @@ async function applyApprovedAddRepository(
     input.workspace_id,
     local.context_path,
   );
-  const localWorkspace = await readWorkspaceManifest(contextPath);
-  await assertRemoteHead(localWorkspace.context_remote, preview.context_head);
+  let localWorkspace: WorkspaceManifest;
+  try {
+    localWorkspace = await readWorkspaceManifest(contextPath);
+  } catch {
+    throw appError('STALE_PREVIEW', 'Local Context manifest changed after preview');
+  }
+  if (!approvedContextManifestMatches(localWorkspace, input)) {
+    throw appError('STALE_PREVIEW', 'Local Context manifest changed after preview');
+  }
+  await assertRemoteHead(input.context_remote, preview.context_head);
   const added = await repositoryAt(input.repository_path);
   const transaction = await createContextTransaction(
     input.home,
-    localWorkspace.context_remote,
+    input.context_remote,
     preview.context_head,
   );
   let workspace: WorkspaceManifest;
   let commit: string;
   try {
-    const current = await readWorkspaceManifest(transaction.context_path);
+    let current: WorkspaceManifest;
+    try {
+      current = await readWorkspaceManifest(transaction.context_path);
+    } catch {
+      throw appError('STALE_PREVIEW', 'Remote Context manifest changed after preview');
+    }
+    if (!approvedContextManifestMatches(current, input)) {
+      throw appError('STALE_PREVIEW', 'Remote Context manifest changed after preview');
+    }
     const repositories = preview.repositories.map(({
       local_path: _localPath,
       candidate_paths: _candidatePaths,

@@ -9,6 +9,7 @@ interface LockOptions {
   staleMs?: number;
   waitMs?: number;
   pollMs?: number;
+  ownerWriter?: (file: string, contents: string) => Promise<void>;
 }
 
 interface LockOwner { pid: number; created_at: number; token: string }
@@ -38,10 +39,13 @@ async function ownerAt(lock: string): Promise<LockOwner | undefined> {
 async function recoverIfStale(lock: string, staleMs: number): Promise<boolean> {
   let stat;
   try {
-    stat = await fs.stat(lock);
+    stat = await fs.lstat(lock);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
     throw error;
+  }
+  if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o777) !== 0o700) {
+    throw appError('INVALID_WORKSPACE_LOCK', 'Workspace lock directory is invalid');
   }
   const owner = await ownerAt(lock);
   const createdAt = typeof owner?.created_at === 'number' ? owner.created_at : stat.mtimeMs;
@@ -69,16 +73,33 @@ export async function withWorkspaceLock<T>(
   const pollMs = options.pollMs ?? 25;
   const deadline = Date.now() + waitMs;
   const owner: LockOwner = { pid: process.pid, created_at: Date.now(), token: randomUUID() };
-  await fs.mkdir(path.dirname(lock), { recursive: true, mode: 0o700 });
+  const lockRoot = path.dirname(lock);
+  await fs.mkdir(home, { recursive: true, mode: 0o700 });
+  let createdLockRoot = false;
+  try {
+    await fs.mkdir(lockRoot, { mode: 0o700 });
+    createdLockRoot = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+  }
+  if (createdLockRoot) await fs.chmod(lockRoot, 0o700);
+  const lockRootInfo = await fs.lstat(lockRoot).catch(() => undefined);
+  if (
+    lockRootInfo === undefined
+    || !lockRootInfo.isDirectory()
+    || lockRootInfo.isSymbolicLink()
+    || (lockRootInfo.mode & 0o777) !== 0o700
+  ) {
+    throw appError('INVALID_WORKSPACE_LOCK', 'Workspace lock directory is invalid');
+  }
+  const ownerWriter = options.ownerWriter ?? (async (file: string, contents: string) => {
+    await fs.writeFile(file, contents, { mode: 0o600, flag: 'wx' });
+  });
 
   while (true) {
     try {
       await fs.mkdir(lock, { mode: 0o700 });
-      await fs.writeFile(path.join(lock, 'owner.json'), JSON.stringify(owner), {
-        mode: 0o600,
-        flag: 'wx',
-      });
-      break;
+      await fs.chmod(lock, 0o700);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       await recoverIfStale(lock, staleMs);
@@ -88,6 +109,24 @@ export async function withWorkspaceLock<T>(
         });
       }
       await new Promise((resolve) => setTimeout(resolve, pollMs));
+      continue;
+    }
+
+    const marker = path.join(lock, `.owner-${owner.token}.pending`);
+    try {
+      await fs.writeFile(marker, owner.token, { mode: 0o600, flag: 'wx' });
+      await ownerWriter(path.join(lock, 'owner.json'), JSON.stringify(owner));
+      await fs.unlink(marker);
+      break;
+    } catch (error) {
+      try {
+        if (await fs.readFile(marker, 'utf8') === owner.token) {
+          await fs.rm(lock, { recursive: true, force: true });
+        }
+      } catch {
+        // A missing ownership marker means this path no longer belongs to us.
+      }
+      throw error;
     }
   }
 

@@ -598,6 +598,42 @@ describe('workspace commands', () => {
     expect((await readWorkspaceManifest(initialized.local.context_path)).repositories).toEqual([]);
   });
 
+  it('rejects a same-HEAD Context mirror retarget before add-repo push or install', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+    }));
+    const external = path.join(root, 'outside', 'worker');
+    await initFixtureRepository(external, 'https://github.com/acme/worker.git');
+    const preview = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    });
+
+    const mirrorBare = await createBareRemote(path.join(root, 'mirror-context.git'));
+    const mirrorRemote = contextRemote.replace('platform-context.git', 'mirror-context.git');
+    await fixtureGit(initialized.local.context_path, ['push', mirrorRemote, 'HEAD:main']);
+    const mirrorHead = await fixtureGit(mirrorBare, ['rev-parse', 'main']);
+    expect(mirrorHead).toBe(preview.context_head);
+
+    const contextPath = initialized.local.context_path;
+    const manifestPath = path.join(contextPath, 'workspace.yaml');
+    const retargeted = { ...initialized.workspace, context_remote: mirrorRemote };
+    await fs.writeFile(manifestPath, stringify(retargeted));
+    const beforeHead = await fixtureGit(contextPath, ['rev-parse', 'HEAD']);
+    const beforeManifest = await fs.readFile(manifestPath);
+
+    await expect(applyAddRepository(preview)).rejects.toMatchObject({ code: 'STALE_PREVIEW' });
+    expect(await fixtureGit(mirrorBare, ['rev-parse', 'main'])).toBe(mirrorHead);
+    expect(await fixtureGit(contextPath, ['rev-parse', 'HEAD'])).toBe(beforeHead);
+    expect(await fs.readFile(manifestPath)).toEqual(beforeManifest);
+    expect((await readLocalWorkspace(home, initialized.workspace.workspace_id)).repository_paths)
+      .not.toHaveProperty('github.com/acme/worker');
+  });
+
   it('allows only one concurrent add-repo application of an approved preview', async () => {
     const home = path.join(root, 'member-a');
     const scanRoot = path.join(root, 'business');

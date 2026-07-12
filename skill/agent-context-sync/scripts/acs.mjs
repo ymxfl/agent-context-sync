@@ -22358,6 +22358,9 @@ function canonicalJson(value) {
   }
   return JSON.stringify(value);
 }
+function workspaceManifestHash(workspace) {
+  return createHash("sha256").update(canonicalJson(workspace)).digest("hex");
+}
 function previewInputHash(operation, input, contextHead, approval) {
   return createHash("sha256").update(canonicalJson({
     operation,
@@ -22620,10 +22623,67 @@ function bindRepositoryPath(local, repoId, repositoryPath) {
 
 // src/workspace/preview-store.ts
 import { createHash as createHash2, createHmac, randomBytes as randomBytes2, timingSafeEqual } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import * as fs3 from "node:fs/promises";
 import path6 from "node:path";
 var DEFAULT_TTL_MS = 10 * 60 * 1e3;
 var PREVIEW_ID = /^preview_[0-9A-HJKMNP-TV-Z]{26}$/;
+var HASH = /^[a-f0-9]{64}$/;
+var previewRepositorySchema = external_exports.strictObject({
+  schema_version: external_exports.literal(1),
+  repo_id: external_exports.string().min(1),
+  name: external_exports.string().min(1),
+  local_path: external_exports.string().optional(),
+  candidate_paths: external_exports.array(external_exports.string()).optional(),
+  binding_hash: external_exports.string().regex(HASH).optional()
+});
+var normalizedInputSchema = external_exports.union([
+  external_exports.strictObject({
+    name: external_exports.string(),
+    context_remote: external_exports.string(),
+    scan_root: external_exports.string(),
+    max_depth: external_exports.number().int().nonnegative(),
+    home: external_exports.string()
+  }),
+  external_exports.strictObject({
+    context_remote: external_exports.string(),
+    scan_roots: external_exports.array(external_exports.string()),
+    max_depth: external_exports.number().int().nonnegative(),
+    home: external_exports.string()
+  }),
+  external_exports.strictObject({
+    workspace_id: external_exports.string(),
+    repository_path: external_exports.string(),
+    home: external_exports.string(),
+    context_remote: external_exports.string(),
+    workspace_manifest_hash: external_exports.string().regex(HASH)
+  })
+]);
+var workspacePreviewSchema = external_exports.strictObject({
+  operation: external_exports.enum(["init", "join", "add-repository"]),
+  preview_id: external_exports.string().regex(PREVIEW_ID),
+  input_hash: external_exports.string().regex(HASH),
+  context_head: external_exports.string(),
+  workspace_id: external_exports.string(),
+  normalized_input: normalizedInputSchema,
+  files_to_write: external_exports.array(external_exports.string()),
+  repositories: external_exports.array(previewRepositorySchema),
+  warnings: external_exports.array(external_exports.string())
+}).superRefine((preview, context) => {
+  const input = preview.normalized_input;
+  const matchesOperation = preview.operation === "init" ? "name" in input && "scan_root" in input : preview.operation === "join" ? "scan_roots" in input : "repository_path" in input && "workspace_manifest_hash" in input;
+  if (!matchesOperation) {
+    context.addIssue({ code: "custom", path: ["normalized_input"], message: "Input does not match operation" });
+  }
+});
+var storedPreviewSchema = external_exports.strictObject({
+  version: external_exports.literal(1),
+  expires_at: external_exports.number().finite(),
+  context_state_hash: external_exports.string().regex(HASH),
+  business_state_hash: external_exports.string().regex(HASH),
+  preview: workspacePreviewSchema,
+  mac: external_exports.string().regex(HASH)
+});
 function assertPreviewId(previewId) {
   if (!PREVIEW_ID.test(previewId)) throw appError("INVALID_PREVIEW", "Preview ID is invalid");
 }
@@ -22643,7 +22703,7 @@ function keyPath(home) {
 async function previewKey(home) {
   const file2 = keyPath(home);
   try {
-    return Buffer.from(await fs3.readFile(file2, "utf8"), "base64");
+    return await readValidatedKey(file2);
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
   }
@@ -22652,15 +22712,58 @@ async function previewKey(home) {
   try {
     const handle = await fs3.open(file2, "wx", 384);
     try {
+      await handle.chmod(384);
       await handle.writeFile(candidate, "utf8");
       await handle.sync();
     } finally {
       await handle.close();
     }
-    return Buffer.from(candidate, "base64");
+    return readValidatedKey(file2);
   } catch (error51) {
     if (error51.code !== "EEXIST") throw error51;
-    return Buffer.from(await fs3.readFile(file2, "utf8"), "base64");
+    return readValidatedKey(file2);
+  }
+}
+async function readValidatedKey(file2) {
+  let handle;
+  try {
+    handle = await fs3.open(file2, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch (error51) {
+    if (error51.code === "ENOENT") throw error51;
+    throw appError("INVALID_PREVIEW", "Preview authentication key is invalid");
+  }
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || (info.mode & 511) !== 384) {
+      throw appError("INVALID_PREVIEW", "Preview authentication key is invalid");
+    }
+    const encoded = await handle.readFile("utf8");
+    const key = Buffer.from(encoded, "base64");
+    if (!/^[A-Za-z0-9+/]{43}=$/.test(encoded) || key.length !== 32 || key.toString("base64") !== encoded) {
+      throw appError("INVALID_PREVIEW", "Preview authentication key is invalid");
+    }
+    return key;
+  } catch (error51) {
+    if (error51.code === "INVALID_PREVIEW") throw error51;
+    throw appError("INVALID_PREVIEW", "Preview authentication key is invalid");
+  } finally {
+    await handle.close();
+  }
+}
+async function ensurePreviewDirectory(home) {
+  const directory = previewsDirectory(home);
+  await fs3.mkdir(home, { recursive: true, mode: 448 });
+  let created = false;
+  try {
+    await fs3.mkdir(directory, { mode: 448 });
+    created = true;
+  } catch (error51) {
+    if (error51.code !== "EEXIST") throw error51;
+  }
+  if (created) await fs3.chmod(directory, 448);
+  const info = await fs3.lstat(directory).catch(() => void 0);
+  if (info === void 0 || !info.isDirectory() || info.isSymbolicLink() || (info.mode & 511) !== 448) {
+    throw appError("INVALID_PREVIEW", "Preview directory is invalid");
   }
 }
 function stateHashes(preview) {
@@ -22684,6 +22787,7 @@ function macFor(key, expiresAt, preview) {
 }
 async function savePreview(home, preview, options = {}) {
   assertPreviewId(preview.preview_id);
+  await ensurePreviewDirectory(home);
   const now = options.now ?? Date.now();
   const expiresAt = now + (options.ttlMs ?? DEFAULT_TTL_MS);
   const key = await previewKey(home);
@@ -22699,6 +22803,7 @@ async function savePreview(home, preview, options = {}) {
   await atomicWriteFile(previewRecordPath(home, preview.preview_id), JSON.stringify(stored));
 }
 async function claimPreview(home, previewId, operation, options = {}) {
+  await ensurePreviewDirectory(home);
   const pending = previewRecordPath(home, previewId);
   const used = usedPreviewPath(home, previewId);
   try {
@@ -22716,12 +22821,15 @@ async function claimPreview(home, previewId, operation, options = {}) {
   return readAuthenticatedPreview(home, used, previewId, operation, options.now);
 }
 async function readAuthenticatedPreview(home, file2, previewId, operation, now = Date.now()) {
-  let stored;
+  let parsed;
   try {
-    stored = JSON.parse(await fs3.readFile(file2, "utf8"));
+    parsed = JSON.parse(await fs3.readFile(file2, "utf8"));
   } catch {
     throw appError("INVALID_PREVIEW", "Stored preview is invalid");
   }
+  const validated = storedPreviewSchema.safeParse(parsed);
+  if (!validated.success) throw appError("INVALID_PREVIEW", "Stored preview is invalid");
+  const stored = parsed;
   const key = await previewKey(home);
   const expected = Buffer.from(macFor(key, stored.expires_at, stored.preview), "hex");
   const actual = typeof stored.mac === "string" ? Buffer.from(stored.mac, "hex") : Buffer.alloc(0);
@@ -22741,6 +22849,7 @@ async function readAuthenticatedPreview(home, file2, previewId, operation, now =
   return stored.preview;
 }
 async function peekPreview(home, previewId, operation, options = {}) {
+  await ensurePreviewDirectory(home);
   const pending = previewRecordPath(home, previewId);
   try {
     return await readAuthenticatedPreview(home, pending, previewId, operation, options.now);
@@ -22780,15 +22889,18 @@ async function ownerAt(lock) {
   }
 }
 async function recoverIfStale(lock, staleMs) {
-  let stat3;
+  let stat2;
   try {
-    stat3 = await fs4.stat(lock);
+    stat2 = await fs4.lstat(lock);
   } catch (error51) {
     if (error51.code === "ENOENT") return true;
     throw error51;
   }
+  if (!stat2.isDirectory() || stat2.isSymbolicLink() || (stat2.mode & 511) !== 448) {
+    throw appError("INVALID_WORKSPACE_LOCK", "Workspace lock directory is invalid");
+  }
   const owner = await ownerAt(lock);
-  const createdAt = typeof owner?.created_at === "number" ? owner.created_at : stat3.mtimeMs;
+  const createdAt = typeof owner?.created_at === "number" ? owner.created_at : stat2.mtimeMs;
   if (Date.now() - createdAt <= staleMs || processIsLive(owner?.pid ?? 0)) return false;
   const recovered = `${lock}.stale-${randomUUID2()}`;
   try {
@@ -22807,15 +22919,27 @@ async function withWorkspaceLock(home, workspaceId, action, options = {}) {
   const pollMs = options.pollMs ?? 25;
   const deadline = Date.now() + waitMs;
   const owner = { pid: process.pid, created_at: Date.now(), token: randomUUID2() };
-  await fs4.mkdir(path7.dirname(lock), { recursive: true, mode: 448 });
+  const lockRoot = path7.dirname(lock);
+  await fs4.mkdir(home, { recursive: true, mode: 448 });
+  let createdLockRoot = false;
+  try {
+    await fs4.mkdir(lockRoot, { mode: 448 });
+    createdLockRoot = true;
+  } catch (error51) {
+    if (error51.code !== "EEXIST") throw error51;
+  }
+  if (createdLockRoot) await fs4.chmod(lockRoot, 448);
+  const lockRootInfo = await fs4.lstat(lockRoot).catch(() => void 0);
+  if (lockRootInfo === void 0 || !lockRootInfo.isDirectory() || lockRootInfo.isSymbolicLink() || (lockRootInfo.mode & 511) !== 448) {
+    throw appError("INVALID_WORKSPACE_LOCK", "Workspace lock directory is invalid");
+  }
+  const ownerWriter = options.ownerWriter ?? (async (file2, contents) => {
+    await fs4.writeFile(file2, contents, { mode: 384, flag: "wx" });
+  });
   while (true) {
     try {
       await fs4.mkdir(lock, { mode: 448 });
-      await fs4.writeFile(path7.join(lock, "owner.json"), JSON.stringify(owner), {
-        mode: 384,
-        flag: "wx"
-      });
-      break;
+      await fs4.chmod(lock, 448);
     } catch (error51) {
       if (error51.code !== "EEXIST") throw error51;
       await recoverIfStale(lock, staleMs);
@@ -22825,6 +22949,22 @@ async function withWorkspaceLock(home, workspaceId, action, options = {}) {
         });
       }
       await new Promise((resolve3) => setTimeout(resolve3, pollMs));
+      continue;
+    }
+    const marker = path7.join(lock, `.owner-${owner.token}.pending`);
+    try {
+      await fs4.writeFile(marker, owner.token, { mode: 384, flag: "wx" });
+      await ownerWriter(path7.join(lock, "owner.json"), JSON.stringify(owner));
+      await fs4.unlink(marker);
+      break;
+    } catch (error51) {
+      try {
+        if (await fs4.readFile(marker, "utf8") === owner.token) {
+          await fs4.rm(lock, { recursive: true, force: true });
+        }
+      } catch {
+      }
+      throw error51;
     }
   }
   try {
@@ -22856,19 +22996,31 @@ async function repositoryAt(repositoryPath) {
     binding_hash: repositoryBindingHash(repository)
   };
 }
+function approvedContextManifestMatches(workspace, input) {
+  try {
+    return workspace.workspace_id === input.workspace_id && canonicalRemote(workspace.context_remote) === input.context_remote && workspaceManifestHash(workspace) === input.workspace_manifest_hash;
+  } catch {
+    return false;
+  }
+}
 async function addRepository(input) {
-  const normalized = await normalizeInput(input);
-  const local = await readLocalWorkspace(normalized.home, normalized.workspace_id);
+  const baseInput = await normalizeInput(input);
+  const local = await readLocalWorkspace(baseInput.home, baseInput.workspace_id);
   const contextPath = await assertLocalContextCheckout(
-    normalized.home,
-    normalized.workspace_id,
+    baseInput.home,
+    baseInput.workspace_id,
     local.context_path
   );
   const localWorkspace = await readWorkspaceManifest(contextPath);
-  const contextHead = await remoteHead(localWorkspace.context_remote);
+  const approvedRemote = canonicalRemote(localWorkspace.context_remote);
+  const approvedManifestHash = workspaceManifestHash(localWorkspace);
+  if (localWorkspace.workspace_id !== baseInput.workspace_id) {
+    throw appError("STALE_PREVIEW", "Local Context manifest identity does not match the registry");
+  }
+  const contextHead = await remoteHead(approvedRemote);
   const transaction = await createContextTransaction(
-    normalized.home,
-    localWorkspace.context_remote,
+    baseInput.home,
+    approvedRemote,
     contextHead
   );
   let workspace;
@@ -22877,9 +23029,14 @@ async function addRepository(input) {
   } finally {
     await fs5.rm(transaction.root, { recursive: true, force: true });
   }
-  if (workspace.workspace_id !== normalized.workspace_id) {
-    throw new Error("Workspace ID does not match the local registry");
+  if (workspace.workspace_id !== baseInput.workspace_id || canonicalRemote(workspace.context_remote) !== approvedRemote || workspaceManifestHash(workspace) !== approvedManifestHash) {
+    throw appError("STALE_PREVIEW", "Local and remote Context manifests do not match");
   }
+  const normalized = {
+    ...baseInput,
+    context_remote: approvedRemote,
+    workspace_manifest_hash: approvedManifestHash
+  };
   const added = await repositoryAt(normalized.repository_path);
   const repositories = [];
   for (const repository of workspace.repositories) {
@@ -22942,18 +23099,34 @@ async function applyApprovedAddRepository(preview) {
     input.workspace_id,
     local.context_path
   );
-  const localWorkspace = await readWorkspaceManifest(contextPath);
-  await assertRemoteHead(localWorkspace.context_remote, preview.context_head);
+  let localWorkspace;
+  try {
+    localWorkspace = await readWorkspaceManifest(contextPath);
+  } catch {
+    throw appError("STALE_PREVIEW", "Local Context manifest changed after preview");
+  }
+  if (!approvedContextManifestMatches(localWorkspace, input)) {
+    throw appError("STALE_PREVIEW", "Local Context manifest changed after preview");
+  }
+  await assertRemoteHead(input.context_remote, preview.context_head);
   const added = await repositoryAt(input.repository_path);
   const transaction = await createContextTransaction(
     input.home,
-    localWorkspace.context_remote,
+    input.context_remote,
     preview.context_head
   );
   let workspace;
   let commit;
   try {
-    const current = await readWorkspaceManifest(transaction.context_path);
+    let current;
+    try {
+      current = await readWorkspaceManifest(transaction.context_path);
+    } catch {
+      throw appError("STALE_PREVIEW", "Remote Context manifest changed after preview");
+    }
+    if (!approvedContextManifestMatches(current, input)) {
+      throw appError("STALE_PREVIEW", "Remote Context manifest changed after preview");
+    }
     const repositories = preview.repositories.map(({
       local_path: _localPath,
       candidate_paths: _candidatePaths,
@@ -22983,7 +23156,7 @@ async function applyAddRepository(previewId, home) {
 }
 
 // src/commands/doctor.ts
-import { constants as fsConstants } from "node:fs";
+import { constants as fsConstants2 } from "node:fs";
 import * as fs7 from "node:fs/promises";
 
 // src/adapters/adapter.ts
@@ -26673,10 +26846,10 @@ async function doctor(input) {
   if (local !== void 0 && contextPath !== void 0) {
     try {
       await Promise.all([
-        fs7.access(registryPath(input.home, input.workspaceId), fsConstants.R_OK),
-        fs7.access(contextPath, fsConstants.R_OK),
+        fs7.access(registryPath(input.home, input.workspaceId), fsConstants2.R_OK),
+        fs7.access(contextPath, fsConstants2.R_OK),
         ...Object.values(local.repository_paths).map(
-          (repositoryPath) => fs7.access(repositoryPath, fsConstants.R_OK)
+          (repositoryPath) => fs7.access(repositoryPath, fsConstants2.R_OK)
         )
       ]);
       checks.push(check2("permissions", "pass", "Required Workspace paths are readable."));

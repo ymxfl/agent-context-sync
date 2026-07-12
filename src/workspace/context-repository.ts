@@ -91,6 +91,8 @@ export interface NormalizedAddRepositoryInput {
   workspace_id: string;
   repository_path: string;
   home: string;
+  context_remote: string;
+  workspace_manifest_hash: string;
 }
 
 export type NormalizedWorkspaceInput =
@@ -144,6 +146,10 @@ function canonicalJson(value: unknown): string {
       .join(',')}}`;
   }
   return JSON.stringify(value);
+}
+
+export function workspaceManifestHash(workspace: WorkspaceManifest): string {
+  return createHash('sha256').update(canonicalJson(workspace)).digest('hex');
 }
 
 export function previewInputHash(

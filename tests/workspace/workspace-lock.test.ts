@@ -33,17 +33,45 @@ describe('workspace apply lock', () => {
 
   it('recovers a stale dead-owner lock but never removes a live lock', async () => {
     const lock = workspaceLockPath(home, workspaceId);
-    await fs.mkdir(lock, { recursive: true });
+    await fs.mkdir(lock, { recursive: true, mode: 0o700 });
     await fs.writeFile(path.join(lock, 'owner.json'), JSON.stringify({ pid: 999_999_999, created_at: 0 }));
     await expect(withWorkspaceLock(home, workspaceId, async () => 'recovered', {
       staleMs: 1, waitMs: 100, pollMs: 5,
     })).resolves.toBe('recovered');
 
-    await fs.mkdir(lock, { recursive: true });
+    await fs.mkdir(lock, { recursive: true, mode: 0o700 });
     await fs.writeFile(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, created_at: 0 }));
     await expect(withWorkspaceLock(home, workspaceId, async () => undefined, {
       staleMs: 1, waitMs: 20, pollMs: 5,
     })).rejects.toMatchObject({ code: 'WORKSPACE_BUSY' });
     expect(await fs.stat(lock)).toBeDefined();
+  });
+
+  it('removes a newly owned lock when owner creation fails and permits immediate reacquire', async () => {
+    const injected = new Error('injected owner write failure');
+    await expect(withWorkspaceLock(home, workspaceId, async () => undefined, {
+      ownerWriter: async () => { throw injected; },
+    })).rejects.toBe(injected);
+    await expect(fs.access(workspaceLockPath(home, workspaceId))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(withWorkspaceLock(home, workspaceId, async () => 'reacquired', {
+      waitMs: 20,
+    })).resolves.toBe('reacquired');
+  });
+
+  it('rejects permissive or symlinked lock directories', async () => {
+    const locks = path.join(home, 'locks');
+    await fs.mkdir(locks, { mode: 0o755 });
+    await expect(withWorkspaceLock(home, workspaceId, async () => undefined))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE_LOCK' });
+
+    await fs.rm(locks, { recursive: true });
+    const external = path.join(home, 'external-locks');
+    await fs.mkdir(external, { mode: 0o700 });
+    await fs.symlink(external, locks);
+    await expect(withWorkspaceLock(home, workspaceId, async () => undefined))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE_LOCK' });
+    expect(await fs.readdir(external)).toEqual([]);
   });
 });
