@@ -1,5 +1,9 @@
 import { pathToFileURL } from 'node:url';
 
+export { addRepository, applyAddRepository } from './commands/add-repo.js';
+export { applyInit, initWorkspace } from './commands/init.js';
+export { applyJoin, joinWorkspace } from './commands/join.js';
+
 export interface CommandIO {
   stdout(line: string): void;
   stderr(line: string): void;
@@ -20,7 +24,11 @@ export interface JsonEnvelope {
 export async function run(argv: string[], io: CommandIO): Promise<number> {
   const command = argv[0] ?? 'help';
   if (command === 'help') {
-    io.stdout(JSON.stringify({ ok: true, command, data: { commands: [] } }));
+    io.stdout(JSON.stringify({
+      ok: true,
+      command,
+      data: { commands: ['init', 'join', 'add-repo'] },
+    }));
     return 0;
   }
   io.stdout(JSON.stringify({
