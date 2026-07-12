@@ -23,6 +23,7 @@ import { parseWorkspaceManifest } from '../../src/schema/workspace.js';
 import {
   readLocalWorkspace,
   registryPath,
+  writeLocalWorkspace,
 } from '../../src/workspace/local-registry.js';
 import { pathExists } from '../helpers/fs.js';
 import {
@@ -511,5 +512,94 @@ describe('workspace commands', () => {
     const result = await applyAddRepository(retry);
     expect(result.workspace.repositories.map((repository) => repository.repo_id))
       .toContain('github.com/acme/worker');
+  });
+
+  it('rejects a tracked repository-directory symlink without writing outside Context', async ({
+    skip,
+  }) => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform',
+      contextRemote,
+      scanRoot,
+      maxDepth: 1,
+      home,
+    }));
+    const victim = path.join(root, 'victim');
+    await fs.mkdir(victim);
+    const sentinel = path.join(victim, 'sentinel.txt');
+    await fs.writeFile(sentinel, 'unchanged\n');
+    const attacker = path.join(root, 'attacker-context');
+    await fixtureGit(root, ['clone', contextRemote, attacker]);
+    await fs.mkdir(path.join(attacker, 'repositories'));
+    try {
+      await fs.symlink(victim, path.join(attacker, 'repositories', 'github.com'), 'dir');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES')) {
+        skip('Creating directory symlinks is not permitted on this Windows host');
+      }
+      throw error;
+    }
+    await fixtureGit(attacker, ['add', 'repositories/github.com']);
+    await fixtureGit(attacker, ['commit', '-m', 'Add malicious repository symlink']);
+    await fixtureGit(attacker, ['push', 'origin', 'main']);
+    const persistentHead = await fixtureGit(
+      initialized.local.context_path,
+      ['rev-parse', 'HEAD'],
+    );
+    const registryFile = registryPath(home, initialized.workspace.workspace_id);
+    const registryBefore = await fs.readFile(registryFile);
+    const external = path.join(root, 'outside', 'worker');
+    await initFixtureRepository(external, 'https://github.com/acme/worker.git');
+    const preview = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    });
+
+    await expect(applyAddRepository(preview)).rejects.toThrow(/symbolic|symlink/i);
+    expect(await fs.readFile(sentinel, 'utf8')).toBe('unchanged\n');
+    expect(await pathExists(path.join(victim, 'acme', 'worker.yaml'))).toBe(false);
+    expect(await fixtureGit(initialized.local.context_path, ['rev-parse', 'HEAD']))
+      .toBe(persistentHead);
+    expect(await fs.readFile(registryFile)).toEqual(registryBefore);
+  });
+
+  it('rejects a registry Context path that points at a business repository', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform',
+      contextRemote,
+      scanRoot,
+      maxDepth: 1,
+      home,
+    }));
+    const victim = path.join(root, 'business-victim');
+    await initFixtureRepository(victim, 'https://github.com/acme/victim.git');
+    await fs.writeFile(path.join(victim, 'workspace.yaml'), stringify(initialized.workspace));
+    await fixtureGit(victim, ['add', 'workspace.yaml']);
+    await fixtureGit(victim, ['commit', '-m', 'Business content']);
+    const victimLog = await fixtureGit(victim, ['log', '--format=%H']);
+    const victimManifest = await fs.readFile(path.join(victim, 'workspace.yaml'));
+    await writeLocalWorkspace(home, {
+      ...initialized.local,
+      context_path: await fs.realpath(victim),
+    });
+    const external = path.join(root, 'outside', 'worker');
+    await initFixtureRepository(external, 'https://github.com/acme/worker.git');
+
+    await expect(addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    })).rejects.toThrow(/context path/i);
+    expect(await fixtureGit(victim, ['log', '--format=%H'])).toBe(victimLog);
+    expect(await fs.readFile(path.join(victim, 'workspace.yaml'))).toEqual(victimManifest);
+    expect(await fixtureGit(victim, ['status', '--porcelain=v1'])).toBe('');
   });
 });

@@ -171,6 +171,39 @@ export function contextCheckoutPath(home: string, workspaceId: string): string {
   return path.join(home, 'contexts', workspaceId);
 }
 
+export async function assertLocalContextCheckout(
+  home: string,
+  workspaceId: string,
+  recordedPath: string,
+): Promise<string> {
+  const canonicalHome = await fs.realpath(home);
+  const contextsPath = path.join(canonicalHome, 'contexts');
+  const expectedPath = path.join(contextsPath, workspaceId);
+  if (path.resolve(recordedPath) !== expectedPath) {
+    throw new Error('Registry Context path does not match the expected checkout path');
+  }
+
+  const contextsInfo = await fs.lstat(contextsPath);
+  const checkoutInfo = await fs.lstat(expectedPath);
+  if (
+    contextsInfo.isSymbolicLink()
+    || !contextsInfo.isDirectory()
+    || checkoutInfo.isSymbolicLink()
+    || !checkoutInfo.isDirectory()
+  ) {
+    throw new Error('Registry Context path is not a trusted checkout directory');
+  }
+  if (await fs.realpath(expectedPath) !== expectedPath) {
+    throw new Error('Registry Context path does not have the expected canonical identity');
+  }
+
+  const gitInfo = await fs.lstat(path.join(expectedPath, '.git'));
+  if (gitInfo.isSymbolicLink() || !gitInfo.isDirectory()) {
+    throw new Error('Registry Context path is not a Git checkout');
+  }
+  return expectedPath;
+}
+
 export interface ContextTransaction {
   root: string;
   context_path: string;
@@ -260,6 +293,47 @@ function repositoryManifestPath(contextPath: string, repoId: string): string {
   return checkedRepositoryManifestPath(path.join(contextPath, 'repositories'), repoId);
 }
 
+async function lstatIfExists(file: string): Promise<Awaited<ReturnType<typeof fs.lstat>> | undefined> {
+  try {
+    return await fs.lstat(file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+async function assertSafeRepositoryManifestFile(
+  contextPath: string,
+  file: string,
+): Promise<void> {
+  const contextInfo = await fs.lstat(contextPath);
+  if (contextInfo.isSymbolicLink() || !contextInfo.isDirectory()) {
+    throw new Error('Context root must be a non-symbolic directory');
+  }
+
+  const relativeParent = path.relative(contextPath, path.dirname(file));
+  let current = contextPath;
+  for (const segment of relativeParent.split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    const info = await lstatIfExists(current);
+    if (info === undefined) break;
+    if (info.isSymbolicLink()) {
+      throw new Error(`Repository manifest ancestor is a symbolic link: ${current}`);
+    }
+    if (!info.isDirectory()) {
+      throw new Error(`Repository manifest ancestor is not a directory: ${current}`);
+    }
+  }
+
+  const fileInfo = await lstatIfExists(file);
+  if (fileInfo?.isSymbolicLink()) {
+    throw new Error(`Repository manifest file is a symbolic link: ${file}`);
+  }
+  if (fileInfo !== undefined && !fileInfo.isFile()) {
+    throw new Error(`Repository manifest path is not a regular file: ${file}`);
+  }
+}
+
 export function repositoryManifestFile(repoId: string): string {
   checkedRepositoryManifestPath('/repositories', repoId);
   return path.posix.join('repositories', `${repoId}.yaml`);
@@ -275,8 +349,12 @@ export async function writeSharedManifests(
     repository,
     file: repositoryManifestPath(contextPath, repository.repo_id),
   }));
+  await Promise.all(repositoryFiles.map(({ file }) =>
+    assertSafeRepositoryManifestFile(contextPath, file),
+  ));
   await atomicWriteFile(path.join(contextPath, 'workspace.yaml'), stringify(validated));
   for (const { repository, file } of repositoryFiles) {
+    await assertSafeRepositoryManifestFile(contextPath, file);
     await atomicWriteFile(
       file,
       stringify(repository),

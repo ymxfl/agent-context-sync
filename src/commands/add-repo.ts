@@ -6,6 +6,7 @@ import type { WorkspaceManifest } from '../domain/model.js';
 import { parseWorkspaceManifest } from '../schema/workspace.js';
 import {
   assertPreviewIntegrity,
+  assertLocalContextCheckout,
   assertRemoteHead,
   commitAndPushContext,
   createContextTransaction,
@@ -61,7 +62,12 @@ export async function addRepository(
 ): Promise<WorkspacePreview> {
   const normalized = await normalizeInput(input);
   const local = await readLocalWorkspace(normalized.home, normalized.workspace_id);
-  const localWorkspace = await readWorkspaceManifest(local.context_path);
+  const contextPath = await assertLocalContextCheckout(
+    normalized.home,
+    normalized.workspace_id,
+    local.context_path,
+  );
+  const localWorkspace = await readWorkspaceManifest(contextPath);
   const contextHead = await remoteHead(localWorkspace.context_remote);
   const transaction = await createContextTransaction(
     normalized.home,
@@ -129,7 +135,12 @@ export async function applyAddRepository(
   assertPreviewIntegrity(preview);
   const input = preview.normalized_input as NormalizedAddRepositoryInput;
   const local = await readLocalWorkspace(input.home, input.workspace_id);
-  const localWorkspace = await readWorkspaceManifest(local.context_path);
+  const contextPath = await assertLocalContextCheckout(
+    input.home,
+    input.workspace_id,
+    local.context_path,
+  );
+  const localWorkspace = await readWorkspaceManifest(contextPath);
   await assertRemoteHead(localWorkspace.context_remote, preview.context_head);
   const added = await repositoryAt(input.repository_path);
   const transaction = await createContextTransaction(
@@ -150,7 +161,7 @@ export async function applyAddRepository(
       transaction.context_path,
       `Add ${added.name} repository`,
     );
-    await installContextTransaction(transaction.context_path, local.context_path);
+    await installContextTransaction(transaction.context_path, contextPath);
   } finally {
     await fs.rm(transaction.root, { recursive: true, force: true });
   }
