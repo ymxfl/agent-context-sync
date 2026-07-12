@@ -37,6 +37,30 @@ interface TransactionJournal {
 
 const storeTails = new Map<string, Promise<void>>();
 
+async function physicalContextRoot(contextRoot: string): Promise<string> {
+  const lexicalRoot = path.resolve(contextRoot);
+  const rootInfo = await lstatIfExists(lexicalRoot);
+  if (rootInfo !== undefined) {
+    if (rootInfo.isSymbolicLink()) throw new Error('Context root must not be symbolic');
+    if (!rootInfo.isDirectory()) throw new Error('Context root must be a directory');
+    return fs.realpath(lexicalRoot);
+  }
+
+  const missing: string[] = [];
+  let ancestor = lexicalRoot;
+  while (true) {
+    const info = await lstatIfExists(ancestor);
+    if (info !== undefined) {
+      if (!info.isDirectory()) throw new Error('Context root ancestor must be a directory');
+      return path.join(await fs.realpath(ancestor), ...missing);
+    }
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) throw new Error('Context root has no existing ancestor');
+    missing.unshift(path.basename(ancestor));
+    ancestor = parent;
+  }
+}
+
 async function withStoreExclusive<T>(root: string, action: () => Promise<T>): Promise<T> {
   const previous = (storeTails.get(root) ?? Promise.resolve()).catch(() => undefined);
   let release = (): void => undefined;
@@ -77,6 +101,37 @@ function resolvedJournalPath(root: string, relative: string): string {
   const file = path.resolve(root, relative);
   assertContained(root, file);
   return file;
+}
+
+async function assertSafePath(
+  root: string,
+  file: string,
+  leaf: 'regular' | 'directory' | 'any' = 'any',
+): Promise<Awaited<ReturnType<typeof fs.lstat>> | undefined> {
+  assertContained(root, file);
+  const rootInfo = await lstatIfExists(root);
+  if (rootInfo === undefined) return undefined;
+  if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) throw corruptJournal();
+  if (await fs.realpath(root) !== root) throw corruptJournal();
+  const relative = path.relative(root, file);
+  let current = root;
+  const segments = relative === '' ? [] : relative.split(path.sep);
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    const info = await lstatIfExists(current);
+    if (info === undefined) return undefined;
+    if (info.isSymbolicLink()) throw corruptJournal();
+    const isLeaf = index === segments.length - 1;
+    if (!isLeaf && !info.isDirectory()) throw corruptJournal();
+    if (isLeaf && leaf === 'regular' && !info.isFile()) throw corruptJournal();
+    if (isLeaf && leaf === 'directory' && !info.isDirectory()) throw corruptJournal();
+    const canonical = await fs.realpath(current);
+    assertContained(root, canonical);
+    if (canonical !== current) throw corruptJournal();
+    if (isLeaf) return info;
+  }
+  if (leaf === 'regular') throw corruptJournal();
+  return rootInfo;
 }
 
 function transactionDirectory(root: string): string {
@@ -198,24 +253,86 @@ async function readJournal(root: string): Promise<TransactionJournal | undefined
   }
 }
 
+function expectedTarget(entry: Pick<KnowledgeEntry, 'id' | 'scope'>): string {
+  return entry.scope === 'workspace'
+    ? path.join('workspace', `${entry.id}.md`)
+    : path.join('repositories', entry.scope.slice('repository:'.length), `${entry.id}.md`);
+}
+
+async function validateTransactionTree(root: string): Promise<void> {
+  const directory = transactionDirectory(root);
+  async function walk(current: string): Promise<void> {
+    await assertSafePath(root, current, 'directory');
+    for (const name of await fs.readdir(current)) {
+      const child = path.join(current, name);
+      const info = await assertSafePath(root, child);
+      if (info?.isDirectory()) await walk(child);
+      else if (info === undefined || !info.isFile()) throw corruptJournal();
+    }
+  }
+  await walk(directory);
+}
+
+async function validateJournalPaths(
+  root: string,
+  journal: TransactionJournal,
+  context?: KnowledgeParseContext,
+): Promise<void> {
+  await validateTransactionTree(root);
+  for (const operation of journal.operations) {
+    const artifacts = [
+      { file: resolvedJournalPath(root, operation.target), required: false },
+      { file: resolvedJournalPath(root, operation.staged), required: false },
+      { file: resolvedJournalPath(root, operation.backup), required: operation.existed },
+    ];
+    let metadataCount = 0;
+    for (const artifact of artifacts) {
+      const info = await assertSafePath(root, artifact.file, 'regular');
+      if (info === undefined) {
+        if (artifact.required) throw corruptJournal();
+        continue;
+      }
+      let parsed: KnowledgeEntry;
+      try {
+        parsed = parseKnowledgeMarkdown(await fs.readFile(artifact.file, 'utf8'), context);
+      } catch (error) {
+        throw corruptJournal(error);
+      }
+      if (expectedTarget(parsed) !== operation.target) throw corruptJournal();
+      metadataCount += 1;
+    }
+    if (metadataCount === 0) throw corruptJournal();
+  }
+}
+
 async function writeJournal(root: string, journal: TransactionJournal): Promise<void> {
   await atomicWriteFile(journalFile(root), `${JSON.stringify(journal)}\n`);
 }
 
-async function rollbackJournal(root: string, journal: TransactionJournal): Promise<void> {
+async function rollbackJournal(
+  root: string,
+  journal: TransactionJournal,
+  context?: KnowledgeParseContext,
+): Promise<void> {
+  await validateJournalPaths(root, journal, context);
   for (const operation of [...journal.operations].reverse()) {
     const target = resolvedJournalPath(root, operation.target);
+    await assertSafePath(root, target, 'regular');
     if (operation.existed) {
       const backup = resolvedJournalPath(root, operation.backup);
-      await fs.mkdir(path.dirname(target), { recursive: true });
-      await fs.copyFile(backup, target);
+      await assertSafePath(root, backup, 'regular');
+      const contents = await fs.readFile(backup, 'utf8');
+      await atomicWriteFile(target, contents);
     } else {
       await fs.rm(target, { force: true });
     }
   }
 }
 
-async function recoverIncompleteTransaction(root: string): Promise<void> {
+async function recoverIncompleteTransaction(
+  root: string,
+  context?: KnowledgeParseContext,
+): Promise<void> {
   const directory = transactionDirectory(root);
   while (true) {
     const directoryInfo = await lstatIfExists(directory);
@@ -236,6 +353,7 @@ async function recoverIncompleteTransaction(root: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 10));
       continue;
     }
+    await validateJournalPaths(root, journal, context);
     if (
       journal.applying_index === null
       && journal.applied_count === journal.operations.length
@@ -243,7 +361,7 @@ async function recoverIncompleteTransaction(root: string): Promise<void> {
       await fs.rm(directory, { recursive: true, force: true });
       return;
     }
-    await rollbackJournal(root, journal);
+    await rollbackJournal(root, journal, context);
     await fs.rm(directory, { recursive: true, force: true });
     return;
   }
@@ -294,6 +412,7 @@ function graphError(entries: KnowledgeEntry[]): Error | undefined {
 
 export class KnowledgeStore {
   readonly root: string;
+  private readonly contextRoot: string;
 
   constructor(
     contextRoot: string,
@@ -301,24 +420,26 @@ export class KnowledgeStore {
     private readonly transactionAdapter: KnowledgeStoreTransactionAdapter =
       nodeKnowledgeStoreTransactionAdapter,
   ) {
-    this.root = path.resolve(contextRoot, 'knowledge');
-    assertContained(path.resolve(contextRoot), this.root);
+    this.contextRoot = path.resolve(contextRoot);
+    this.root = path.resolve(this.contextRoot, 'knowledge');
+    assertContained(this.contextRoot, this.root);
   }
 
-  private fileFor(entry: Pick<KnowledgeEntry, 'id' | 'scope'>): string {
-    const relative = entry.scope === 'workspace'
-      ? path.join('workspace', `${entry.id}.md`)
-      : path.join('repositories', entry.scope.slice('repository:'.length), `${entry.id}.md`);
-    const file = path.resolve(this.root, relative);
-    assertContained(this.root, file);
+  private async physicalRoot(): Promise<string> {
+    return path.join(await physicalContextRoot(this.contextRoot), 'knowledge');
+  }
+
+  private fileFor(root: string, entry: Pick<KnowledgeEntry, 'id' | 'scope'>): string {
+    const file = path.resolve(root, expectedTarget(entry));
+    assertContained(root, file);
     return file;
   }
 
-  private async storedEntriesUnlocked(): Promise<StoredEntry[]> {
+  private async storedEntriesUnlocked(root: string): Promise<StoredEntry[]> {
     const stored: StoredEntry[] = [];
-    for (const file of await markdownFiles(this.root)) {
+    for (const file of await markdownFiles(root)) {
       const entry = parseKnowledgeMarkdown(await fs.readFile(file, 'utf8'), this.context);
-      if (file !== this.fileFor(entry)) {
+      if (file !== this.fileFor(root, entry)) {
         throw new Error(`Knowledge ${entry.id} is not stored at its ID-derived path`);
       }
       stored.push({ entry, file });
@@ -331,39 +452,44 @@ export class KnowledgeStore {
   }
 
   async list(): Promise<KnowledgeEntry[]> {
-    return withStoreExclusive(this.root, async () => {
-      await recoverIncompleteTransaction(this.root);
-      return (await this.storedEntriesUnlocked()).map(({ entry }) => entry);
+    const root = await this.physicalRoot();
+    return withStoreExclusive(root, async () => {
+      await recoverIncompleteTransaction(root, this.context);
+      return (await this.storedEntriesUnlocked(root)).map(({ entry }) => entry);
     });
   }
 
   async get(id: string): Promise<KnowledgeEntry | undefined> {
-    return withStoreExclusive(this.root, async () => {
-      await recoverIncompleteTransaction(this.root);
-      return (await this.storedEntriesUnlocked()).find(({ entry }) => entry.id === id)?.entry;
+    const root = await this.physicalRoot();
+    return withStoreExclusive(root, async () => {
+      await recoverIncompleteTransaction(root, this.context);
+      return (await this.storedEntriesUnlocked(root)).find(({ entry }) => entry.id === id)?.entry;
     });
   }
 
   async put(entry: KnowledgeEntry): Promise<void> {
-    return withStoreExclusive(this.root, async () => {
-      await recoverIncompleteTransaction(this.root);
-      await this.putUnlocked(entry);
+    const root = await this.physicalRoot();
+    return withStoreExclusive(root, async () => {
+      await recoverIncompleteTransaction(root, this.context);
+      await this.putUnlocked(root, entry);
     });
   }
 
   private async commitChanges(
+    root: string,
     changes: ReadonlyArray<{ file: string; contents: string }>,
   ): Promise<void> {
     if (changes.length === 0) return;
-    await fs.mkdir(this.root, { recursive: true, mode: 0o700 });
-    const directory = transactionDirectory(this.root);
+    await fs.mkdir(root, { recursive: true, mode: 0o700 });
+    await assertSafePath(root, root, 'directory');
+    const directory = transactionDirectory(root);
     while (true) {
       try {
         await fs.mkdir(directory, { mode: 0o700 });
         break;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        await recoverIncompleteTransaction(this.root);
+        await recoverIncompleteTransaction(root, this.context);
       }
     }
     const journal: TransactionJournal = {
@@ -374,7 +500,7 @@ export class KnowledgeStore {
       operations: [],
     };
     try {
-      await writeJournal(this.root, journal);
+      await writeJournal(root, journal);
       const stagedDirectory = path.join(directory, 'staged');
       const backupDirectory = path.join(directory, 'backups');
       await fs.mkdir(stagedDirectory, { recursive: true, mode: 0o700 });
@@ -392,30 +518,33 @@ export class KnowledgeStore {
           await atomicWriteFile(backup, await fs.readFile(change.file, 'utf8'));
         }
         journal.operations.push({
-          target: relativeContained(this.root, change.file),
-          staged: relativeContained(this.root, staged),
-          backup: relativeContained(this.root, backup),
+          target: relativeContained(root, change.file),
+          staged: relativeContained(root, staged),
+          backup: relativeContained(root, backup),
           existed: previous !== undefined,
         });
       }
-      await writeJournal(this.root, journal);
+      await writeJournal(root, journal);
+
+      await validateJournalPaths(root, journal, this.context);
 
       for (const [index, operation] of journal.operations.entries()) {
         journal.applying_index = index;
-        await writeJournal(this.root, journal);
+        await writeJournal(root, journal);
+        await validateJournalPaths(root, journal, this.context);
         await this.transactionAdapter.rename(
-          resolvedJournalPath(this.root, operation.staged),
-          resolvedJournalPath(this.root, operation.target),
+          resolvedJournalPath(root, operation.staged),
+          resolvedJournalPath(root, operation.target),
         );
-        await syncDirectory(path.dirname(resolvedJournalPath(this.root, operation.target)));
+        await syncDirectory(path.dirname(resolvedJournalPath(root, operation.target)));
         journal.applied_count = index + 1;
         journal.applying_index = null;
-        await writeJournal(this.root, journal);
+        await writeJournal(root, journal);
       }
       await fs.rm(directory, { recursive: true, force: true });
     } catch (error) {
       try {
-        if (journal.operations.length > 0) await rollbackJournal(this.root, journal);
+        if (journal.operations.length > 0) await rollbackJournal(root, journal, this.context);
         await fs.rm(directory, { recursive: true, force: true });
       } catch (rollbackError) {
         throw new AggregateError([error, rollbackError], 'Knowledge transaction and rollback failed');
@@ -424,11 +553,11 @@ export class KnowledgeStore {
     }
   }
 
-  private async putUnlocked(entry: KnowledgeEntry): Promise<void> {
+  private async putUnlocked(root: string, entry: KnowledgeEntry): Promise<void> {
     const validated = parseKnowledgeEntry(entry, this.context);
-    const stored = await this.storedEntriesUnlocked();
+    const stored = await this.storedEntriesUnlocked(root);
     const previous = stored.find((item) => item.entry.id === validated.id);
-    const target = this.fileFor(validated);
+    const target = this.fileFor(root, validated);
     if (previous !== undefined && previous.file !== target) {
       throw new Error('Knowledge scope cannot move an existing ID to a different path');
     }
@@ -463,9 +592,9 @@ export class KnowledgeStore {
       const old = stored.find((item) => item.entry.id === current.id)?.entry;
       const contents = serializeKnowledge(current);
       if (old === undefined || serializeKnowledge(old) !== contents) {
-        changes.push({ file: this.fileFor(current), contents });
+        changes.push({ file: this.fileFor(root, current), contents });
       }
     }
-    await this.commitChanges(changes);
+    await this.commitChanges(root, changes);
   }
 }

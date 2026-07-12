@@ -15,7 +15,14 @@ function contextForScope(scope: unknown): KnowledgeParseContext | undefined {
 }
 
 function containsPrivateLocalPath(value: string): boolean {
-  return /\/(?:Users|home)\//.test(value)
+  // A leading slash is treated as a filesystem path unless its syntax explicitly
+  // identifies an HTTP request target or URI-like field. This deliberately does
+  // not infer routes from broad prefixes such as /api or /v1.
+  const withoutWebUrls = value.replace(/https?:\/\/[^\s<>"']+/gi, '');
+  const withoutExplicitRoutes = withoutWebUrls
+    .replace(/\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|CONNECT|TRACE)\s+\/(?!\/)[^\s<>"']*/gi, '')
+    .replace(/\b(?:URI|route|endpoint)\s*[:=]\s*\/(?!\/)[^\s<>"']*/gi, '');
+  return /(?:^|[\s('"=:\[])\/{1,2}(?:[^\s)\]}>"']+|(?=[\s)\]}>"']|$))/.test(withoutExplicitRoutes)
     || /(?:^|[^a-z0-9])[a-z]:[\\/]/i.test(value)
     || /\\\\[^\\\s]+\\[^\\\s]+/.test(value)
     || /(?:^|[^a-z0-9])file:/i.test(value);

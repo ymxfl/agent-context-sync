@@ -113,12 +113,32 @@ describe('canonical Knowledge Markdown', () => {
     }))).toThrow(/paths/i);
   });
 
-  it('allows repository-relative POSIX globs and API routes in human text', () => {
+  it('allows repository-relative POSIX globs and explicitly identified HTTP routes', () => {
     expect(() => serializeKnowledge(entry({
       applies_to: { paths: ['packages/*/src/**', 'src/api/*.ts'], agents: ['codex'] },
-      statement: 'Serve /api/users and /v1/health.',
+      statement: 'Serve GET /api/users and URI: /v1/health.',
       reason: 'These are API routes, not local paths.',
     }))).not.toThrow();
+  });
+
+  it.each([
+    '/',
+    '/tmp/agent-context-sync/private.md',
+    '/private/tmp/agent-context-sync/private.md',
+    '/var/db/agent-context-sync/private.md',
+    '/Volumes/Secret/private.md',
+    '/opt/acme/private.md',
+    '/etc/passwd',
+    '/api/users',
+    String.raw`D:\work\private.md`,
+    String.raw`\\server\share\private.md`,
+    '//server/share/private.md',
+    'file:///tmp/private.md',
+    'FILE://server/share/private.md',
+  ])('rejects filesystem syntax in a serialized string: %j', (candidate) => {
+    expect(() => serializeKnowledge(entry({
+      statement: `Read ${candidate} before continuing.`,
+    }))).toThrow(/private local path/i);
   });
 
   it('rejects a private path injected only into the human display body', () => {
@@ -350,6 +370,195 @@ describe('KnowledgeStore', () => {
       [ids.a, [ids.b]],
       [ids.b, [ids.a]],
     ]);
+  });
+
+  it('uses one physical lock for a live writer and a reader reached through an alias parent', async () => {
+    await store.put(entry());
+    await store.put(entry({ id: ids.b }));
+    const aliasBase = await fs.mkdtemp(path.join(tmpdir(), 'acs-knowledge-alias-'));
+    const aliasParent = path.join(aliasBase, 'contexts');
+    await fs.symlink(path.dirname(root), aliasParent);
+    const aliasRoot = path.join(aliasParent, path.basename(root));
+    const aliasReader = new KnowledgeStore(aliasRoot, {
+      registeredRepositoryIds: new Set(['github.com/acme/api']),
+    });
+    let releaseRename = (): void => undefined;
+    const renameGate = new Promise<void>((resolve) => { releaseRename = resolve; });
+    let signalRenameStarted = (): void => undefined;
+    const renameStarted = new Promise<void>((resolve) => { signalRenameStarted = resolve; });
+    let first = true;
+    const writer = new KnowledgeStore(root, undefined, {
+      async rename(staged, target) {
+        if (first) {
+          first = false;
+          signalRenameStarted();
+          await renameGate;
+        }
+        await fs.rename(staged, target);
+      },
+    });
+
+    const write = writer.put(entry({ conflicts_with: [ids.b] }));
+    await renameStarted;
+    let readerResolved = false;
+    const read = aliasReader.list().then((entries) => {
+      readerResolved = true;
+      return entries;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(readerResolved).toBe(false);
+
+    releaseRename();
+    await write;
+    expect((await read).map((item) => [item.id, item.conflicts_with])).toEqual([
+      [ids.a, [ids.b]],
+      [ids.b, [ids.a]],
+    ]);
+  });
+
+  it('rejects a directly symlinked Context root', async () => {
+    const aliasBase = await fs.mkdtemp(path.join(tmpdir(), 'acs-context-root-alias-'));
+    const aliasRoot = path.join(aliasBase, 'context');
+    await fs.symlink(root, aliasRoot);
+
+    const aliasStore = new KnowledgeStore(aliasRoot);
+    await expect(aliasStore.list()).rejects.toThrow(/Context root.*symbolic/i);
+  });
+
+  it('rejects an applying journal whose target ancestor escapes through a symlink', async () => {
+    await store.put(entry());
+    const knowledge = path.join(root, 'knowledge');
+    const transaction = path.join(knowledge, '.transaction');
+    const original = await fs.readFile(path.join(knowledge, 'workspace', `${ids.a}.md`), 'utf8');
+    await fs.rm(path.join(knowledge, 'workspace'), { recursive: true });
+    const external = await fs.mkdtemp(path.join(tmpdir(), 'acs-external-knowledge-'));
+    const sentinel = path.join(external, `${ids.a}.md`);
+    await fs.writeFile(sentinel, 'outside sentinel');
+    await fs.symlink(external, path.join(knowledge, 'workspace'));
+    await fs.mkdir(path.join(transaction, 'backups'), { recursive: true });
+    await fs.mkdir(path.join(transaction, 'staged'), { recursive: true });
+    await fs.writeFile(path.join(transaction, 'backups/0.backup'), original);
+    await fs.writeFile(path.join(transaction, 'staged/0.stage'), serializeKnowledge(entry({
+      status: 'archived',
+    })));
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: 0,
+      applied_count: 0,
+      operations: [{
+        target: path.join('workspace', `${ids.a}.md`),
+        staged: path.join('.transaction', 'staged', '0.stage'),
+        backup: path.join('.transaction', 'backups', '0.backup'),
+        existed: true,
+      }],
+    })}\n`);
+
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(sentinel, 'utf8')).toBe('outside sentinel');
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.a);
+  });
+
+  it('rejects a committed journal with a symlinked target and preserves recovery evidence', async () => {
+    await store.put(entry());
+    const knowledge = path.join(root, 'knowledge');
+    const target = path.join(knowledge, 'workspace', `${ids.a}.md`);
+    const transaction = path.join(knowledge, '.transaction');
+    const external = await fs.mkdtemp(path.join(tmpdir(), 'acs-external-knowledge-'));
+    const sentinel = path.join(external, 'sentinel.md');
+    await fs.writeFile(sentinel, 'outside sentinel');
+    await fs.rm(target);
+    await fs.symlink(sentinel, target);
+    await fs.mkdir(path.join(transaction, 'backups'), { recursive: true });
+    await fs.mkdir(path.join(transaction, 'staged'), { recursive: true });
+    await fs.writeFile(path.join(transaction, 'backups/0.backup'), serializeKnowledge(entry()));
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: null,
+      applied_count: 1,
+      operations: [{
+        target: path.join('workspace', `${ids.a}.md`),
+        staged: path.join('.transaction', 'staged', '0.stage'),
+        backup: path.join('.transaction', 'backups', '0.backup'),
+        existed: true,
+      }],
+    })}\n`);
+
+    await expect(store.get(ids.a)).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.get(ids.a)).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(sentinel, 'utf8')).toBe('outside sentinel');
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.a);
+  });
+
+  it.each([
+    ['applying backup', 'backups/0.backup', 0, 0],
+    ['committed staged file', 'staged/0.stage', null, 1],
+  ] as const)('rejects a symlinked %s artifact without following it', async (
+    _name,
+    linkedArtifact,
+    applyingIndex,
+    appliedCount,
+  ) => {
+    await store.put(entry());
+    const knowledge = path.join(root, 'knowledge');
+    const target = path.join(knowledge, 'workspace', `${ids.a}.md`);
+    const transaction = path.join(knowledge, '.transaction');
+    const external = await fs.mkdtemp(path.join(tmpdir(), 'acs-external-artifact-'));
+    const sentinel = path.join(external, 'sentinel.md');
+    await fs.writeFile(sentinel, 'outside sentinel');
+    await fs.mkdir(path.join(transaction, 'backups'), { recursive: true });
+    await fs.mkdir(path.join(transaction, 'staged'), { recursive: true });
+    await fs.writeFile(path.join(transaction, 'backups/0.backup'), await fs.readFile(target, 'utf8'));
+    await fs.writeFile(path.join(transaction, 'staged/0.stage'), serializeKnowledge(entry({
+      status: 'archived',
+    })));
+    await fs.rm(path.join(transaction, linkedArtifact));
+    await fs.symlink(sentinel, path.join(transaction, linkedArtifact));
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: applyingIndex,
+      applied_count: appliedCount,
+      operations: [{
+        target: path.join('workspace', `${ids.a}.md`),
+        staged: path.join('.transaction', 'staged', '0.stage'),
+        backup: path.join('.transaction', 'backups', '0.backup'),
+        existed: true,
+      }],
+    })}\n`);
+
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(sentinel, 'utf8')).toBe('outside sentinel');
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.a);
+  });
+
+  it('rejects journal metadata whose target is not the entry ID-derived path', async () => {
+    await store.put(entry());
+    const knowledge = path.join(root, 'knowledge');
+    const transaction = path.join(knowledge, '.transaction');
+    await fs.mkdir(path.join(transaction, 'backups'), { recursive: true });
+    await fs.mkdir(path.join(transaction, 'staged'), { recursive: true });
+    await fs.writeFile(path.join(transaction, 'backups/0.backup'), serializeKnowledge(entry()));
+    await fs.writeFile(path.join(transaction, 'staged/0.stage'), serializeKnowledge(entry()));
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: 0,
+      applied_count: 0,
+      operations: [{
+        target: path.join('workspace', `${ids.b}.md`),
+        staged: path.join('.transaction', 'staged', '0.stage'),
+        backup: path.join('.transaction', 'backups', '0.backup'),
+        existed: true,
+      }],
+    })}\n`);
+
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.b);
   });
 
   it('rejects a symbolic transaction journal without touching its target', async () => {
