@@ -17,10 +17,21 @@ function contextForScope(scope: unknown): KnowledgeParseContext | undefined {
 function containsPrivateLocalPath(value: string): boolean {
   // Remove only narrowly identifiable web spans. Route targets intentionally stop
   // at prose punctuation so a later absolute path cannot hide inside the match.
-  const withoutWebUrls = value.replace(/\bhttps?:\/\/[^\s<>`"'{},;()[\]]+/gi, '');
+  const withoutWebUrls = value.replace(
+    /\bhttps?:\/\/(?!\/)[^\s<>`"'{},;!$()[\]]+/gi,
+    (candidate) => {
+      try {
+        const parsed = new URL(candidate);
+        if (/^https?:$/.test(parsed.protocol) && parsed.hostname.length > 0) return '';
+      } catch {
+        // Leave invalid URL-like text in place for the fail-closed path scan.
+      }
+      return candidate;
+    },
+  );
   const withoutExplicitRoutes = withoutWebUrls
-    .replace(/\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|CONNECT|TRACE)\s+\/(?!\/)[a-z0-9._~!$&*+\-\/=:@%?#]*/gi, '')
-    .replace(/\b(?:URI|route|endpoint)\s*[:=]\s*\/(?!\/)[a-z0-9._~!$&*+\-\/=:@%?#]*/gi, '');
+    .replace(/\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|CONNECT|TRACE)\s+\/(?!\/)[a-z0-9._~&+\-\/=:@%?]*/gi, '')
+    .replace(/\b(?:URI|route|endpoint)\s*[:=]\s*\/(?!\/)[a-z0-9._~&+\-\/=:@%?]*/gi, '');
   return /(?:^|[^a-z0-9._*?+\-])\/{1,2}(?=[^\s/]|\/(?=[^\s/])|\s|$)/i
     .test(withoutExplicitRoutes)
     || /(?:^|[^a-z0-9])[a-z]:[\\/]/i.test(value)

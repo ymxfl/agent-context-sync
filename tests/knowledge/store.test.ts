@@ -170,6 +170,10 @@ describe('canonical Knowledge Markdown', () => {
     'See https://example.com/docs,/Users/alice/private.md.',
     'See (https://example.com/docs)/Users/alice/private.md.',
     'Serve GET /health)/Users/alice/private.md.',
+    'Serve GET /health!/Users/alice/private.md.',
+    'Serve route: /health$/Users/alice/private.md.',
+    'See https://example.com!/Users/alice/private.md.',
+    'See https:///Users/alice/private.md.',
   ])('rejects punctuation-surrounded POSIX path bypass %j', (statement) => {
     expect(() => serializeKnowledge(entry({ statement }))).toThrow(/private local path/i);
   });
@@ -698,6 +702,25 @@ describe('KnowledgeStore', () => {
     expect((await fs.readdir(path.join(root, 'knowledge')))
       .filter((name) => name.startsWith('.writer-lock'))).toEqual([]);
   });
+
+  it('recovers when a stale-lock reclaimer crashes after publishing its claim', async () => {
+    const lock = path.join(root, 'knowledge/.writer-lock');
+    await fs.mkdir(lock, { recursive: true });
+    await fs.writeFile(path.join(lock, 'owner.json'), `${JSON.stringify({
+      owner_pid: 999_999_999,
+      token: 'stale-owner-token',
+    })}\n`);
+    await fs.writeFile(path.join(lock, 'reclaim.json'), `${JSON.stringify({
+      owner_pid: 999_999_998,
+      token: 'crashed-reclaimer-token',
+      observed_token: 'stale-owner-token',
+      created_at_ms: Date.now() - 10_000,
+    })}\n`);
+
+    expect(await store.list()).toEqual([]);
+    expect((await fs.readdir(path.join(root, 'knowledge')))
+      .filter((name) => name.startsWith('.writer-lock'))).toEqual([]);
+  }, 2_000);
 
   it('never follows a symbolic writer lock', async () => {
     const knowledge = path.join(root, 'knowledge');

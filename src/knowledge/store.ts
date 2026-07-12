@@ -45,6 +45,13 @@ interface WriterLockOwner {
   token: string;
 }
 
+interface WriterReclaimClaim {
+  owner_pid: number;
+  token: string;
+  observed_token: string;
+  created_at_ms: number;
+}
+
 async function physicalContextRoot(contextRoot: string): Promise<string> {
   const lexicalRoot = path.resolve(contextRoot);
   const rootInfo = await lstatIfExists(lexicalRoot);
@@ -211,20 +218,82 @@ async function assertWriterLockOwned(lock: string, owner: WriterLockOwner): Prom
   }
 }
 
+function parseWriterReclaimClaim(value: unknown): WriterReclaimClaim {
+  if (!isRecord(value)) throw corruptWriterLock();
+  const keys = Object.keys(value).sort(compareCodeUnits);
+  if (keys.join('\0') !== [
+    'created_at_ms',
+    'observed_token',
+    'owner_pid',
+    'token',
+  ].join('\0')) throw corruptWriterLock();
+  if (
+    !Number.isSafeInteger(value.owner_pid)
+    || (value.owner_pid as number) <= 0
+    || typeof value.token !== 'string'
+    || !/^[a-z0-9-]{8,128}$/i.test(value.token)
+    || typeof value.observed_token !== 'string'
+    || !/^[a-z0-9-]{8,128}$/i.test(value.observed_token)
+    || !Number.isSafeInteger(value.created_at_ms)
+    || (value.created_at_ms as number) <= 0
+  ) throw corruptWriterLock();
+  return {
+    owner_pid: value.owner_pid as number,
+    token: value.token,
+    observed_token: value.observed_token,
+    created_at_ms: value.created_at_ms as number,
+  };
+}
+
+async function readWriterReclaimClaim(file: string): Promise<WriterReclaimClaim | undefined> {
+  const info = await lstatIfExists(file);
+  if (info === undefined) return undefined;
+  if (info.isSymbolicLink() || !info.isFile()) throw corruptWriterLock();
+  try {
+    return parseWriterReclaimClaim(JSON.parse(await fs.readFile(file, 'utf8')));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Knowledge writer lock')) throw error;
+    throw corruptWriterLock(error);
+  }
+}
+
 async function claimStaleWriterLock(lock: string, observed: WriterLockOwner): Promise<boolean> {
-  const claim = path.join(lock, 'reclaim.json');
-  const claimToken = randomUUID();
+  const claimFile = path.join(lock, 'reclaim.json');
+  const claim: WriterReclaimClaim = {
+    owner_pid: process.pid,
+    token: randomUUID(),
+    observed_token: observed.token,
+    created_at_ms: Date.now(),
+  };
   try {
     await fs.writeFile(
-      claim,
-      `${JSON.stringify({ observed_token: observed.token, claim_token: claimToken })}\n`,
+      claimFile,
+      `${JSON.stringify(claim)}\n`,
       { flag: 'wx', mode: 0o600 },
     );
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw error;
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const existing = await readWriterReclaimClaim(claimFile);
+    if (existing === undefined) return false;
+    if (existing.observed_token !== observed.token) throw corruptWriterLock();
+    if (isProcessAlive(existing.owner_pid)) return false;
+
+    const quarantine = path.join(lock, `.reclaim-stale-${randomUUID()}.json`);
+    try {
+      await fs.rename(claimFile, quarantine);
+    } catch (renameError) {
+      if ((renameError as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw renameError;
+    }
+    const moved = await readWriterReclaimClaim(quarantine);
+    await fs.rm(quarantine, { force: true });
+    if (moved?.token !== existing.token) return false;
+    return false;
   }
+
+  const ownedClaim = await readWriterReclaimClaim(claimFile);
+  if (ownedClaim?.token !== claim.token || ownedClaim.observed_token !== observed.token) return false;
   const current = await readWriterLockOwner(lock);
   if (current?.owner_pid !== observed.owner_pid || current.token !== observed.token) {
     throw corruptWriterLock();
