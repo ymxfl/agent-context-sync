@@ -9,6 +9,8 @@ import {
   assertRemoteHead,
   cloneContext,
   contextCheckoutPath,
+  createContextTransaction,
+  installContextTransaction,
   previewInputHash,
   readWorkspaceManifest,
   remoteHead,
@@ -51,7 +53,7 @@ export async function joinWorkspace(input: JoinInput): Promise<WorkspacePreview>
   let workspace;
   try {
     const temporaryContext = path.join(temporaryRoot, 'context');
-    await cloneContext(normalized.context_remote, temporaryContext);
+    await cloneContext(normalized.context_remote, temporaryContext, contextHead);
     workspace = await readWorkspaceManifest(temporaryContext);
   } finally {
     await fs.rm(temporaryRoot, { recursive: true, force: true });
@@ -79,14 +81,23 @@ export async function joinWorkspace(input: JoinInput): Promise<WorkspacePreview>
     .filter((repository) => repository.local_path === undefined)
     .map((repository) => `Repository ${repository.repo_id} is not available locally`);
 
+  const filesToWrite = [
+    path.join(normalized.home, 'workspaces', `${workspace.workspace_id}.yaml`),
+  ];
+  const approval = {
+    workspace_id: workspace.workspace_id,
+    files_to_write: filesToWrite,
+    repositories,
+    warnings,
+  };
   return {
     operation: 'join',
     preview_id: createId('preview'),
-    input_hash: previewInputHash('join', normalized, contextHead),
+    input_hash: previewInputHash('join', normalized, contextHead, approval),
     context_head: contextHead,
     workspace_id: workspace.workspace_id,
     normalized_input: normalized,
-    files_to_write: [path.join(normalized.home, 'workspaces', `${workspace.workspace_id}.yaml`)],
+    files_to_write: filesToWrite,
     repositories,
     warnings,
   };
@@ -100,10 +111,21 @@ export async function applyJoin(preview: WorkspacePreview): Promise<WorkspaceRes
   const input = preview.normalized_input as NormalizedJoinInput;
   await assertRemoteHead(input.context_remote, preview.context_head);
   const contextPath = contextCheckoutPath(input.home, preview.workspace_id);
-  await cloneContext(input.context_remote, contextPath);
-  const workspace = await readWorkspaceManifest(contextPath);
-  if (workspace.workspace_id !== preview.workspace_id) {
-    throw new Error('Workspace ID changed after preview generation');
+  const transaction = await createContextTransaction(
+    input.home,
+    input.context_remote,
+    preview.context_head,
+  );
+  let workspace;
+  try {
+    workspace = await readWorkspaceManifest(transaction.context_path);
+    if (workspace.workspace_id !== preview.workspace_id) {
+      throw new Error('Workspace ID changed after preview generation');
+    }
+    await assertRemoteHead(input.context_remote, preview.context_head);
+    await installContextTransaction(transaction.context_path, contextPath);
+  } finally {
+    await fs.rm(transaction.root, { recursive: true, force: true });
   }
   const local: LocalWorkspace = {
     schema_version: 1,

@@ -21,4 +21,12 @@ describe('repository identity', () => {
       repositoryIdFromRemote('ssh://git@GitHub.com/Acme/API.git?ref=main#readme'),
     ).toBe('github.com/Acme/API');
   });
+
+  it.each([
+    'git@github.com:acme/../workspace.yaml',
+    'git@github.com:acme/./api',
+    String.raw`git@github.com:acme\..\workspace.yaml`,
+  ])('rejects traversal-bearing SCP remotes: %s', (remote) => {
+    expect(() => repositoryIdFromRemote(remote)).toThrow(/path segment/i);
+  });
 });

@@ -2,16 +2,17 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { createId } from '../domain/ids.js';
-import { appError } from '../domain/errors.js';
 import type { WorkspaceManifest } from '../domain/model.js';
 import { parseWorkspaceManifest } from '../schema/workspace.js';
 import {
   assertPreviewIntegrity,
   assertRemoteHead,
   commitAndPushContext,
-  localHead,
+  createContextTransaction,
+  installContextTransaction,
   previewInputHash,
   readWorkspaceManifest,
+  remoteHead,
   repositoryManifestFile,
   writeSharedManifests,
   type NormalizedAddRepositoryInput,
@@ -60,9 +61,22 @@ export async function addRepository(
 ): Promise<WorkspacePreview> {
   const normalized = await normalizeInput(input);
   const local = await readLocalWorkspace(normalized.home, normalized.workspace_id);
-  const workspace = await readWorkspaceManifest(local.context_path);
-  const contextHead = await localHead(local.context_path);
-  await assertRemoteHead(workspace.context_remote, contextHead);
+  const localWorkspace = await readWorkspaceManifest(local.context_path);
+  const contextHead = await remoteHead(localWorkspace.context_remote);
+  const transaction = await createContextTransaction(
+    normalized.home,
+    localWorkspace.context_remote,
+    contextHead,
+  );
+  let workspace;
+  try {
+    workspace = await readWorkspaceManifest(transaction.context_path);
+  } finally {
+    await fs.rm(transaction.root, { recursive: true, force: true });
+  }
+  if (workspace.workspace_id !== normalized.workspace_id) {
+    throw new Error('Workspace ID does not match the local registry');
+  }
   const added = await repositoryAt(normalized.repository_path);
   const repositories: PreviewRepository[] = [
     ...workspace.repositories.map((repository) => ({
@@ -79,20 +93,30 @@ export async function addRepository(
     existing.local_path = added.local_path;
   }
   repositories.sort((left, right) => left.repo_id.localeCompare(right.repo_id));
+  const filesToWrite = [
+    'workspace.yaml',
+    repositoryManifestFile(added.repo_id),
+    path.join(normalized.home, 'workspaces', `${workspace.workspace_id}.yaml`),
+  ];
+  const warnings = existing === undefined
+    ? []
+    : [`Repository ${added.repo_id} is already shared`];
+  const approval = {
+    workspace_id: workspace.workspace_id,
+    files_to_write: filesToWrite,
+    repositories,
+    warnings,
+  };
   return {
     operation: 'add-repository',
     preview_id: createId('preview'),
-    input_hash: previewInputHash('add-repository', normalized, contextHead),
+    input_hash: previewInputHash('add-repository', normalized, contextHead, approval),
     context_head: contextHead,
     workspace_id: workspace.workspace_id,
     normalized_input: normalized,
-    files_to_write: [
-      'workspace.yaml',
-      repositoryManifestFile(added.repo_id),
-      path.join(normalized.home, 'workspaces', `${workspace.workspace_id}.yaml`),
-    ],
+    files_to_write: filesToWrite,
     repositories,
-    warnings: existing === undefined ? [] : [`Repository ${added.repo_id} is already shared`],
+    warnings,
   };
 }
 
@@ -105,25 +129,31 @@ export async function applyAddRepository(
   assertPreviewIntegrity(preview);
   const input = preview.normalized_input as NormalizedAddRepositoryInput;
   const local = await readLocalWorkspace(input.home, input.workspace_id);
-  if (await localHead(local.context_path) !== preview.context_head) {
-    throw appError(
-      'STALE_PREVIEW',
-      'Local Context HEAD changed after preview generation',
-    );
-  }
-  const current = await readWorkspaceManifest(local.context_path);
-  await assertRemoteHead(current.context_remote, preview.context_head);
+  const localWorkspace = await readWorkspaceManifest(local.context_path);
+  await assertRemoteHead(localWorkspace.context_remote, preview.context_head);
   const added = await repositoryAt(input.repository_path);
-  const repositories = preview.repositories.map(({ local_path: _localPath, ...item }) => item);
-  const workspace: WorkspaceManifest = parseWorkspaceManifest({
-    ...current,
-    repositories,
-  });
-  await writeSharedManifests(local.context_path, workspace, [added]);
-  const commit = await commitAndPushContext(
-    local.context_path,
-    `Add ${added.name} repository`,
+  const transaction = await createContextTransaction(
+    input.home,
+    localWorkspace.context_remote,
+    preview.context_head,
   );
+  let workspace: WorkspaceManifest;
+  let commit: string;
+  try {
+    const current = await readWorkspaceManifest(transaction.context_path);
+    const repositories = preview.repositories.map(
+      ({ local_path: _localPath, ...item }) => item,
+    );
+    workspace = parseWorkspaceManifest({ ...current, repositories });
+    await writeSharedManifests(transaction.context_path, workspace, [added]);
+    commit = await commitAndPushContext(
+      transaction.context_path,
+      `Add ${added.name} repository`,
+    );
+    await installContextTransaction(transaction.context_path, local.context_path);
+  } finally {
+    await fs.rm(transaction.root, { recursive: true, force: true });
+  }
   const updatedLocal = bindRepositoryPath(local, added.repo_id, input.repository_path);
   await writeLocalWorkspace(input.home, updatedLocal);
   return { workspace, local: updatedLocal, commit };

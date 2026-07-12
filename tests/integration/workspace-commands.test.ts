@@ -4,9 +4,15 @@ import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  cloneContext,
+  repositoryManifestFile,
+  UNBORN_HEAD,
+  type WorkspacePreview,
+} from '../../src/workspace/context-repository.js';
 import {
   addRepository,
   applyAddRepository,
@@ -14,7 +20,10 @@ import {
 import { applyInit, initWorkspace } from '../../src/commands/init.js';
 import { applyJoin, joinWorkspace } from '../../src/commands/join.js';
 import { parseWorkspaceManifest } from '../../src/schema/workspace.js';
-import { readLocalWorkspace } from '../../src/workspace/local-registry.js';
+import {
+  readLocalWorkspace,
+  registryPath,
+} from '../../src/workspace/local-registry.js';
 import { pathExists } from '../helpers/fs.js';
 import {
   createBareRemote,
@@ -43,6 +52,20 @@ async function startGitDaemon(root: string, repository: string): Promise<{
   remote: string;
 }> {
   const port = await availablePort();
+  const raceMarker = path.join(root, 'advance-main-on-next-push');
+  const accessHook = path.join(root, 'git-daemon-access-hook.mjs');
+  await fs.writeFile(accessHook, `#!/usr/bin/env node
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const marker = ${JSON.stringify(raceMarker)};
+const repository = ${JSON.stringify(repository)};
+if (process.argv[2] === 'receive-pack' && existsSync(marker)) {
+  const commit = readFileSync(marker, 'utf8').trim();
+  execFileSync('git', ['--git-dir', repository, 'update-ref', 'refs/heads/main', commit]);
+  rmSync(marker);
+}
+`);
+  await fs.chmod(accessHook, 0o700);
   const child = spawn('git', [
     'daemon',
     '--reuseaddr',
@@ -51,6 +74,7 @@ async function startGitDaemon(root: string, repository: string): Promise<{
     '--listen=127.0.0.1',
     `--port=${port}`,
     `--base-path=${root}`,
+    `--access-hook=${accessHook}`,
     root,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   const stderr: Buffer[] = [];
@@ -194,6 +218,39 @@ describe('workspace commands', () => {
     expect(await pathExists(path.join(home, 'contexts'))).toBe(false);
   });
 
+  it('binds every approved init write field into the preview hash', async () => {
+    const scanRoot = path.join(root, 'business');
+    const repository = path.join(scanRoot, 'api');
+    const home = path.join(root, 'member-a');
+    await initFixtureRepository(repository, 'https://github.com/acme/api.git');
+    const preview = await initWorkspace({
+      name: 'platform',
+      contextRemote,
+      scanRoot,
+      maxDepth: 1,
+      home,
+    });
+    const mutations: Array<[string, (value: WorkspacePreview) => void]> = [
+      ['workspace ID', (value) => { value.workspace_id = 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV'; }],
+      ['name', (value) => {
+        (value.normalized_input as { name: string }).name = 'other';
+      }],
+      ['repository name', (value) => { value.repositories[0]!.name = 'other'; }],
+      ['local binding', (value) => { value.repositories[0]!.local_path = root; }],
+      ['file list', (value) => { value.files_to_write.push('outside.yaml'); }],
+      ['warnings', (value) => { value.warnings.push('approved warning changed'); }],
+    ];
+
+    for (const [field, mutate] of mutations) {
+      const changed = structuredClone(preview);
+      mutate(changed);
+      await expect(applyInit(changed), field).rejects.toMatchObject({
+        code: 'STALE_PREVIEW',
+      });
+    }
+    expect(await pathExists(path.join(home, 'contexts'))).toBe(false);
+  });
+
   it('refuses to initialize a non-empty Context repository', async () => {
     const seed = path.join(root, 'seed');
     await fixtureGit(root, ['clone', contextRemote, seed]);
@@ -213,6 +270,49 @@ describe('workspace commands', () => {
       maxDepth: 1,
       home: path.join(root, 'member-a'),
     })).rejects.toMatchObject({ code: 'CONTEXT_NOT_EMPTY' });
+  });
+
+  it('leaves no persistent init state when a concurrent initializer wins', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const preview = await initWorkspace({
+      name: 'platform',
+      contextRemote,
+      scanRoot,
+      maxDepth: 1,
+      home,
+    });
+    const rival = path.join(root, 'rival-init-push');
+    await fixtureGit(root, ['clone', contextRemote, rival]);
+    await fixtureGit(rival, ['config', 'user.name', 'Rival']);
+    await fixtureGit(rival, ['config', 'user.email', 'rival@example.invalid']);
+    await fs.writeFile(path.join(rival, 'workspace.yaml'), stringify({
+      schema_version: 1,
+      workspace_id: preview.workspace_id,
+      name: 'platform',
+      context_remote: contextRemote,
+      repositories: [],
+    }));
+    await fixtureGit(rival, ['add', 'workspace.yaml']);
+    await fixtureGit(rival, ['commit', '-m', 'Concurrent initialization']);
+    const rivalHead = await fixtureGit(rival, ['rev-parse', 'HEAD']);
+    await fixtureGit(rival, ['push', 'origin', 'HEAD:refs/race/next']);
+    await fs.writeFile(path.join(root, 'advance-main-on-next-push'), rivalHead);
+
+    await expect(applyInit(preview)).rejects.toThrow();
+    expect(await pathExists(path.join(home, 'contexts', preview.workspace_id))).toBe(false);
+    expect(await pathExists(registryPath(home, preview.workspace_id))).toBe(false);
+    expect((await fs.readdir(home)).some((name) => name.startsWith('.acs-'))).toBe(false);
+
+    const retry = await joinWorkspace({
+      contextRemote,
+      scanRoots: [scanRoot],
+      maxDepth: 1,
+      home,
+    });
+    const joined = await applyJoin(retry);
+    expect(joined.workspace.workspace_id).toBe(preview.workspace_id);
   });
 
   it('joins when only one shared repository is local without changing Context Git', async () => {
@@ -276,6 +376,55 @@ describe('workspace commands', () => {
     expect(await pathExists(path.join(home, 'contexts'))).toBe(false);
   });
 
+  it('rejects a clone whose born Context HEAD differs from the precheck', async () => {
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform',
+      contextRemote,
+      scanRoot,
+      maxDepth: 1,
+      home: path.join(root, 'member-a'),
+    }));
+    const expectedHead = initialized.commit!;
+    const rival = path.join(root, 'rival-born');
+    await fixtureGit(root, ['clone', contextRemote, rival]);
+    await fixtureGit(rival, ['config', 'user.name', 'Rival']);
+    await fixtureGit(rival, ['config', 'user.email', 'rival@example.invalid']);
+    await fs.writeFile(path.join(rival, 'README.md'), 'advance\n');
+    await fixtureGit(rival, ['add', 'README.md']);
+    await fixtureGit(rival, ['commit', '-m', 'Advance Context']);
+    await fixtureGit(rival, ['push', 'origin', 'main']);
+
+    await expect(cloneContext(
+      contextRemote,
+      path.join(root, 'stale-born-clone'),
+      expectedHead,
+    )).rejects.toMatchObject({ code: 'STALE_PREVIEW' });
+  });
+
+  it('rejects a clone that becomes born after an unborn precheck', async () => {
+    const rival = path.join(root, 'rival-unborn');
+    await fixtureGit(root, ['clone', contextRemote, rival]);
+    await fixtureGit(rival, ['config', 'user.name', 'Rival']);
+    await fixtureGit(rival, ['config', 'user.email', 'rival@example.invalid']);
+    await fs.writeFile(path.join(rival, 'README.md'), 'advance\n');
+    await fixtureGit(rival, ['add', 'README.md']);
+    await fixtureGit(rival, ['commit', '-m', 'Advance empty Context']);
+    await fixtureGit(rival, ['push', 'origin', 'main']);
+
+    await expect(cloneContext(
+      contextRemote,
+      path.join(root, 'stale-unborn-clone'),
+      UNBORN_HEAD,
+    )).rejects.toMatchObject({ code: 'STALE_PREVIEW' });
+  });
+
+  it('rejects traversal-bearing repository manifest paths before filesystem use', () => {
+    expect(() => repositoryManifestFile('github.com/acme/../../../outside'))
+      .toThrow(/outside/i);
+  });
+
   it('adds an outside repository only on apply and never changes its history', async () => {
     const home = path.join(root, 'member-a');
     const scanRoot = path.join(root, 'business');
@@ -311,5 +460,56 @@ describe('workspace commands', () => {
       .toBe(await fs.realpath(external));
     expect(await fixtureGit(external, ['log', '--format=%H'])).toBe(businessLog);
     expect(await fixtureGit(bareRemote, ['rev-list', '--count', 'main'])).toBe('2');
+  });
+
+  it('leaves persistent state unchanged on a concurrent add push and permits retry', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform',
+      contextRemote,
+      scanRoot,
+      maxDepth: 1,
+      home,
+    }));
+    const external = path.join(root, 'outside', 'worker');
+    await initFixtureRepository(external, 'https://github.com/acme/worker.git');
+    const preview = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    });
+    const contextPath = initialized.local.context_path;
+    const registryFile = registryPath(home, initialized.workspace.workspace_id);
+    const beforeHead = await fixtureGit(contextPath, ['rev-parse', 'HEAD']);
+    const beforeManifest = await fs.readFile(path.join(contextPath, 'workspace.yaml'));
+    const beforeRegistry = await fs.readFile(registryFile);
+
+    const rival = path.join(root, 'rival-push');
+    await fixtureGit(root, ['clone', contextRemote, rival]);
+    await fixtureGit(rival, ['config', 'user.name', 'Rival']);
+    await fixtureGit(rival, ['config', 'user.email', 'rival@example.invalid']);
+    await fs.writeFile(path.join(rival, 'README.md'), 'concurrent\n');
+    await fixtureGit(rival, ['add', 'README.md']);
+    await fixtureGit(rival, ['commit', '-m', 'Concurrent Context change']);
+    const rivalHead = await fixtureGit(rival, ['rev-parse', 'HEAD']);
+    await fixtureGit(rival, ['push', 'origin', 'HEAD:refs/race/next']);
+    await fs.writeFile(path.join(root, 'advance-main-on-next-push'), rivalHead);
+
+    await expect(applyAddRepository(preview)).rejects.toThrow();
+    expect(await fixtureGit(contextPath, ['rev-parse', 'HEAD'])).toBe(beforeHead);
+    expect(await fs.readFile(path.join(contextPath, 'workspace.yaml'))).toEqual(beforeManifest);
+    expect(await fs.readFile(registryFile)).toEqual(beforeRegistry);
+    expect((await fs.readdir(home)).some((name) => name.startsWith('.acs-'))).toBe(false);
+
+    const retry = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    });
+    const result = await applyAddRepository(retry);
+    expect(result.workspace.repositories.map((repository) => repository.repo_id))
+      .toContain('github.com/acme/worker');
   });
 });

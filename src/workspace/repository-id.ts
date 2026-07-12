@@ -1,6 +1,12 @@
 function normalizePath(remotePath: string): string {
+  if (remotePath.includes('\\')) {
+    throw new Error('Remote must not contain invalid path segments');
+  }
   const withoutQueryOrFragment = remotePath.split(/[?#]/, 1)[0] ?? '';
   const withoutSeparators = withoutQueryOrFragment.replace(/^\/+|\/+$/g, '');
+  if (withoutSeparators.split('/').some((segment) => segment === '.' || segment === '..')) {
+    throw new Error('Remote must not contain dot path segments');
+  }
   return withoutSeparators.replace(/\.git$/i, '');
 }
 
@@ -8,6 +14,9 @@ export function normalizeRemote(remote: string): string {
   const value = remote.trim();
 
   if (value.includes('://')) {
+    const afterScheme = value.slice(value.indexOf('://') + 3);
+    const rawPathStart = afterScheme.indexOf('/');
+    if (rawPathStart >= 0) normalizePath(afterScheme.slice(rawPathStart));
     const parsed = new URL(value);
     const host = parsed.port
       ? `${parsed.hostname.toLowerCase()}:${parsed.port}`

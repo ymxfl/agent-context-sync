@@ -66,6 +66,13 @@ export interface WorkspaceResult {
   commit?: string;
 }
 
+interface PreviewApproval {
+  workspace_id: string;
+  files_to_write: string[];
+  repositories: PreviewRepository[];
+  warnings: string[];
+}
+
 export function validateContextRemote(remote: string): void {
   parseWorkspaceManifest({
     schema_version: 1,
@@ -93,9 +100,15 @@ export function previewInputHash(
   operation: WorkspaceOperation,
   input: NormalizedWorkspaceInput,
   contextHead: string,
+  approval: PreviewApproval,
 ): string {
   return createHash('sha256')
-    .update(canonicalJson({ operation, input, context_head: contextHead }))
+    .update(canonicalJson({
+      operation,
+      input,
+      context_head: contextHead,
+      ...approval,
+    }))
     .digest('hex');
 }
 
@@ -107,6 +120,12 @@ export function assertPreviewIntegrity(preview: WorkspacePreview): void {
     preview.operation,
     preview.normalized_input,
     preview.context_head,
+    {
+      workspace_id: preview.workspace_id,
+      files_to_write: preview.files_to_write,
+      repositories: preview.repositories,
+      warnings: preview.warnings,
+    },
   );
   if (preview.input_hash !== expected) {
     throw appError('STALE_PREVIEW', 'Preview inputs changed after preview generation');
@@ -116,6 +135,7 @@ export function assertPreviewIntegrity(preview: WorkspacePreview): void {
 export async function remoteHead(remote: string): Promise<string> {
   const { stdout } = await runGit(process.cwd(), [
     'ls-remote',
+    '--',
     remote,
     'refs/heads/main',
     'HEAD',
@@ -151,9 +171,69 @@ export function contextCheckoutPath(home: string, workspaceId: string): string {
   return path.join(home, 'contexts', workspaceId);
 }
 
-export async function cloneContext(remote: string, destination: string): Promise<void> {
+export interface ContextTransaction {
+  root: string;
+  context_path: string;
+}
+
+export async function createContextTransaction(
+  home: string,
+  remote: string,
+  expectedHead: string,
+): Promise<ContextTransaction> {
+  await fs.mkdir(home, { recursive: true });
+  const root = await fs.mkdtemp(path.join(home, '.acs-context-transaction-'));
+  const contextPath = path.join(root, 'context');
+  try {
+    await cloneContext(remote, contextPath, expectedHead);
+    return { root, context_path: contextPath };
+  } catch (error) {
+    await fs.rm(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+export async function installContextTransaction(
+  transactionPath: string,
+  destination: string,
+): Promise<void> {
   await fs.mkdir(path.dirname(destination), { recursive: true });
-  await runGit(path.dirname(destination), ['clone', remote, destination]);
+  const backup = `${destination}.previous-${createHash('sha256')
+    .update(transactionPath)
+    .digest('hex')
+    .slice(0, 16)}`;
+  let hadPrevious = false;
+  try {
+    await fs.rename(destination, backup);
+    hadPrevious = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  try {
+    await fs.rename(transactionPath, destination);
+  } catch (error) {
+    if (hadPrevious) await fs.rename(backup, destination);
+    throw error;
+  }
+  if (hadPrevious) await fs.rm(backup, { recursive: true, force: true });
+}
+
+export async function cloneContext(
+  remote: string,
+  destination: string,
+  expectedHead: string,
+): Promise<void> {
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await runGit(path.dirname(destination), ['clone', '--', remote, destination]);
+  const clonedHead = await localHead(destination);
+  if (clonedHead !== expectedHead) {
+    await fs.rm(destination, { recursive: true, force: true });
+    throw appError('STALE_PREVIEW', 'Cloned Context HEAD differs from preview', {
+      expected_head: expectedHead,
+      actual_head: clonedHead,
+    });
+  }
 }
 
 export async function readWorkspaceManifest(
@@ -163,11 +243,25 @@ export async function readWorkspaceManifest(
   return parseWorkspaceManifest(parse(contents));
 }
 
+function checkedRepositoryManifestPath(root: string, repoId: string): string {
+  const file = path.resolve(root, `${repoId}.yaml`);
+  const relative = path.relative(root, file);
+  if (
+    relative === '..'
+    || relative.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relative)
+  ) {
+    throw new Error('Repository manifest path resolves outside its root');
+  }
+  return file;
+}
+
 function repositoryManifestPath(contextPath: string, repoId: string): string {
-  return path.join(contextPath, 'repositories', `${repoId}.yaml`);
+  return checkedRepositoryManifestPath(path.join(contextPath, 'repositories'), repoId);
 }
 
 export function repositoryManifestFile(repoId: string): string {
+  checkedRepositoryManifestPath('/repositories', repoId);
   return path.posix.join('repositories', `${repoId}.yaml`);
 }
 
@@ -177,10 +271,14 @@ export async function writeSharedManifests(
   repositories: readonly RepositoryManifest[],
 ): Promise<void> {
   const validated = parseWorkspaceManifest(workspace);
+  const repositoryFiles = repositories.map((repository) => ({
+    repository,
+    file: repositoryManifestPath(contextPath, repository.repo_id),
+  }));
   await atomicWriteFile(path.join(contextPath, 'workspace.yaml'), stringify(validated));
-  for (const repository of repositories) {
+  for (const { repository, file } of repositoryFiles) {
     await atomicWriteFile(
-      repositoryManifestPath(contextPath, repository.repo_id),
+      file,
       stringify(repository),
     );
   }

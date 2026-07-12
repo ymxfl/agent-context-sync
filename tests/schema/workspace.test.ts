@@ -34,6 +34,9 @@ describe('parseWorkspaceManifest', () => {
   it.each([
     'file:///private/platform-context',
     'file:///C:/Users/alice/platform-context',
+    '../platform-context',
+    'platform-context.git',
+    '-uhoh',
   ])('rejects local file URL context remote %s', (contextRemote) => {
     expect(() => parseWorkspaceManifest({
       schema_version: 1,
@@ -47,6 +50,7 @@ describe('parseWorkspaceManifest', () => {
   it.each([
     'https://github.com/acme/platform-context.git',
     'ssh://git@github.com/acme/platform-context.git',
+    'git://github.com/acme/platform-context.git',
     'git@github.com:acme/platform-context.git',
   ])('accepts Git context remote %s', (contextRemote) => {
     expect(parseWorkspaceManifest({
@@ -79,6 +83,9 @@ describe('parseWorkspaceManifest', () => {
     'GitHub.com/acme/backend',
     'github.com/acme/backend.git',
     'github.com/acme/backend/',
+    'github.com/acme/../backend',
+    'github.com/acme/./backend',
+    String.raw`github.com/acme\..\backend`,
   ])('rejects non-normalized repository ID %s', (repoId) => {
     expect(() => parseWorkspaceManifest({
       schema_version: 1,

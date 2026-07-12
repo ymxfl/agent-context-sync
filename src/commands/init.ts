@@ -8,9 +8,10 @@ import { parseWorkspaceManifest } from '../schema/workspace.js';
 import {
   assertPreviewIntegrity,
   assertRemoteHead,
-  cloneContext,
   commitAndPushContext,
   contextCheckoutPath,
+  createContextTransaction,
+  installContextTransaction,
   previewInputHash,
   remoteHead,
   repositoryManifestFile,
@@ -85,18 +86,25 @@ export async function initWorkspace(input: InitInput): Promise<WorkspacePreview>
   }
   repositories.sort((left, right) => left.repo_id.localeCompare(right.repo_id));
 
+  const filesToWrite = [
+    'workspace.yaml',
+    ...repositories.map((repository) => repositoryManifestFile(repository.repo_id)),
+    path.join(normalized.home, 'workspaces', `${workspaceId}.yaml`),
+  ];
+  const approval = {
+    workspace_id: workspaceId,
+    files_to_write: filesToWrite,
+    repositories,
+    warnings,
+  };
   return {
     operation: 'init',
     preview_id: createId('preview'),
-    input_hash: previewInputHash('init', normalized, contextHead),
+    input_hash: previewInputHash('init', normalized, contextHead, approval),
     context_head: contextHead,
     workspace_id: workspaceId,
     normalized_input: normalized,
-    files_to_write: [
-      'workspace.yaml',
-      ...repositories.map((repository) => repositoryManifestFile(repository.repo_id)),
-      path.join(normalized.home, 'workspaces', `${workspaceId}.yaml`),
-    ],
+    files_to_write: filesToWrite,
     repositories,
     warnings,
   };
@@ -120,12 +128,22 @@ export async function applyInit(preview: WorkspacePreview): Promise<WorkspaceRes
     repositories,
   });
   const contextPath = contextCheckoutPath(input.home, preview.workspace_id);
-  await cloneContext(input.context_remote, contextPath);
-  await writeSharedManifests(contextPath, workspace, repositories);
-  const commit = await commitAndPushContext(
-    contextPath,
-    `Initialize ${workspace.name} workspace`,
+  const transaction = await createContextTransaction(
+    input.home,
+    input.context_remote,
+    preview.context_head,
   );
+  let commit: string;
+  try {
+    await writeSharedManifests(transaction.context_path, workspace, repositories);
+    commit = await commitAndPushContext(
+      transaction.context_path,
+      `Initialize ${workspace.name} workspace`,
+    );
+    await installContextTransaction(transaction.context_path, contextPath);
+  } finally {
+    await fs.rm(transaction.root, { recursive: true, force: true });
+  }
   const local: LocalWorkspace = {
     schema_version: 1,
     workspace_id: workspace.workspace_id,

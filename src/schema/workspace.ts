@@ -12,22 +12,38 @@ const workspaceIdSchema = z.string().regex(
 );
 
 const repositoryIdSchema = z.string().regex(
-  /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/[^\s/?#]+(?:\/[^\s/?#]+)*$/,
+  /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/[^\s\\/?#]+(?:\/[^\s\\/?#]+)*$/,
   'Repository ID must be a normalized host/path string',
 ).refine((value) => !value.endsWith('.git'), {
   message: 'Repository ID must not include a .git suffix',
+}).refine((value) => {
+  const repositoryPath = value.slice(value.indexOf('/') + 1);
+  return repositoryPath.split('/').every((segment) => segment !== '.' && segment !== '..');
+}, {
+  message: 'Repository ID must not contain dot path segments',
 });
 
 const absolutePathSchema = z.string().refine(path.isAbsolute, {
   message: 'Path must be absolute',
 });
 
-const sharedRemoteSchema = z.string().trim().min(1).refine(
-  (value) => !/^file:/i.test(value)
-    && !path.posix.isAbsolute(value)
-    && !path.win32.isAbsolute(value),
-  { message: 'Shared remote must not be an absolute local path' },
-);
+function isSupportedRemote(value: string): boolean {
+  if (value.startsWith('-')) return false;
+  if (/^(?:https|ssh|git):\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      return parsed.hostname.length > 0 && parsed.pathname.replace(/^\/+/, '').length > 0;
+    } catch {
+      return false;
+    }
+  }
+  if (value.includes('://')) return false;
+  return /^(?:[^@\s/:]+@)?[^\s/:\\]+:[^\s\\]+$/.test(value);
+}
+
+const sharedRemoteSchema = z.string().trim().min(1).refine(isSupportedRemote, {
+  message: 'Shared remote must be an HTTPS, SSH, Git, or SCP-like remote',
+});
 
 const repositoryManifestSchema: z.ZodType<RepositoryManifest> = z.strictObject({
   schema_version: z.literal(1),
