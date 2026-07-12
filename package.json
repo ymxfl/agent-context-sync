@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --outfile=skill/agent-context-sync/scripts/acs.mjs",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --banner:js=\"import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);\" --outfile=skill/agent-context-sync/scripts/acs.mjs",
     "audit:engines": "node scripts/audit-lock-engines.mjs",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
