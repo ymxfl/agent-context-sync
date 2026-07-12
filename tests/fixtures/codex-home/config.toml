@@ -1,0 +1,2 @@
+project_doc_max_bytes = 32768
+project_doc_fallback_filenames = ["TEAM.md", "INSTRUCTIONS.md"]
