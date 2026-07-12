@@ -12,6 +12,46 @@ interface StoredEntry {
   file: string;
 }
 
+export interface KnowledgeStoreTransactionAdapter {
+  rename(staged: string, target: string): Promise<void>;
+}
+
+const nodeKnowledgeStoreTransactionAdapter: KnowledgeStoreTransactionAdapter = {
+  rename: (staged, target) => fs.rename(staged, target),
+};
+
+interface TransactionOperation {
+  target: string;
+  staged: string;
+  backup: string;
+  existed: boolean;
+}
+
+interface TransactionJournal {
+  schema_version: 1;
+  owner_pid: number;
+  applying_index: number | null;
+  applied_count: number;
+  operations: TransactionOperation[];
+}
+
+const storeTails = new Map<string, Promise<void>>();
+
+async function withStoreExclusive<T>(root: string, action: () => Promise<T>): Promise<T> {
+  const previous = (storeTails.get(root) ?? Promise.resolve()).catch(() => undefined);
+  let release = (): void => undefined;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.then(() => gate);
+  storeTails.set(root, tail);
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release();
+    if (storeTails.get(root) === tail) storeTails.delete(root);
+  }
+}
+
 async function lstatIfExists(file: string): Promise<Awaited<ReturnType<typeof fs.lstat>> | undefined> {
   try {
     return await fs.lstat(file);
@@ -25,6 +65,202 @@ function assertContained(root: string, file: string): void {
   const relative = path.relative(root, file);
   if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     throw new Error('Knowledge path resolves outside its root');
+  }
+}
+
+function relativeContained(root: string, file: string): string {
+  assertContained(root, file);
+  return path.relative(root, file);
+}
+
+function resolvedJournalPath(root: string, relative: string): string {
+  const file = path.resolve(root, relative);
+  assertContained(root, file);
+  return file;
+}
+
+function transactionDirectory(root: string): string {
+  return path.join(root, '.transaction');
+}
+
+function journalFile(root: string): string {
+  return path.join(transactionDirectory(root), 'journal.json');
+}
+
+function corruptJournal(cause?: unknown): Error {
+  return new Error('Knowledge transaction journal is corrupt', { cause });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function assertJournalRelativePath(root: string, value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || path.isAbsolute(value)) {
+    throw corruptJournal();
+  }
+  const resolved = resolvedJournalPath(root, value);
+  if (path.relative(root, resolved) !== value) throw corruptJournal();
+  return value;
+}
+
+function parseTransactionJournal(value: unknown, root: string): TransactionJournal {
+  if (!isRecord(value)) throw corruptJournal();
+  const keys = Object.keys(value).sort(compareCodeUnits);
+  if (keys.join('\0') !== [
+    'applied_count',
+    'applying_index',
+    'operations',
+    'owner_pid',
+    'schema_version',
+  ].join('\0')) throw corruptJournal();
+  if (
+    value.schema_version !== 1
+    || !Number.isSafeInteger(value.owner_pid)
+    || (value.owner_pid as number) <= 0
+    || !Number.isSafeInteger(value.applied_count)
+    || (value.applied_count as number) < 0
+    || !Array.isArray(value.operations)
+  ) throw corruptJournal();
+
+  const appliedCount = value.applied_count as number;
+  const applyingIndex = value.applying_index;
+  if (
+    applyingIndex !== null
+    && (!Number.isSafeInteger(applyingIndex) || (applyingIndex as number) < 0)
+  ) throw corruptJournal();
+  if (
+    appliedCount > value.operations.length
+    || (applyingIndex !== null
+      && (applyingIndex !== appliedCount || applyingIndex >= value.operations.length))
+  ) throw corruptJournal();
+
+  const targets = new Set<string>();
+  const operations = value.operations.map((candidate, index): TransactionOperation => {
+    if (!isRecord(candidate)) throw corruptJournal();
+    const operationKeys = Object.keys(candidate).sort(compareCodeUnits);
+    if (operationKeys.join('\0') !== ['backup', 'existed', 'staged', 'target'].join('\0')) {
+      throw corruptJournal();
+    }
+    if (typeof candidate.existed !== 'boolean') throw corruptJournal();
+    const target = assertJournalRelativePath(root, candidate.target);
+    const staged = assertJournalRelativePath(root, candidate.staged);
+    const backup = assertJournalRelativePath(root, candidate.backup);
+    if (
+      !target.endsWith('.md')
+      || (!target.startsWith(`workspace${path.sep}`)
+        && !target.startsWith(`repositories${path.sep}`))
+      || staged !== path.join('.transaction', 'staged', `${index}.stage`)
+      || backup !== path.join('.transaction', 'backups', `${index}.backup`)
+      || targets.has(target)
+    ) throw corruptJournal();
+    targets.add(target);
+    return { target, staged, backup, existed: candidate.existed };
+  });
+
+  return {
+    schema_version: 1,
+    owner_pid: value.owner_pid as number,
+    applying_index: applyingIndex as number | null,
+    applied_count: appliedCount,
+    operations,
+  };
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+async function readJournal(root: string): Promise<TransactionJournal | undefined> {
+  const file = journalFile(root);
+  const info = await lstatIfExists(file);
+  if (info === undefined) return undefined;
+  if (info.isSymbolicLink() || !info.isFile()) throw corruptJournal();
+  let text: string;
+  try {
+    text = await fs.readFile(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+  try {
+    return parseTransactionJournal(JSON.parse(text), root);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Knowledge transaction journal is corrupt') {
+      throw error;
+    }
+    throw corruptJournal(error);
+  }
+}
+
+async function writeJournal(root: string, journal: TransactionJournal): Promise<void> {
+  await atomicWriteFile(journalFile(root), `${JSON.stringify(journal)}\n`);
+}
+
+async function rollbackJournal(root: string, journal: TransactionJournal): Promise<void> {
+  for (const operation of [...journal.operations].reverse()) {
+    const target = resolvedJournalPath(root, operation.target);
+    if (operation.existed) {
+      const backup = resolvedJournalPath(root, operation.backup);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.copyFile(backup, target);
+    } else {
+      await fs.rm(target, { force: true });
+    }
+  }
+}
+
+async function recoverIncompleteTransaction(root: string): Promise<void> {
+  const directory = transactionDirectory(root);
+  while (true) {
+    const directoryInfo = await lstatIfExists(directory);
+    if (directoryInfo === undefined) return;
+    if (directoryInfo.isSymbolicLink() || !directoryInfo.isDirectory()) {
+      throw new Error('Knowledge transaction path must be a non-symbolic directory');
+    }
+    const journal = await readJournal(root);
+    if (journal === undefined) {
+      if (Date.now() - Number(directoryInfo.mtimeMs) < 1_000) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        continue;
+      }
+      await fs.rm(directory, { recursive: true, force: true });
+      return;
+    }
+    if (journal.owner_pid !== process.pid && isProcessAlive(journal.owner_pid)) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      continue;
+    }
+    if (
+      journal.applying_index === null
+      && journal.applied_count === journal.operations.length
+    ) {
+      await fs.rm(directory, { recursive: true, force: true });
+      return;
+    }
+    await rollbackJournal(root, journal);
+    await fs.rm(directory, { recursive: true, force: true });
+    return;
+  }
+}
+
+async function syncDirectory(directory: string): Promise<void> {
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(directory, 'r');
+    await handle.sync();
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? '';
+    if (!new Set(['EACCES', 'EBADF', 'EINVAL', 'EISDIR', 'ENOTSUP', 'EPERM']).has(code)) {
+      throw error;
+    }
+  } finally {
+    await handle?.close();
   }
 }
 
@@ -62,6 +298,8 @@ export class KnowledgeStore {
   constructor(
     contextRoot: string,
     private readonly context?: KnowledgeParseContext,
+    private readonly transactionAdapter: KnowledgeStoreTransactionAdapter =
+      nodeKnowledgeStoreTransactionAdapter,
   ) {
     this.root = path.resolve(contextRoot, 'knowledge');
     assertContained(path.resolve(contextRoot), this.root);
@@ -76,7 +314,7 @@ export class KnowledgeStore {
     return file;
   }
 
-  private async storedEntries(): Promise<StoredEntry[]> {
+  private async storedEntriesUnlocked(): Promise<StoredEntry[]> {
     const stored: StoredEntry[] = [];
     for (const file of await markdownFiles(this.root)) {
       const entry = parseKnowledgeMarkdown(await fs.readFile(file, 'utf8'), this.context);
@@ -93,16 +331,102 @@ export class KnowledgeStore {
   }
 
   async list(): Promise<KnowledgeEntry[]> {
-    return (await this.storedEntries()).map(({ entry }) => entry);
+    return withStoreExclusive(this.root, async () => {
+      await recoverIncompleteTransaction(this.root);
+      return (await this.storedEntriesUnlocked()).map(({ entry }) => entry);
+    });
   }
 
   async get(id: string): Promise<KnowledgeEntry | undefined> {
-    return (await this.storedEntries()).find(({ entry }) => entry.id === id)?.entry;
+    return withStoreExclusive(this.root, async () => {
+      await recoverIncompleteTransaction(this.root);
+      return (await this.storedEntriesUnlocked()).find(({ entry }) => entry.id === id)?.entry;
+    });
   }
 
   async put(entry: KnowledgeEntry): Promise<void> {
+    return withStoreExclusive(this.root, async () => {
+      await recoverIncompleteTransaction(this.root);
+      await this.putUnlocked(entry);
+    });
+  }
+
+  private async commitChanges(
+    changes: ReadonlyArray<{ file: string; contents: string }>,
+  ): Promise<void> {
+    if (changes.length === 0) return;
+    await fs.mkdir(this.root, { recursive: true, mode: 0o700 });
+    const directory = transactionDirectory(this.root);
+    while (true) {
+      try {
+        await fs.mkdir(directory, { mode: 0o700 });
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        await recoverIncompleteTransaction(this.root);
+      }
+    }
+    const journal: TransactionJournal = {
+      schema_version: 1,
+      owner_pid: process.pid,
+      applying_index: null,
+      applied_count: 0,
+      operations: [],
+    };
+    try {
+      await writeJournal(this.root, journal);
+      const stagedDirectory = path.join(directory, 'staged');
+      const backupDirectory = path.join(directory, 'backups');
+      await fs.mkdir(stagedDirectory, { recursive: true, mode: 0o700 });
+      await fs.mkdir(backupDirectory, { recursive: true, mode: 0o700 });
+      for (const [index, change] of changes.entries()) {
+        const staged = path.join(stagedDirectory, `${index}.stage`);
+        const backup = path.join(backupDirectory, `${index}.backup`);
+        const previous = await lstatIfExists(change.file);
+        if (previous !== undefined && (previous.isSymbolicLink() || !previous.isFile())) {
+          throw new Error(`Knowledge target is not a regular file: ${change.file}`);
+        }
+        await fs.mkdir(path.dirname(change.file), { recursive: true, mode: 0o700 });
+        await atomicWriteFile(staged, change.contents);
+        if (previous !== undefined) {
+          await atomicWriteFile(backup, await fs.readFile(change.file, 'utf8'));
+        }
+        journal.operations.push({
+          target: relativeContained(this.root, change.file),
+          staged: relativeContained(this.root, staged),
+          backup: relativeContained(this.root, backup),
+          existed: previous !== undefined,
+        });
+      }
+      await writeJournal(this.root, journal);
+
+      for (const [index, operation] of journal.operations.entries()) {
+        journal.applying_index = index;
+        await writeJournal(this.root, journal);
+        await this.transactionAdapter.rename(
+          resolvedJournalPath(this.root, operation.staged),
+          resolvedJournalPath(this.root, operation.target),
+        );
+        await syncDirectory(path.dirname(resolvedJournalPath(this.root, operation.target)));
+        journal.applied_count = index + 1;
+        journal.applying_index = null;
+        await writeJournal(this.root, journal);
+      }
+      await fs.rm(directory, { recursive: true, force: true });
+    } catch (error) {
+      try {
+        if (journal.operations.length > 0) await rollbackJournal(this.root, journal);
+        await fs.rm(directory, { recursive: true, force: true });
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], 'Knowledge transaction and rollback failed');
+      }
+      throw error;
+    }
+  }
+
+  private async putUnlocked(entry: KnowledgeEntry): Promise<void> {
     const validated = parseKnowledgeEntry(entry, this.context);
-    const stored = await this.storedEntries();
+    const stored = await this.storedEntriesUnlocked();
     const previous = stored.find((item) => item.entry.id === validated.id);
     const target = this.fileFor(validated);
     if (previous !== undefined && previous.file !== target) {
@@ -134,11 +458,14 @@ export class KnowledgeStore {
     const error = graphError(entries);
     if (error) throw error;
     entries.sort((left, right) => compareCodeUnits(left.id, right.id));
+    const changes: Array<{ file: string; contents: string }> = [];
     for (const current of entries) {
       const old = stored.find((item) => item.entry.id === current.id)?.entry;
-      if (old === undefined || serializeKnowledge(old) !== serializeKnowledge(current)) {
-        await atomicWriteFile(this.fileFor(current), serializeKnowledge(current));
+      const contents = serializeKnowledge(current);
+      if (old === undefined || serializeKnowledge(old) !== contents) {
+        changes.push({ file: this.fileFor(current), contents });
       }
     }
+    await this.commitChanges(changes);
   }
 }

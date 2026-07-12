@@ -7,13 +7,34 @@ import type {
 import { compareCodeUnits } from '../domain/compare.js';
 import { parseKnowledgeEntry } from '../schema/knowledge.js';
 
-type KnowledgeFrontmatter = Omit<KnowledgeEntry, 'statement' | 'reason'>;
-
 function contextForScope(scope: unknown): KnowledgeParseContext | undefined {
   if (typeof scope !== 'string' || !scope.startsWith('repository:')) return undefined;
   return {
     registeredRepositoryIds: new Set([scope.slice('repository:'.length)]),
   };
+}
+
+function containsPrivateLocalPath(value: string): boolean {
+  return /\/(?:Users|home)\//.test(value)
+    || /(?:^|[^a-z0-9])[a-z]:[\\/]/i.test(value)
+    || /\\\\[^\\\s]+\\[^\\\s]+/.test(value)
+    || /(?:^|[^a-z0-9])file:/i.test(value);
+}
+
+function assertNoPrivateLocalPaths(value: unknown): void {
+  if (typeof value === 'string') {
+    if (containsPrivateLocalPath(value)) {
+      throw new Error('Knowledge contains a private local path');
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) assertNoPrivateLocalPaths(item);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value)) assertNoPrivateLocalPaths(item);
+  }
 }
 
 function normalizeText(value: string): string {
@@ -37,12 +58,12 @@ function canonicalEntry(entry: KnowledgeEntry): KnowledgeEntry {
 
 export function serializeKnowledge(entry: KnowledgeEntry): string {
   const canonical = canonicalEntry(entry);
-  const { statement, reason, ...frontmatter } = canonical;
-  const yaml = stringify(frontmatter, {
+  assertNoPrivateLocalPaths(canonical);
+  const yaml = stringify(canonical, {
     lineWidth: 0,
     sortMapEntries: true,
   }).replace(/\r\n?/g, '\n').trimEnd();
-  return `---\n${yaml}\n---\n\n${statement}\n\n## Reason\n\n${reason}\n`;
+  return `---\n${yaml}\n---\n\n${canonical.statement}\n\n## Reason\n\n${canonical.reason}\n`;
 }
 
 export function parseKnowledgeMarkdown(
@@ -50,6 +71,7 @@ export function parseKnowledgeMarkdown(
   context?: KnowledgeParseContext,
 ): KnowledgeEntry {
   const normalized = text.replace(/\r\n?/g, '\n');
+  assertNoPrivateLocalPaths(normalized);
   if (!normalized.startsWith('---\n')) {
     throw new Error('Knowledge Markdown must begin with YAML frontmatter');
   }
@@ -57,21 +79,12 @@ export function parseKnowledgeMarkdown(
   if (frontmatterEnd === -1) {
     throw new Error('Knowledge Markdown frontmatter is not terminated');
   }
-  const body = normalized.slice(frontmatterEnd + 5).replace(/\n+$/, '');
-  const reasonMarker = '\n\n## Reason\n\n';
-  const reasonIndex = body.indexOf(reasonMarker);
-  if (reasonIndex === -1 || body.indexOf(reasonMarker, reasonIndex + 1) !== -1) {
-    throw new Error('Knowledge Markdown must contain one Reason section');
-  }
-
   const raw = parse(normalized.slice(4, frontmatterEnd)) as Record<string, unknown>;
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('Knowledge Markdown frontmatter must be a mapping');
   }
   const scope = raw.scope as KnowledgeScope | undefined;
-  return parseKnowledgeEntry({
-    ...raw,
-    statement: body.slice(0, reasonIndex),
-    reason: body.slice(reasonIndex + reasonMarker.length),
-  }, context ?? contextForScope(scope));
+  const entry = parseKnowledgeEntry(raw, context ?? contextForScope(scope));
+  assertNoPrivateLocalPaths(entry);
+  return entry;
 }

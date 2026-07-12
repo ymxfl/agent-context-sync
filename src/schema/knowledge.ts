@@ -52,6 +52,22 @@ const logicalLocatorSchema = nonEmptyStringSchema.refine(isLogicalLocator, {
   message: 'Source locator must be a redacted logical locator',
 });
 
+function isRepositoryRelativePosixGlob(value: string): boolean {
+  if (
+    value.startsWith('/')
+    || value.startsWith('\\')
+    || /^[a-z]:/i.test(value)
+    || /^file:/i.test(value)
+    || value.includes('\\')
+  ) return false;
+  return value.split('/').every((segment) => segment !== '.' && segment !== '..' && segment !== '');
+}
+
+const repositoryRelativePosixGlobSchema = nonEmptyStringSchema.refine(
+  isRepositoryRelativePosixGlob,
+  { message: 'applies_to paths must be repository-relative POSIX globs' },
+);
+
 export const sourceReferenceSchema: z.ZodType<SourceReference> = z.strictObject({
   agent: nonEmptyStringSchema,
   source_type: kebabCaseSchema,
@@ -61,7 +77,7 @@ export const sourceReferenceSchema: z.ZodType<SourceReference> = z.strictObject(
 });
 
 const appliesToSchema = z.strictObject({
-  paths: z.array(nonEmptyStringSchema),
+  paths: z.array(repositoryRelativePosixGlobSchema),
   agents: z.array(nonEmptyStringSchema),
 });
 
