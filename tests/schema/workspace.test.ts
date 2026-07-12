@@ -7,6 +7,43 @@ import {
 const workspaceId = 'ws_01J00000000000000000000000';
 
 describe('parseWorkspaceManifest', () => {
+  it('rejects duplicate repository identities', () => {
+    expect(() => parseWorkspaceManifest({
+      schema_version: 1,
+      workspace_id: 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      name: 'platform',
+      context_remote: 'git@github.com:acme/context.git',
+      repositories: [
+        { schema_version: 1, repo_id: 'github.com/acme/api', name: 'api-a' },
+        { schema_version: 1, repo_id: 'github.com/acme/api', name: 'api-b' },
+      ],
+    })).toThrow(/unique/i);
+  });
+
+  it.each([
+    'https://user@github.com/acme/context.git',
+    'https://user:secret@github.com/acme/context.git',
+    'ssh://git@github.com/acme/context.git',
+    'git://user@github.com/acme/context.git',
+  ])('rejects URL userinfo in Context remotes: %s', (contextRemote) => {
+    expect(() => parseWorkspaceManifest({
+      schema_version: 1,
+      workspace_id: 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      name: 'platform',
+      context_remote: contextRemote,
+      repositories: [],
+    })).toThrow(/userinfo|credential/i);
+  });
+
+  it('continues to accept credential-free SCP remotes', () => {
+    expect(parseWorkspaceManifest({
+      schema_version: 1,
+      workspace_id: 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      name: 'platform',
+      context_remote: 'git@github.com:acme/context.git',
+      repositories: [],
+    }).context_remote).toBe('git@github.com:acme/context.git');
+  });
   it('rejects local paths in the shared manifest', () => {
     expect(() => parseWorkspaceManifest({
       schema_version: 1,
@@ -49,7 +86,7 @@ describe('parseWorkspaceManifest', () => {
 
   it.each([
     'https://github.com/acme/platform-context.git',
-    'ssh://git@github.com/acme/platform-context.git',
+    'ssh://github.com/acme/platform-context.git',
     'git://github.com/acme/platform-context.git',
     'git@github.com:acme/platform-context.git',
   ])('accepts Git context remote %s', (contextRemote) => {

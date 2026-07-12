@@ -6,6 +6,7 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
+import { compareCodeUnits } from '../../domain/compare.js';
 import {
   ADAPTER_CONTRACT_VERSION,
   COVERAGE_CONTRACT_VERSION,
@@ -383,7 +384,7 @@ export class CodexAdapter implements AgentAdapter {
         ));
       }
     }
-    memoryEntries.sort((left, right) => left.name.localeCompare(right.name));
+    memoryEntries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of memoryEntries) {
       if (!entry.isFile() || !entry.name.endsWith('.toml')) continue;
       const locator = join(memoriesRoot, entry.name);
@@ -464,7 +465,7 @@ export class CodexAdapter implements AgentAdapter {
       const rightSelected = selected.findIndex((item) => item.locator === right.locator);
       const leftRank = leftSelected === -1 ? Number.MAX_SAFE_INTEGER : leftSelected;
       const rightRank = rightSelected === -1 ? Number.MAX_SAFE_INTEGER : rightSelected;
-      return leftRank - rightRank || left.locator.localeCompare(right.locator);
+      return leftRank - rightRank || compareCodeUnits(left.locator, right.locator);
     });
     coverageItems.push(coverage(
       'codex-known-sources',
@@ -478,7 +479,7 @@ export class CodexAdapter implements AgentAdapter {
         'Codex instruction content exceeds the configured UTF-8 byte limit.',
       ));
     }
-    coverageItems.sort((left, right) => left.id.localeCompare(right.id) || (left.locator ?? '').localeCompare(right.locator ?? ''));
+    coverageItems.sort((left, right) => compareCodeUnits(left.id, right.id) || compareCodeUnits(left.locator ?? '', right.locator ?? ''));
 
     return {
       agent: AGENT,

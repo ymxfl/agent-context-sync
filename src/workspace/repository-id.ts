@@ -10,6 +10,27 @@ function normalizePath(remotePath: string): string {
   return withoutSeparators.replace(/\.git$/i, '');
 }
 
+export function canonicalRemote(remote: string): string {
+  const value = remote.trim();
+  if (value.includes('://')) {
+    const parsed = new URL(value);
+    if (parsed.username.length > 0 || parsed.password.length > 0) {
+      throw new Error('URL userinfo and credentials are forbidden');
+    }
+    const pathname = parsed.pathname.replace(/\/+$/g, '');
+    if (parsed.hostname.length === 0 || pathname.replace(/^\/+/, '').length === 0) {
+      throw new Error('Remote must include a host and repository path');
+    }
+    const host = parsed.port ? `${parsed.hostname.toLowerCase()}:${parsed.port}` : parsed.hostname.toLowerCase();
+    return `${parsed.protocol.toLowerCase()}//${host}/${pathname.replace(/^\/+/, '')}`;
+  }
+  const match = /^(git@)?([^@:/?#]+):(.+)$/.exec(value);
+  if (match === null) throw new Error(`Unsupported Git remote: ${remote}`);
+  const remotePath = (match[3] ?? '').split(/[?#]/, 1)[0]?.replace(/\/+$/g, '') ?? '';
+  if (remotePath.length === 0) throw new Error('Remote must include a repository path');
+  return `${match[1] ?? ''}${(match[2] ?? '').toLowerCase()}:${remotePath}`;
+}
+
 export function normalizeRemote(remote: string): string {
   const value = remote.trim();
 

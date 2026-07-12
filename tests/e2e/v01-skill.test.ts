@@ -24,6 +24,7 @@ it('documents the exact Skill approval workflow and v0.1 boundaries', async () =
   expect(skill).toContain('init preview --name');
   expect(skill).toContain('join preview --context-remote');
   expect(skill).toContain('add-repo preview --workspace');
+  expect(skill).toContain('--binding repo_id=path');
   expect(readme).toContain('~/.codex/skills/agent-context-sync');
   expect(readme).toContain('~/.claude/skills/agent-context-sync');
   expect(readme).toContain('Claude Code and Codex');
@@ -35,15 +36,15 @@ it('documents the exact Skill approval workflow and v0.1 boundaries', async () =
       path.join(mockSkill, 'scripts/acs.mjs'),
       'process.stdout.write(JSON.stringify(process.argv.slice(2)));\n',
     );
-    const previewJson = JSON.stringify({ preview_id: 'preview_exact', nested: { value: '$literal' } });
+    const previewId = 'preview_01ARZ3NDEKTSV4RRFFQ69G5FAV';
     const applyInvocations = skill.match(/^node .* (?:init|join|add-repo) apply .*$/gm) ?? [];
     expect(applyInvocations).toHaveLength(3);
     for (const invocation of applyInvocations) {
       const { stdout } = await execFileAsync('/bin/sh', ['-c', invocation], {
-        env: { ...process.env, SKILL_DIR: mockSkill, PREVIEW_JSON: previewJson },
+        env: { ...process.env, SKILL_DIR: mockSkill, PREVIEW_ID: previewId },
       });
       const args = JSON.parse(stdout) as string[];
-      expect(args.slice(-2)).toEqual(['--preview-json', previewJson]);
+      expect(args.slice(-2)).toEqual(['--preview-id', previewId]);
     }
   } finally {
     await fs.rm(mockSkill, { recursive: true, force: true });
@@ -128,7 +129,7 @@ it('delivers the v0.1 two-repository Skill workflow without business mutations',
     expect(initPreview.exitCode).toBe(0);
     expect(initPreview.json.data.preview.repositories).toHaveLength(2);
     const initResult = await invoke([
-      'init', 'apply', '--preview-json', JSON.stringify(initPreview.json.data.preview),
+      'init', 'apply', '--preview-id', initPreview.json.data.preview.preview_id,
     ], memberAEnv);
     expect(initResult.exitCode).toBe(0);
     const workspaceId = initResult.json.data.result.workspace.workspace_id as string;
@@ -141,6 +142,10 @@ it('delivers the v0.1 two-repository Skill workflow without business mutations',
     await initFixtureRepository(apiB, 'git@github.com:acme/api.git');
     await fs.writeFile(path.join(apiB, 'AGENTS.md'), '# Joined API Codex\n');
     await fs.writeFile(path.join(apiB, 'CLAUDE.md'), '# Joined API Claude\n');
+    const nestedB = path.join(apiB, 'packages/api');
+    await fs.mkdir(nestedB, { recursive: true });
+    await fs.writeFile(path.join(nestedB, 'AGENTS.override.md'), '# Nested Codex\n');
+    await fs.writeFile(path.join(nestedB, 'CLAUDE.md'), '# Nested Claude\n');
     const beforeB = {
       head: await fixtureGit(apiB, ['rev-parse', 'HEAD']),
       status: await fixtureGit(apiB, ['status', '--porcelain=v1']),
@@ -162,7 +167,7 @@ it('delivers the v0.1 two-repository Skill workflow without business mutations',
       (repository: { local_path?: string }) => repository.local_path !== undefined,
     )).toHaveLength(1);
     const joinResult = await invoke([
-      'join', 'apply', '--preview-json', JSON.stringify(joinPreview.json.data.preview),
+      'join', 'apply', '--preview-id', joinPreview.json.data.preview.preview_id,
     ], memberBEnv);
     expect(joinResult.exitCode).toBe(0);
 
@@ -171,14 +176,29 @@ it('delivers the v0.1 two-repository Skill workflow without business mutations',
     ], memberBEnv);
     expect(codex.exitCode).toBe(0);
     expect(codex.json.data.reports).toHaveLength(1);
-    expect(codex.json.data.reports[0].agent).toBe('codex');
-    expect(codex.json.data.reports[0].sources.length).toBeGreaterThan(0);
+    expect(codex.json.data.reports[0].repo_id).toBe('github.com/acme/api');
+    expect(codex.json.data.reports[0].report.agent).toBe('codex');
+    expect(codex.json.data.reports[0].report.sources.length).toBeGreaterThan(0);
+    const nestedCodex = await invoke([
+      'inspect', '--workspace', workspaceId, '--agent', 'codex',
+      '--repository', 'github.com/acme/api', '--cwd', nestedB,
+    ], memberBEnv);
+    expect(nestedCodex.json.data.reports[0].report.loadPlan.map(
+      (item: { locator: string }) => item.locator,
+    )).toContain(await fs.realpath(path.join(nestedB, 'AGENTS.override.md')));
     const claude = await invoke([
       'inspect', '--workspace', workspaceId, '--agent', 'claude-code',
     ], memberBEnv);
     expect(claude.exitCode).toBe(0);
-    expect(claude.json.data.reports[0].agent).toBe('claude-code');
-    expect(claude.json.data.reports[0].sources.length).toBeGreaterThan(0);
+    expect(claude.json.data.reports[0].report.agent).toBe('claude-code');
+    expect(claude.json.data.reports[0].report.sources.length).toBeGreaterThan(0);
+    const nestedClaude = await invoke([
+      'inspect', '--workspace', workspaceId, '--agent', 'claude-code',
+      '--repository', 'github.com/acme/api', '--cwd', nestedB,
+    ], memberBEnv);
+    expect(nestedClaude.json.data.reports[0].report.loadPlan.map(
+      (item: { locator: string }) => item.locator,
+    )).toContain(await fs.realpath(path.join(nestedB, 'CLAUDE.md')));
 
     const diagnosis = await invoke(['doctor', '--workspace', workspaceId], memberBEnv);
     expect(diagnosis.exitCode).toBe(0);

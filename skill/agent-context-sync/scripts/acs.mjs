@@ -112,17 +112,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path12) {
-      const ctrl = callVisitor(key, node, visitor, path12);
+    function visit_(key, node, visitor, path14) {
+      const ctrl = callVisitor(key, node, visitor, path14);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path12, ctrl);
-        return visit_(key, ctrl, visitor, path12);
+        replaceNode(key, path14, ctrl);
+        return visit_(key, ctrl, visitor, path14);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path12 = Object.freeze(path12.concat(node));
+          path14 = Object.freeze(path14.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path12);
+            const ci = visit_(i, node.items[i], visitor, path14);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -133,13 +133,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path12 = Object.freeze(path12.concat(node));
-          const ck = visit_("key", node.key, visitor, path12);
+          path14 = Object.freeze(path14.concat(node));
+          const ck = visit_("key", node.key, visitor, path14);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path12);
+          const cv = visit_("value", node.value, visitor, path14);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -160,17 +160,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path12) {
-      const ctrl = await callVisitor(key, node, visitor, path12);
+    async function visitAsync_(key, node, visitor, path14) {
+      const ctrl = await callVisitor(key, node, visitor, path14);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path12, ctrl);
-        return visitAsync_(key, ctrl, visitor, path12);
+        replaceNode(key, path14, ctrl);
+        return visitAsync_(key, ctrl, visitor, path14);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path12 = Object.freeze(path12.concat(node));
+          path14 = Object.freeze(path14.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path12);
+            const ci = await visitAsync_(i, node.items[i], visitor, path14);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -181,13 +181,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path12 = Object.freeze(path12.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path12);
+          path14 = Object.freeze(path14.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path14);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path12);
+          const cv = await visitAsync_("value", node.value, visitor, path14);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -214,23 +214,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path12) {
+    function callVisitor(key, node, visitor, path14) {
       if (typeof visitor === "function")
-        return visitor(key, node, path12);
+        return visitor(key, node, path14);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path12);
+        return visitor.Map?.(key, node, path14);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path12);
+        return visitor.Seq?.(key, node, path14);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path12);
+        return visitor.Pair?.(key, node, path14);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path12);
+        return visitor.Scalar?.(key, node, path14);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path12);
+        return visitor.Alias?.(key, node, path14);
       return void 0;
     }
-    function replaceNode(key, path12, node) {
-      const parent = path12[path12.length - 1];
+    function replaceNode(key, path14, node) {
+      const parent = path14[path14.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -840,10 +840,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path12, value) {
+    function collectionFromPath(schema, path14, value) {
       let v = value;
-      for (let i = path12.length - 1; i >= 0; --i) {
-        const k = path12[i];
+      for (let i = path14.length - 1; i >= 0; --i) {
+        const k = path14[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -862,7 +862,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path12) => path12 == null || typeof path12 === "object" && !!path12[Symbol.iterator]().next().done;
+    var isEmptyPath = (path14) => path14 == null || typeof path14 === "object" && !!path14[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -892,11 +892,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path12, value) {
-        if (isEmptyPath(path12))
+      addIn(path14, value) {
+        if (isEmptyPath(path14))
           this.add(value);
         else {
-          const [key, ...rest] = path12;
+          const [key, ...rest] = path14;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -910,8 +910,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path12) {
-        const [key, ...rest] = path12;
+      deleteIn(path14) {
+        const [key, ...rest] = path14;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -925,8 +925,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path12, keepScalar) {
-        const [key, ...rest] = path12;
+      getIn(path14, keepScalar) {
+        const [key, ...rest] = path14;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -944,8 +944,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path12) {
-        const [key, ...rest] = path12;
+      hasIn(path14) {
+        const [key, ...rest] = path14;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -955,8 +955,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path12, value) {
-        const [key, ...rest] = path12;
+      setIn(path14, value) {
+        const [key, ...rest] = path14;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3471,9 +3471,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path12, value) {
+      addIn(path14, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path12, value);
+          this.contents.addIn(path14, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3548,14 +3548,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path12) {
-        if (Collection.isEmptyPath(path12)) {
+      deleteIn(path14) {
+        if (Collection.isEmptyPath(path14)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path12) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path14) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3570,10 +3570,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path12, keepScalar) {
-        if (Collection.isEmptyPath(path12))
+      getIn(path14, keepScalar) {
+        if (Collection.isEmptyPath(path14))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path12, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path14, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3584,10 +3584,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path12) {
-        if (Collection.isEmptyPath(path12))
+      hasIn(path14) {
+        if (Collection.isEmptyPath(path14))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path12) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path14) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3604,13 +3604,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path12, value) {
-        if (Collection.isEmptyPath(path12)) {
+      setIn(path14, value) {
+        if (Collection.isEmptyPath(path14)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path12), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path14), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path12, value);
+          this.contents.setIn(path14, value);
         }
       }
       /**
@@ -5570,9 +5570,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path12) => {
+    visit.itemAtPath = (cst, path14) => {
       let item = cst;
-      for (const [field, index] of path12) {
+      for (const [field, index] of path14) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5581,23 +5581,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path12) => {
-      const parent = visit.itemAtPath(cst, path12.slice(0, -1));
-      const field = path12[path12.length - 1][0];
+    visit.parentCollection = (cst, path14) => {
+      const parent = visit.itemAtPath(cst, path14.slice(0, -1));
+      const field = path14[path14.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path12, item, visitor) {
-      let ctrl = visitor(item, path12);
+    function _visit(path14, item, visitor) {
+      let ctrl = visitor(item, path14);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path12.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path14.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5608,10 +5608,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path12);
+            ctrl = ctrl(item, path14);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path12) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path14) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6913,14 +6913,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs7 = this.flowScalar(this.type);
+              const fs10 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map2.items.push({ start, key: fs7, sep: [] });
+                map2.items.push({ start, key: fs10, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs7);
+                this.stack.push(fs10);
               } else {
-                Object.assign(it, { key: fs7, sep: [] });
+                Object.assign(it, { key: fs10, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7048,13 +7048,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs7 = this.flowScalar(this.type);
+              const fs10 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs7, sep: [] });
+                fc.items.push({ start: [], key: fs10, sep: [] });
               else if (it.sep)
-                this.stack.push(fs7);
+                this.stack.push(fs10);
               else
-                Object.assign(it, { key: fs7, sep: [] });
+                Object.assign(it, { key: fs10, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7364,12 +7364,45 @@ var require_dist = __commonJS({
 
 // src/main.ts
 import { homedir as homedir2 } from "node:os";
-import path11 from "node:path";
+import path13 from "node:path";
 import { pathToFileURL } from "node:url";
 
+// src/domain/compare.ts
+function compareCodeUnits(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+// src/domain/errors.ts
+function appError(code, message, details) {
+  if (details === void 0) {
+    return { code, message };
+  }
+  return { code, message, details };
+}
+function sanitize(value) {
+  if (value === null || typeof value === "boolean" || typeof value === "number") return value;
+  if (typeof value === "string") return value.length <= 512 ? value : value.slice(0, 512);
+  if (Array.isArray(value)) {
+    return value.map(sanitize).filter((item) => item !== void 0);
+  }
+  if (typeof value !== "object") return void 0;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return void 0;
+  const output = {};
+  for (const [key, item] of Object.entries(value).sort(([left], [right]) => compareCodeUnits(left, right))) {
+    if (!/^[a-z][a-z0-9_]*$/i.test(key)) continue;
+    const safe = sanitize(item);
+    if (safe !== void 0) output[key] = safe;
+  }
+  return output;
+}
+function sanitizedAppErrorDetails(error51) {
+  return sanitize(error51.details);
+}
+
 // src/commands/add-repo.ts
-import * as fs3 from "node:fs/promises";
-import path6 from "node:path";
+import * as fs5 from "node:fs/promises";
+import path8 from "node:path";
 
 // src/domain/ids.ts
 import { randomBytes } from "node:crypto";
@@ -8159,10 +8192,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path12) {
-  if (!path12)
+function getElementAtPath(obj, path14) {
+  if (!path14)
     return obj;
-  return path12.reduce((acc, key) => acc?.[key], obj);
+  return path14.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8571,11 +8604,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path12, issues) {
+function prefixIssues(path14, issues) {
   return issues.map((iss) => {
     var _a4;
     (_a4 = iss).path ?? (_a4.path = []);
-    iss.path.unshift(path12);
+    iss.path.unshift(path14);
     return iss;
   });
 }
@@ -8722,16 +8755,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path12 = []) => {
+  const processError = (error52, path14 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path12, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else {
-        const fullpath = [...path12, ...issue2.path];
+        const fullpath = [...path14, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8758,17 +8791,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path12 = []) => {
+  const processError = (error52, path14 = []) => {
     var _a4, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path12, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else {
-        const fullpath = [...path12, ...issue2.path];
+        const fullpath = [...path14, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8800,8 +8833,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path12 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path12) {
+  const path14 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path14) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -21493,13 +21526,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path12 = ref.slice(1).split("/").filter(Boolean);
-  if (path12.length === 0) {
+  const path14 = ref.slice(1).split("/").filter(Boolean);
+  if (path14.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path12[0] === defsKey) {
-    const key = path12[1];
+  if (path14[0] === defsKey) {
+    const key = path14[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -21931,16 +21964,16 @@ function isSupportedRemote(value) {
   if (/^(?:https|ssh|git):\/\//i.test(value)) {
     try {
       const parsed = new URL(value);
-      return parsed.hostname.length > 0 && parsed.pathname.replace(/^\/+/, "").length > 0;
+      return parsed.username.length === 0 && parsed.password.length === 0 && parsed.hostname.length > 0 && parsed.pathname.replace(/^\/+/, "").length > 0;
     } catch {
       return false;
     }
   }
   if (value.includes("://")) return false;
-  return /^(?:[^@\s/:]+@)?[^\s/:\\]+:[^\s\\]+$/.test(value);
+  return /^(?:git@)?[^@\s/:\\]+:[^\s\\]+$/.test(value);
 }
 var sharedRemoteSchema = external_exports.string().trim().min(1).refine(isSupportedRemote, {
-  message: "Shared remote must be an HTTPS, SSH, Git, or SCP-like remote"
+  message: "Shared remote must be credential-free HTTPS, SSH, Git, or git@ SCP-like remote; URL userinfo is forbidden"
 });
 var repositoryManifestSchema = external_exports.strictObject({
   schema_version: external_exports.literal(1),
@@ -21953,6 +21986,18 @@ var workspaceManifestSchema = external_exports.strictObject({
   name: external_exports.string().trim().min(1),
   context_remote: sharedRemoteSchema,
   repositories: external_exports.array(repositoryManifestSchema)
+}).superRefine((workspace, context) => {
+  const seen = /* @__PURE__ */ new Set();
+  for (const [index, repository] of workspace.repositories.entries()) {
+    if (seen.has(repository.repo_id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["repositories", index, "repo_id"],
+        message: "Repository IDs must be unique within a Workspace"
+      });
+    }
+    seen.add(repository.repo_id);
+  }
 });
 var localWorkspaceSchema = external_exports.strictObject({
   schema_version: external_exports.literal(1),
@@ -21974,15 +22019,7 @@ function parseLocalWorkspace(value) {
 var import_yaml = __toESM(require_dist(), 1);
 import { createHash } from "node:crypto";
 import * as fs2 from "node:fs/promises";
-import path3 from "node:path";
-
-// src/domain/errors.ts
-function appError(code, message, details) {
-  if (details === void 0) {
-    return { code, message };
-  }
-  return { code, message, details };
-}
+import path4 from "node:path";
 
 // src/fs/atomic-write.ts
 import { randomUUID } from "node:crypto";
@@ -22090,8 +22127,219 @@ async function runGit(cwd, args) {
   });
 }
 
+// src/workspace/scanner.ts
+import { lstat, readdir, realpath, stat } from "node:fs/promises";
+import path3 from "node:path";
+
+// src/workspace/repository-id.ts
+function normalizePath(remotePath) {
+  if (remotePath.includes("\\")) {
+    throw new Error("Remote must not contain invalid path segments");
+  }
+  const withoutQueryOrFragment = remotePath.split(/[?#]/, 1)[0] ?? "";
+  const withoutSeparators = withoutQueryOrFragment.replace(/^\/+|\/+$/g, "");
+  if (withoutSeparators.split("/").some((segment) => segment === "." || segment === "..")) {
+    throw new Error("Remote must not contain dot path segments");
+  }
+  return withoutSeparators.replace(/\.git$/i, "");
+}
+function canonicalRemote(remote) {
+  const value = remote.trim();
+  if (value.includes("://")) {
+    const parsed = new URL(value);
+    if (parsed.username.length > 0 || parsed.password.length > 0) {
+      throw new Error("URL userinfo and credentials are forbidden");
+    }
+    const pathname = parsed.pathname.replace(/\/+$/g, "");
+    if (parsed.hostname.length === 0 || pathname.replace(/^\/+/, "").length === 0) {
+      throw new Error("Remote must include a host and repository path");
+    }
+    const host = parsed.port ? `${parsed.hostname.toLowerCase()}:${parsed.port}` : parsed.hostname.toLowerCase();
+    return `${parsed.protocol.toLowerCase()}//${host}/${pathname.replace(/^\/+/, "")}`;
+  }
+  const match2 = /^(git@)?([^@:/?#]+):(.+)$/.exec(value);
+  if (match2 === null) throw new Error(`Unsupported Git remote: ${remote}`);
+  const remotePath = (match2[3] ?? "").split(/[?#]/, 1)[0]?.replace(/\/+$/g, "") ?? "";
+  if (remotePath.length === 0) throw new Error("Remote must include a repository path");
+  return `${match2[1] ?? ""}${(match2[2] ?? "").toLowerCase()}:${remotePath}`;
+}
+function normalizeRemote(remote) {
+  const value = remote.trim();
+  if (value.includes("://")) {
+    const afterScheme = value.slice(value.indexOf("://") + 3);
+    const rawPathStart = afterScheme.indexOf("/");
+    if (rawPathStart >= 0) normalizePath(afterScheme.slice(rawPathStart));
+    const parsed = new URL(value);
+    const host2 = parsed.port ? `${parsed.hostname.toLowerCase()}:${parsed.port}` : parsed.hostname.toLowerCase();
+    const remotePath2 = normalizePath(parsed.pathname);
+    if (host2.length === 0 || remotePath2.length === 0) {
+      throw new Error(`Remote must include a host and repository path: ${remote}`);
+    }
+    return `${host2}/${remotePath2}`;
+  }
+  const scpLike = /^(?:[^@/]+@)?([^:/?#]+):(.+)$/.exec(value);
+  if (scpLike === null) {
+    throw new Error(`Unsupported Git remote: ${remote}`);
+  }
+  const host = scpLike[1]?.toLowerCase() ?? "";
+  const remotePath = normalizePath(scpLike[2] ?? "");
+  if (host.length === 0 || remotePath.length === 0) {
+    throw new Error(`Remote must include a host and repository path: ${remote}`);
+  }
+  return `${host}/${remotePath}`;
+}
+function repositoryIdFromRemote(remote) {
+  return normalizeRemote(remote);
+}
+
+// src/workspace/scanner.ts
+var ignoredDirectories = /* @__PURE__ */ new Set([".git", "node_modules"]);
+function isInsideIgnoredDirectory(directory) {
+  return directory.split(path3.sep).some((part) => ignoredDirectories.has(part));
+}
+function isDescendantOf(directory, parent) {
+  const relative3 = path3.relative(parent, directory);
+  return relative3.length > 0 && !relative3.startsWith(`..${path3.sep}`) && !path3.isAbsolute(relative3);
+}
+async function isRepository(directory) {
+  try {
+    await lstat(path3.join(directory, ".git"));
+    return true;
+  } catch (error51) {
+    if (error51.code === "ENOENT") {
+      return false;
+    }
+    throw error51;
+  }
+}
+async function readOrigin(directory) {
+  try {
+    const { stdout } = await runGit(directory, ["config", "--get", "remote.origin.url"]);
+    const remote = stdout.trim();
+    return remote.length === 0 ? void 0 : remote;
+  } catch {
+    return void 0;
+  }
+}
+async function scanRepositories(root, options) {
+  if (!Number.isInteger(options.maxDepth) || options.maxDepth < 0) {
+    throw new RangeError("maxDepth must be a non-negative integer");
+  }
+  const repositories = /* @__PURE__ */ new Map();
+  const visitedDepths = /* @__PURE__ */ new Map();
+  async function visit(directory, depth, viaSymlink) {
+    const directoryInfo = await lstat(directory);
+    let encounteredViaSymlink = viaSymlink;
+    if (directoryInfo.isSymbolicLink()) {
+      let targetInfo;
+      try {
+        targetInfo = await stat(directory);
+      } catch (error51) {
+        const code = error51.code;
+        if (code === "ENOENT" || code === "ELOOP") {
+          return;
+        }
+        throw error51;
+      }
+      if (!targetInfo.isDirectory()) {
+        return;
+      }
+      encounteredViaSymlink = true;
+    } else if (!directoryInfo.isDirectory()) {
+      return;
+    }
+    const canonicalDirectory = await realpath(directory);
+    if (isInsideIgnoredDirectory(canonicalDirectory)) {
+      return;
+    }
+    if ([...repositories.keys()].some(
+      (repositoryPath) => isDescendantOf(canonicalDirectory, repositoryPath)
+    )) {
+      return;
+    }
+    const previousDepth = visitedDepths.get(canonicalDirectory);
+    if (previousDepth !== void 0 && previousDepth <= depth) {
+      return;
+    }
+    visitedDepths.set(canonicalDirectory, depth);
+    if (await isRepository(directory)) {
+      for (const repositoryPath of repositories.keys()) {
+        if (isDescendantOf(repositoryPath, canonicalDirectory)) {
+          repositories.delete(repositoryPath);
+        }
+      }
+      const remote = await readOrigin(directory);
+      let repositoryId;
+      if (remote !== void 0) {
+        try {
+          repositoryId = repositoryIdFromRemote(remote);
+        } catch {
+          repositoryId = void 0;
+        }
+      }
+      repositories.set(canonicalDirectory, {
+        localPath: directory,
+        realPath: canonicalDirectory,
+        encounteredViaSymlink,
+        ...remote === void 0 ? {} : { remote },
+        ...repositoryId === void 0 ? {} : { repositoryId }
+      });
+      return;
+    }
+    if (depth >= options.maxDepth) {
+      return;
+    }
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((left, right) => compareCodeUnits(left.name, right.name));
+    for (const entry of entries) {
+      if (ignoredDirectories.has(entry.name)) {
+        continue;
+      }
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) {
+        continue;
+      }
+      await visit(path3.join(directory, entry.name), depth + 1, encounteredViaSymlink);
+    }
+  }
+  await visit(path3.resolve(root), 0, false);
+  return [...repositories.values()].sort(
+    (left, right) => compareCodeUnits(left.realPath, right.realPath)
+  );
+}
+
 // src/workspace/context-repository.ts
 var UNBORN_HEAD = "UNBORN";
+function repositoryDisplayName(repoId) {
+  return repoId.slice(repoId.lastIndexOf("/") + 1);
+}
+function repositoryBindingHash(repository) {
+  return createHash("sha256").update(canonicalJson({
+    local_path: repository.realPath,
+    remote: repository.remote,
+    repo_id: repository.repositoryId
+  })).digest("hex");
+}
+async function assertApprovedRepositoryBindings(preview) {
+  for (const approved of preview.repositories) {
+    if (approved.local_path === void 0) {
+      if (approved.candidate_paths !== void 0 && approved.candidate_paths.length > 1) {
+        throw appError(
+          "AMBIGUOUS_BINDING",
+          "Multiple local clones match this repository; an explicit binding is required",
+          { repo_id: approved.repo_id, candidate_paths: approved.candidate_paths }
+        );
+      }
+      continue;
+    }
+    const canonical = await fs2.realpath(approved.local_path).catch(() => void 0);
+    const [current] = canonical === void 0 ? [] : await scanRepositories(canonical, { maxDepth: 0 });
+    if (current === void 0 || current.realPath !== approved.local_path || current.repositoryId !== approved.repo_id || approved.binding_hash === void 0 || repositoryBindingHash(current) !== approved.binding_hash || approved.candidate_paths !== void 0 && !approved.candidate_paths.includes(approved.local_path)) {
+      throw appError("STALE_PREVIEW", "An approved repository binding changed after preview", {
+        repo_id: approved.repo_id
+      });
+    }
+  }
+}
 function validateContextRemote(remote) {
   parseWorkspaceManifest({
     schema_version: 1,
@@ -22106,7 +22354,7 @@ function canonicalJson(value) {
     return `[${value.map(canonicalJson).join(",")}]`;
   }
   if (value !== null && typeof value === "object") {
-    return `{${Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+    return `{${Object.entries(value).sort(([left], [right]) => compareCodeUnits(left, right)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -22167,13 +22415,13 @@ async function assertRemoteHead(remote, expectedHead) {
   }
 }
 function contextCheckoutPath(home, workspaceId) {
-  return path3.join(home, "contexts", workspaceId);
+  return path4.join(home, "contexts", workspaceId);
 }
 async function assertLocalContextCheckout(home, workspaceId, recordedPath) {
   const canonicalHome = await fs2.realpath(home);
-  const contextsPath = path3.join(canonicalHome, "contexts");
-  const expectedPath = path3.join(contextsPath, workspaceId);
-  if (path3.resolve(recordedPath) !== expectedPath) {
+  const contextsPath = path4.join(canonicalHome, "contexts");
+  const expectedPath = path4.join(contextsPath, workspaceId);
+  if (path4.resolve(recordedPath) !== expectedPath) {
     throw new Error("Registry Context path does not match the expected checkout path");
   }
   const contextsInfo = await fs2.lstat(contextsPath);
@@ -22184,7 +22432,7 @@ async function assertLocalContextCheckout(home, workspaceId, recordedPath) {
   if (await fs2.realpath(expectedPath) !== expectedPath) {
     throw new Error("Registry Context path does not have the expected canonical identity");
   }
-  const gitInfo = await fs2.lstat(path3.join(expectedPath, ".git"));
+  const gitInfo = await fs2.lstat(path4.join(expectedPath, ".git"));
   if (gitInfo.isSymbolicLink() || !gitInfo.isDirectory()) {
     throw new Error("Registry Context path is not a Git checkout");
   }
@@ -22192,8 +22440,8 @@ async function assertLocalContextCheckout(home, workspaceId, recordedPath) {
 }
 async function createContextTransaction(home, remote, expectedHead) {
   await fs2.mkdir(home, { recursive: true });
-  const root = await fs2.mkdtemp(path3.join(home, ".acs-context-transaction-"));
-  const contextPath = path3.join(root, "context");
+  const root = await fs2.mkdtemp(path4.join(home, ".acs-context-transaction-"));
+  const contextPath = path4.join(root, "context");
   try {
     await cloneContext(remote, contextPath, expectedHead);
     return { root, context_path: contextPath };
@@ -22203,7 +22451,7 @@ async function createContextTransaction(home, remote, expectedHead) {
   }
 }
 async function installContextTransaction(transactionPath, destination) {
-  await fs2.mkdir(path3.dirname(destination), { recursive: true });
+  await fs2.mkdir(path4.dirname(destination), { recursive: true });
   const backup = `${destination}.previous-${createHash("sha256").update(transactionPath).digest("hex").slice(0, 16)}`;
   let hadPrevious = false;
   try {
@@ -22221,8 +22469,8 @@ async function installContextTransaction(transactionPath, destination) {
   if (hadPrevious) await fs2.rm(backup, { recursive: true, force: true });
 }
 async function cloneContext(remote, destination, expectedHead) {
-  await fs2.mkdir(path3.dirname(destination), { recursive: true });
-  await runGit(path3.dirname(destination), ["clone", "--", remote, destination]);
+  await fs2.mkdir(path4.dirname(destination), { recursive: true });
+  await runGit(path4.dirname(destination), ["clone", "--", remote, destination]);
   const clonedHead = await localHead(destination);
   if (clonedHead !== expectedHead) {
     await fs2.rm(destination, { recursive: true, force: true });
@@ -22233,19 +22481,19 @@ async function cloneContext(remote, destination, expectedHead) {
   }
 }
 async function readWorkspaceManifest(contextPath) {
-  const contents = await fs2.readFile(path3.join(contextPath, "workspace.yaml"), "utf8");
+  const contents = await fs2.readFile(path4.join(contextPath, "workspace.yaml"), "utf8");
   return parseWorkspaceManifest((0, import_yaml.parse)(contents));
 }
 function checkedRepositoryManifestPath(root, repoId) {
-  const file2 = path3.resolve(root, `${repoId}.yaml`);
-  const relative3 = path3.relative(root, file2);
-  if (relative3 === ".." || relative3.startsWith(`..${path3.sep}`) || path3.isAbsolute(relative3)) {
+  const file2 = path4.resolve(root, `${repoId}.yaml`);
+  const relative3 = path4.relative(root, file2);
+  if (relative3 === ".." || relative3.startsWith(`..${path4.sep}`) || path4.isAbsolute(relative3)) {
     throw new Error("Repository manifest path resolves outside its root");
   }
   return file2;
 }
 function repositoryManifestPath(contextPath, repoId) {
-  return checkedRepositoryManifestPath(path3.join(contextPath, "repositories"), repoId);
+  return checkedRepositoryManifestPath(path4.join(contextPath, "repositories"), repoId);
 }
 async function lstatIfExists(file2) {
   try {
@@ -22260,10 +22508,10 @@ async function assertSafeRepositoryManifestFile(contextPath, file2) {
   if (contextInfo.isSymbolicLink() || !contextInfo.isDirectory()) {
     throw new Error("Context root must be a non-symbolic directory");
   }
-  const relativeParent = path3.relative(contextPath, path3.dirname(file2));
+  const relativeParent = path4.relative(contextPath, path4.dirname(file2));
   let current = contextPath;
-  for (const segment of relativeParent.split(path3.sep).filter(Boolean)) {
-    current = path3.join(current, segment);
+  for (const segment of relativeParent.split(path4.sep).filter(Boolean)) {
+    current = path4.join(current, segment);
     const info = await lstatIfExists(current);
     if (info === void 0) break;
     if (info.isSymbolicLink()) {
@@ -22283,7 +22531,7 @@ async function assertSafeRepositoryManifestFile(contextPath, file2) {
 }
 function repositoryManifestFile(repoId) {
   checkedRepositoryManifestPath("/repositories", repoId);
-  return path3.posix.join("repositories", `${repoId}.yaml`);
+  return path4.posix.join("repositories", `${repoId}.yaml`);
 }
 async function writeSharedManifests(contextPath, workspace, repositories) {
   const validated = parseWorkspaceManifest(workspace);
@@ -22294,7 +22542,7 @@ async function writeSharedManifests(contextPath, workspace, repositories) {
   await Promise.all(repositoryFiles.map(
     ({ file: file2 }) => assertSafeRepositoryManifestFile(contextPath, file2)
   ));
-  await atomicWriteFile(path3.join(contextPath, "workspace.yaml"), (0, import_yaml.stringify)(validated));
+  await atomicWriteFile(path4.join(contextPath, "workspace.yaml"), (0, import_yaml.stringify)(validated));
   for (const { repository, file: file2 } of repositoryFiles) {
     await assertSafeRepositoryManifestFile(contextPath, file2);
     await atomicWriteFile(
@@ -22312,7 +22560,7 @@ async function commitAndPushContext(contextPath, message) {
   ]);
   await runGit(contextPath, ["add", "workspace.yaml"]);
   try {
-    await fs2.access(path3.join(contextPath, "repositories"));
+    await fs2.access(path4.join(contextPath, "repositories"));
     await runGit(contextPath, ["add", "repositories"]);
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
@@ -22327,13 +22575,13 @@ async function commitAndPushContext(contextPath, message) {
 var import_yaml2 = __toESM(require_dist(), 1);
 import { realpathSync } from "node:fs";
 import { readFile as readFileAsync } from "node:fs/promises";
-import path4 from "node:path";
+import path5 from "node:path";
 function registryPath(home, workspaceId) {
   const validWorkspaceId = parseWorkspaceId(workspaceId);
-  const directory = path4.resolve(home, "workspaces");
-  const file2 = path4.resolve(directory, `${validWorkspaceId}.yaml`);
-  const relativePath = path4.relative(directory, file2);
-  if (relativePath === ".." || relativePath.startsWith(`..${path4.sep}`) || path4.isAbsolute(relativePath)) {
+  const directory = path5.resolve(home, "workspaces");
+  const file2 = path5.resolve(directory, `${validWorkspaceId}.yaml`);
+  const relativePath = path5.relative(directory, file2);
+  if (relativePath === ".." || relativePath.startsWith(`..${path5.sep}`) || path5.isAbsolute(relativePath)) {
     throw new Error("Workspace ID resolves outside the registry directory");
   }
   return file2;
@@ -22357,7 +22605,7 @@ async function writeLocalWorkspace(home, value, writer = atomicWriteFile) {
   await writer(registryPath(home, local.workspace_id), (0, import_yaml2.stringify)(local));
 }
 function bindRepositoryPath(local, repoId, repositoryPath) {
-  if (!path4.isAbsolute(repositoryPath)) {
+  if (!path5.isAbsolute(repositoryPath)) {
     throw new TypeError("Repository path must be absolute");
   }
   const canonicalPath = realpathSync(repositoryPath);
@@ -22370,172 +22618,229 @@ function bindRepositoryPath(local, repoId, repositoryPath) {
   });
 }
 
-// src/workspace/scanner.ts
-import { lstat as lstat2, readdir, realpath as realpath2, stat } from "node:fs/promises";
-import path5 from "node:path";
-
-// src/workspace/repository-id.ts
-function normalizePath(remotePath) {
-  if (remotePath.includes("\\")) {
-    throw new Error("Remote must not contain invalid path segments");
-  }
-  const withoutQueryOrFragment = remotePath.split(/[?#]/, 1)[0] ?? "";
-  const withoutSeparators = withoutQueryOrFragment.replace(/^\/+|\/+$/g, "");
-  if (withoutSeparators.split("/").some((segment) => segment === "." || segment === "..")) {
-    throw new Error("Remote must not contain dot path segments");
-  }
-  return withoutSeparators.replace(/\.git$/i, "");
+// src/workspace/preview-store.ts
+import { createHash as createHash2, createHmac, randomBytes as randomBytes2, timingSafeEqual } from "node:crypto";
+import * as fs3 from "node:fs/promises";
+import path6 from "node:path";
+var DEFAULT_TTL_MS = 10 * 60 * 1e3;
+var PREVIEW_ID = /^preview_[0-9A-HJKMNP-TV-Z]{26}$/;
+function assertPreviewId(previewId) {
+  if (!PREVIEW_ID.test(previewId)) throw appError("INVALID_PREVIEW", "Preview ID is invalid");
 }
-function normalizeRemote(remote) {
-  const value = remote.trim();
-  if (value.includes("://")) {
-    const afterScheme = value.slice(value.indexOf("://") + 3);
-    const rawPathStart = afterScheme.indexOf("/");
-    if (rawPathStart >= 0) normalizePath(afterScheme.slice(rawPathStart));
-    const parsed = new URL(value);
-    const host2 = parsed.port ? `${parsed.hostname.toLowerCase()}:${parsed.port}` : parsed.hostname.toLowerCase();
-    const remotePath2 = normalizePath(parsed.pathname);
-    if (host2.length === 0 || remotePath2.length === 0) {
-      throw new Error(`Remote must include a host and repository path: ${remote}`);
-    }
-    return `${host2}/${remotePath2}`;
-  }
-  const scpLike = /^(?:[^@/]+@)?([^:/?#]+):(.+)$/.exec(value);
-  if (scpLike === null) {
-    throw new Error(`Unsupported Git remote: ${remote}`);
-  }
-  const host = scpLike[1]?.toLowerCase() ?? "";
-  const remotePath = normalizePath(scpLike[2] ?? "");
-  if (host.length === 0 || remotePath.length === 0) {
-    throw new Error(`Remote must include a host and repository path: ${remote}`);
-  }
-  return `${host}/${remotePath}`;
+function previewsDirectory(home) {
+  return path6.resolve(home, "previews");
 }
-function repositoryIdFromRemote(remote) {
-  return normalizeRemote(remote);
+function previewRecordPath(home, previewId) {
+  assertPreviewId(previewId);
+  return path6.join(previewsDirectory(home), `${previewId}.json`);
 }
-
-// src/workspace/scanner.ts
-var ignoredDirectories = /* @__PURE__ */ new Set([".git", "node_modules"]);
-function isInsideIgnoredDirectory(directory) {
-  return directory.split(path5.sep).some((part) => ignoredDirectories.has(part));
+function usedPreviewPath(home, previewId) {
+  return path6.join(previewsDirectory(home), `${previewId}.used`);
 }
-function isDescendantOf(directory, parent) {
-  const relative3 = path5.relative(parent, directory);
-  return relative3.length > 0 && !relative3.startsWith(`..${path5.sep}`) && !path5.isAbsolute(relative3);
+function keyPath(home) {
+  return path6.resolve(home, "preview-auth.key");
 }
-async function isRepository(directory) {
+async function previewKey(home) {
+  const file2 = keyPath(home);
   try {
-    await lstat2(path5.join(directory, ".git"));
+    return Buffer.from(await fs3.readFile(file2, "utf8"), "base64");
+  } catch (error51) {
+    if (error51.code !== "ENOENT") throw error51;
+  }
+  await fs3.mkdir(path6.dirname(file2), { recursive: true, mode: 448 });
+  const candidate = randomBytes2(32).toString("base64");
+  try {
+    const handle = await fs3.open(file2, "wx", 384);
+    try {
+      await handle.writeFile(candidate, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    return Buffer.from(candidate, "base64");
+  } catch (error51) {
+    if (error51.code !== "EEXIST") throw error51;
+    return Buffer.from(await fs3.readFile(file2, "utf8"), "base64");
+  }
+}
+function stateHashes(preview) {
+  return {
+    context: createHash2("sha256").update(preview.context_head).digest("hex"),
+    business: createHash2("sha256").update(JSON.stringify(preview.repositories)).digest("hex")
+  };
+}
+function authenticatedBytes(expiresAt, preview) {
+  const hashes = stateHashes(preview);
+  return JSON.stringify({
+    version: 1,
+    expires_at: expiresAt,
+    context_state_hash: hashes.context,
+    business_state_hash: hashes.business,
+    preview
+  });
+}
+function macFor(key, expiresAt, preview) {
+  return createHmac("sha256", key).update(authenticatedBytes(expiresAt, preview)).digest("hex");
+}
+async function savePreview(home, preview, options = {}) {
+  assertPreviewId(preview.preview_id);
+  const now = options.now ?? Date.now();
+  const expiresAt = now + (options.ttlMs ?? DEFAULT_TTL_MS);
+  const key = await previewKey(home);
+  const hashes = stateHashes(preview);
+  const stored = {
+    version: 1,
+    expires_at: expiresAt,
+    context_state_hash: hashes.context,
+    business_state_hash: hashes.business,
+    preview,
+    mac: macFor(key, expiresAt, preview)
+  };
+  await atomicWriteFile(previewRecordPath(home, preview.preview_id), JSON.stringify(stored));
+}
+async function claimPreview(home, previewId, operation, options = {}) {
+  const pending = previewRecordPath(home, previewId);
+  const used = usedPreviewPath(home, previewId);
+  try {
+    await fs3.rename(pending, used);
+  } catch (error51) {
+    if (error51.code !== "ENOENT") throw error51;
+    try {
+      await fs3.access(used);
+      throw appError("PREVIEW_ALREADY_USED", "Preview has already been applied");
+    } catch (usedError) {
+      if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
+      throw appError("INVALID_PREVIEW", "Preview does not exist");
+    }
+  }
+  return readAuthenticatedPreview(home, used, previewId, operation, options.now);
+}
+async function readAuthenticatedPreview(home, file2, previewId, operation, now = Date.now()) {
+  let stored;
+  try {
+    stored = JSON.parse(await fs3.readFile(file2, "utf8"));
+  } catch {
+    throw appError("INVALID_PREVIEW", "Stored preview is invalid");
+  }
+  const key = await previewKey(home);
+  const expected = Buffer.from(macFor(key, stored.expires_at, stored.preview), "hex");
+  const actual = typeof stored.mac === "string" ? Buffer.from(stored.mac, "hex") : Buffer.alloc(0);
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    throw appError("INVALID_PREVIEW", "Stored preview authentication failed");
+  }
+  const hashes = stateHashes(stored.preview);
+  if (stored.context_state_hash !== hashes.context || stored.business_state_hash !== hashes.business) {
+    throw appError("INVALID_PREVIEW", "Stored preview state hashes do not match");
+  }
+  if (stored.preview.preview_id !== previewId || stored.preview.operation !== operation) {
+    throw appError("INVALID_PREVIEW", "Stored preview does not match the requested operation");
+  }
+  if (now > stored.expires_at) {
+    throw appError("PREVIEW_EXPIRED", "Preview approval has expired");
+  }
+  return stored.preview;
+}
+async function peekPreview(home, previewId, operation, options = {}) {
+  const pending = previewRecordPath(home, previewId);
+  try {
+    return await readAuthenticatedPreview(home, pending, previewId, operation, options.now);
+  } catch (error51) {
+    if (error51.code !== "INVALID_PREVIEW") throw error51;
+    try {
+      await fs3.access(usedPreviewPath(home, previewId));
+      throw appError("PREVIEW_ALREADY_USED", "Preview has already been applied");
+    } catch (usedError) {
+      if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
+      throw error51;
+    }
+  }
+}
+
+// src/workspace/workspace-lock.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+import * as fs4 from "node:fs/promises";
+import path7 from "node:path";
+function workspaceLockPath(home, workspaceId) {
+  return path7.resolve(home, "locks", `${parseWorkspaceId(workspaceId)}.lock`);
+}
+function processIsLive(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
     return true;
   } catch (error51) {
-    if (error51.code === "ENOENT") {
-      return false;
-    }
-    throw error51;
+    return error51.code === "EPERM";
   }
 }
-async function readOrigin(directory) {
+async function ownerAt(lock) {
   try {
-    const { stdout } = await runGit(directory, ["config", "--get", "remote.origin.url"]);
-    const remote = stdout.trim();
-    return remote.length === 0 ? void 0 : remote;
+    return JSON.parse(await fs4.readFile(path7.join(lock, "owner.json"), "utf8"));
   } catch {
     return void 0;
   }
 }
-async function scanRepositories(root, options) {
-  if (!Number.isInteger(options.maxDepth) || options.maxDepth < 0) {
-    throw new RangeError("maxDepth must be a non-negative integer");
+async function recoverIfStale(lock, staleMs) {
+  let stat3;
+  try {
+    stat3 = await fs4.stat(lock);
+  } catch (error51) {
+    if (error51.code === "ENOENT") return true;
+    throw error51;
   }
-  const repositories = /* @__PURE__ */ new Map();
-  const visitedDepths = /* @__PURE__ */ new Map();
-  async function visit(directory, depth, viaSymlink) {
-    const directoryInfo = await lstat2(directory);
-    let encounteredViaSymlink = viaSymlink;
-    if (directoryInfo.isSymbolicLink()) {
-      let targetInfo;
-      try {
-        targetInfo = await stat(directory);
-      } catch (error51) {
-        const code = error51.code;
-        if (code === "ENOENT" || code === "ELOOP") {
-          return;
-        }
-        throw error51;
-      }
-      if (!targetInfo.isDirectory()) {
-        return;
-      }
-      encounteredViaSymlink = true;
-    } else if (!directoryInfo.isDirectory()) {
-      return;
-    }
-    const canonicalDirectory = await realpath2(directory);
-    if (isInsideIgnoredDirectory(canonicalDirectory)) {
-      return;
-    }
-    if ([...repositories.keys()].some(
-      (repositoryPath) => isDescendantOf(canonicalDirectory, repositoryPath)
-    )) {
-      return;
-    }
-    const previousDepth = visitedDepths.get(canonicalDirectory);
-    if (previousDepth !== void 0 && previousDepth <= depth) {
-      return;
-    }
-    visitedDepths.set(canonicalDirectory, depth);
-    if (await isRepository(directory)) {
-      for (const repositoryPath of repositories.keys()) {
-        if (isDescendantOf(repositoryPath, canonicalDirectory)) {
-          repositories.delete(repositoryPath);
-        }
-      }
-      const remote = await readOrigin(directory);
-      let repositoryId;
-      if (remote !== void 0) {
-        try {
-          repositoryId = repositoryIdFromRemote(remote);
-        } catch {
-          repositoryId = void 0;
-        }
-      }
-      repositories.set(canonicalDirectory, {
-        localPath: directory,
-        realPath: canonicalDirectory,
-        encounteredViaSymlink,
-        ...remote === void 0 ? {} : { remote },
-        ...repositoryId === void 0 ? {} : { repositoryId }
+  const owner = await ownerAt(lock);
+  const createdAt = typeof owner?.created_at === "number" ? owner.created_at : stat3.mtimeMs;
+  if (Date.now() - createdAt <= staleMs || processIsLive(owner?.pid ?? 0)) return false;
+  const recovered = `${lock}.stale-${randomUUID2()}`;
+  try {
+    await fs4.rename(lock, recovered);
+  } catch (error51) {
+    if (error51.code === "ENOENT") return true;
+    throw error51;
+  }
+  await fs4.rm(recovered, { recursive: true, force: true });
+  return true;
+}
+async function withWorkspaceLock(home, workspaceId, action, options = {}) {
+  const lock = workspaceLockPath(home, workspaceId);
+  const waitMs = options.waitMs ?? 3e4;
+  const staleMs = options.staleMs ?? 5 * 6e4;
+  const pollMs = options.pollMs ?? 25;
+  const deadline = Date.now() + waitMs;
+  const owner = { pid: process.pid, created_at: Date.now(), token: randomUUID2() };
+  await fs4.mkdir(path7.dirname(lock), { recursive: true, mode: 448 });
+  while (true) {
+    try {
+      await fs4.mkdir(lock, { mode: 448 });
+      await fs4.writeFile(path7.join(lock, "owner.json"), JSON.stringify(owner), {
+        mode: 384,
+        flag: "wx"
       });
-      return;
-    }
-    if (depth >= options.maxDepth) {
-      return;
-    }
-    const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      if (ignoredDirectories.has(entry.name)) {
-        continue;
+      break;
+    } catch (error51) {
+      if (error51.code !== "EEXIST") throw error51;
+      await recoverIfStale(lock, staleMs);
+      if (Date.now() >= deadline) {
+        throw appError("WORKSPACE_BUSY", "Another apply operation holds the Workspace lock", {
+          workspace_id: workspaceId
+        });
       }
-      if (!entry.isDirectory() && !entry.isSymbolicLink()) {
-        continue;
-      }
-      await visit(path5.join(directory, entry.name), depth + 1, encounteredViaSymlink);
+      await new Promise((resolve3) => setTimeout(resolve3, pollMs));
     }
   }
-  await visit(path5.resolve(root), 0, false);
-  return [...repositories.values()].sort(
-    (left, right) => left.realPath.localeCompare(right.realPath)
-  );
+  try {
+    return await action();
+  } finally {
+    const current = await ownerAt(lock);
+    if (current?.token === owner.token) await fs4.rm(lock, { recursive: true, force: true });
+  }
 }
 
 // src/commands/add-repo.ts
 async function normalizeInput(input) {
   return {
     workspace_id: input.workspaceId,
-    repository_path: await fs3.realpath(path6.resolve(input.repositoryPath)),
-    home: path6.resolve(input.home)
+    repository_path: await fs5.realpath(path8.resolve(input.repositoryPath)),
+    home: path8.resolve(input.home)
   };
 }
 async function repositoryAt(repositoryPath) {
@@ -22546,8 +22851,9 @@ async function repositoryAt(repositoryPath) {
   return {
     schema_version: 1,
     repo_id: repository.repositoryId,
-    name: path6.basename(repository.realPath),
-    local_path: repository.realPath
+    name: repositoryDisplayName(repository.repositoryId),
+    local_path: repository.realPath,
+    binding_hash: repositoryBindingHash(repository)
   };
 }
 async function addRepository(input) {
@@ -22569,29 +22875,38 @@ async function addRepository(input) {
   try {
     workspace = await readWorkspaceManifest(transaction.context_path);
   } finally {
-    await fs3.rm(transaction.root, { recursive: true, force: true });
+    await fs5.rm(transaction.root, { recursive: true, force: true });
   }
   if (workspace.workspace_id !== normalized.workspace_id) {
     throw new Error("Workspace ID does not match the local registry");
   }
   const added = await repositoryAt(normalized.repository_path);
-  const repositories = [
-    ...workspace.repositories.map((repository) => ({
-      ...repository,
-      ...local.repository_paths[repository.repo_id] === void 0 ? {} : { local_path: local.repository_paths[repository.repo_id] }
-    }))
-  ];
+  const repositories = [];
+  for (const repository of workspace.repositories) {
+    const localPath = local.repository_paths[repository.repo_id];
+    if (localPath === void 0) repositories.push(repository);
+    else {
+      const binding = await repositoryAt(localPath);
+      if (binding.repo_id !== repository.repo_id) {
+        throw appError("REPOSITORY_ID_DRIFT", "A registered repository no longer matches its shared identity", {
+          repo_id: repository.repo_id
+        });
+      }
+      repositories.push({ ...repository, ...binding, name: repository.name });
+    }
+  }
   const existing = repositories.find((repository) => repository.repo_id === added.repo_id);
   if (existing === void 0) {
     repositories.push(added);
   } else {
     existing.local_path = added.local_path;
+    existing.binding_hash = added.binding_hash;
   }
-  repositories.sort((left, right) => left.repo_id.localeCompare(right.repo_id));
+  repositories.sort((left, right) => compareCodeUnits(left.repo_id, right.repo_id));
   const filesToWrite = [
     "workspace.yaml",
     repositoryManifestFile(added.repo_id),
-    path6.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
+    path8.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
   ];
   const warnings = existing === void 0 ? [] : [`Repository ${added.repo_id} is already shared`];
   const approval = {
@@ -22600,7 +22915,7 @@ async function addRepository(input) {
     repositories,
     warnings
   };
-  return {
+  const preview = {
     operation: "add-repository",
     preview_id: createId("preview"),
     input_hash: previewInputHash("add-repository", normalized, contextHead, approval),
@@ -22611,13 +22926,16 @@ async function addRepository(input) {
     repositories,
     warnings
   };
+  await savePreview(normalized.home, preview);
+  return preview;
 }
-async function applyAddRepository(preview) {
+async function applyApprovedAddRepository(preview) {
   if (preview.operation !== "add-repository") {
     throw new TypeError("Expected an add-repository preview");
   }
   assertPreviewIntegrity(preview);
   const input = preview.normalized_input;
+  await assertApprovedRepositoryBindings(preview);
   const local = await readLocalWorkspace(input.home, input.workspace_id);
   const contextPath = await assertLocalContextCheckout(
     input.home,
@@ -22636,9 +22954,12 @@ async function applyAddRepository(preview) {
   let commit;
   try {
     const current = await readWorkspaceManifest(transaction.context_path);
-    const repositories = preview.repositories.map(
-      ({ local_path: _localPath, ...item }) => item
-    );
+    const repositories = preview.repositories.map(({
+      local_path: _localPath,
+      candidate_paths: _candidatePaths,
+      binding_hash: _bindingHash,
+      ...item
+    }) => item);
     workspace = parseWorkspaceManifest({ ...current, repositories });
     await writeSharedManifests(transaction.context_path, workspace, [added]);
     commit = await commitAndPushContext(
@@ -22647,16 +22968,23 @@ async function applyAddRepository(preview) {
     );
     await installContextTransaction(transaction.context_path, contextPath);
   } finally {
-    await fs3.rm(transaction.root, { recursive: true, force: true });
+    await fs5.rm(transaction.root, { recursive: true, force: true });
   }
   const updatedLocal = bindRepositoryPath(local, added.repo_id, input.repository_path);
   await writeLocalWorkspace(input.home, updatedLocal);
   return { workspace, local: updatedLocal, commit };
 }
+async function applyAddRepository(previewId, home) {
+  const pending = await peekPreview(home, previewId, "add-repository");
+  return withWorkspaceLock(home, pending.workspace_id, async () => {
+    const preview = await claimPreview(home, previewId, "add-repository");
+    return applyApprovedAddRepository(preview);
+  });
+}
 
 // src/commands/doctor.ts
 import { constants as fsConstants } from "node:fs";
-import * as fs4 from "node:fs/promises";
+import * as fs7 from "node:fs/promises";
 
 // src/adapters/adapter.ts
 var ADAPTER_CONTRACT_VERSION = 1;
@@ -23728,11 +24056,11 @@ var qmarksTestNoExtDot = ([$0]) => {
   return (f) => f.length === len && f !== "." && f !== "..";
 };
 var defaultPlatform = typeof process === "object" && process ? typeof process.env === "object" && process.env && process.env.__MINIMATCH_TESTING_PLATFORM__ || process.platform : "posix";
-var path7 = {
+var path9 = {
   win32: { sep: "\\" },
   posix: { sep: "/" }
 };
-var sep = defaultPlatform === "win32" ? path7.win32.sep : path7.posix.sep;
+var sep = defaultPlatform === "win32" ? path9.win32.sep : path9.posix.sep;
 minimatch.sep = sep;
 var GLOBSTAR = Symbol("globstar **");
 minimatch.GLOBSTAR = GLOBSTAR;
@@ -24403,10 +24731,10 @@ var Minimatch = class {
       }
       return filtered.join("/");
     }).join("|");
-    const [open2, close] = set2.length > 1 ? ["(?:", ")"] : ["", ""];
-    re = "^" + open2 + re + close + "$";
+    const [open3, close] = set2.length > 1 ? ["(?:", ")"] : ["", ""];
+    re = "^" + open3 + re + close + "$";
     if (this.partial) {
-      re = "^(?:\\/|" + open2 + re.slice(1, -1) + close + ")$";
+      re = "^(?:\\/|" + open3 + re.slice(1, -1) + close + ")$";
     }
     if (this.negate)
       re = "^(?!" + re + ").+$";
@@ -24481,10 +24809,10 @@ minimatch.unescape = unescape;
 // src/adapters/claude/discover.ts
 var import_yaml3 = __toESM(require_dist(), 1);
 var defaultFileSystem = {
-  readFile: (path12) => nodeReadFile(path12, "utf8"),
-  readdir: (path12, options) => nodeReaddir(path12, options),
-  realpath: (path12) => nodeRealpath(path12),
-  stat: (path12) => nodeStat(path12)
+  readFile: (path14) => nodeReadFile(path14, "utf8"),
+  readdir: (path14, options) => nodeReaddir(path14, options),
+  realpath: (path14) => nodeRealpath(path14),
+  stat: (path14) => nodeStat(path14)
 };
 var AGENT = "claude-code";
 function isInside(parent, child) {
@@ -24492,28 +24820,28 @@ function isInside(parent, child) {
   return pathFromParent === "" || !pathFromParent.startsWith(`..${sep2}`) && pathFromParent !== ".." && !isAbsolute(pathFromParent);
 }
 function uniqueSorted(values) {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort(compareCodeUnits);
 }
 function coverage(id, status, detail, locator) {
   return { id, status, detail, ...locator === void 0 ? {} : { locator } };
 }
-async function readableFile(fs7, path12) {
+async function readableFile(fs10, path14) {
   try {
-    if (!(await fs7.stat(path12)).isFile()) return "missing";
-    await fs7.readFile(path12);
+    if (!(await fs10.stat(path14)).isFile()) return "missing";
+    await fs10.readFile(path14);
     return "file";
   } catch (error51) {
     return error51.code === "ENOENT" ? "missing" : "inaccessible";
   }
 }
-async function walkMarkdown(fs7, root) {
+async function walkMarkdown(fs10, root) {
   const files = [];
   const inaccessible = [];
   const escapes = [];
   const visited = /* @__PURE__ */ new Set();
   let canonicalRoot;
   try {
-    canonicalRoot = await fs7.realpath(root);
+    canonicalRoot = await fs10.realpath(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
     return { files, inaccessible, escapes };
@@ -24521,7 +24849,7 @@ async function walkMarkdown(fs7, root) {
   async function visit(directory) {
     let canonical;
     try {
-      canonical = await fs7.realpath(directory);
+      canonical = await fs10.realpath(directory);
     } catch {
       inaccessible.push(directory);
       return;
@@ -24534,40 +24862,40 @@ async function walkMarkdown(fs7, root) {
     visited.add(canonical);
     let entries;
     try {
-      entries = await fs7.readdir(directory, { withFileTypes: true });
+      entries = await fs10.readdir(directory, { withFileTypes: true });
     } catch {
       inaccessible.push(directory);
       return;
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of entries) {
       if (entry.name === ".git" || entry.name === "node_modules") continue;
-      const path12 = join(directory, entry.name);
+      const path14 = join(directory, entry.name);
       if (entry.isDirectory() || entry.isSymbolicLink()) {
         let target;
         try {
-          target = await fs7.stat(path12);
+          target = await fs10.stat(path14);
         } catch {
-          inaccessible.push(path12);
+          inaccessible.push(path14);
           continue;
         }
-        if (target.isDirectory()) await visit(path12);
+        if (target.isDirectory()) await visit(path14);
         else if (target.isFile() && entry.name.endsWith(".md")) {
           try {
-            const canonicalFile = await fs7.realpath(path12);
-            if (isInside(canonicalRoot, canonicalFile)) files.push(path12);
-            else escapes.push(path12);
+            const canonicalFile = await fs10.realpath(path14);
+            if (isInside(canonicalRoot, canonicalFile)) files.push(path14);
+            else escapes.push(path14);
           } catch {
-            inaccessible.push(path12);
+            inaccessible.push(path14);
           }
         }
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        files.push(path12);
+        files.push(path14);
       }
     }
   }
   try {
-    if ((await fs7.stat(root)).isDirectory()) await visit(root);
+    if ((await fs10.stat(root)).isDirectory()) await visit(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
   }
@@ -24637,8 +24965,8 @@ function importedPaths(markdown) {
   }
   return imports;
 }
-function resolveTilde(path12, homeDir) {
-  return path12 === "~" ? homeDir : path12.startsWith(`~${sep2}`) || path12.startsWith("~/") ? join(homeDir, path12.slice(2)) : path12;
+function resolveTilde(path14, homeDir) {
+  return path14 === "~" ? homeDir : path14.startsWith(`~${sep2}`) || path14.startsWith("~/") ? join(homeDir, path14.slice(2)) : path14;
 }
 function rulePaths(markdown) {
   const match2 = markdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -24662,8 +24990,8 @@ var ClaudeAdapter = class {
     supported: true
   };
   fs;
-  constructor(fs7 = {}) {
-    this.fs = { ...defaultFileSystem, ...fs7 };
+  constructor(fs10 = {}) {
+    this.fs = { ...defaultFileSystem, ...fs10 };
   }
   async discover(input) {
     const repositoryRoot = resolve(input.repositoryRoot);
@@ -24673,6 +25001,22 @@ var ClaudeAdapter = class {
     const coverageItems = [];
     const foundInstructions = [];
     let canonicalRepositoryRoot = repositoryRoot;
+    const managedInputsSupplied = input.managedSettingsPaths !== void 0 && input.managedInstructionPaths !== void 0;
+    const additionalInputsSupplied = input.additionalDirectories !== void 0;
+    if (!managedInputsSupplied) {
+      coverageItems.push(coverage(
+        "claude-managed-inputs",
+        "unknown",
+        "Managed settings and instruction locations were not supplied, so managed coverage cannot be confirmed."
+      ));
+    }
+    if (!additionalInputsSupplied) {
+      coverageItems.push(coverage(
+        "claude-additional-directory-inputs",
+        "unknown",
+        "Additional-directory inputs were not supplied, so their coverage cannot be confirmed."
+      ));
+    }
     try {
       canonicalRepositoryRoot = await this.fs.realpath(repositoryRoot);
     } catch {
@@ -24683,10 +25027,10 @@ var ClaudeAdapter = class {
         repositoryRoot
       ));
     }
-    const safeShareability = async (path12, intended) => {
+    const safeShareability = async (path14, intended) => {
       if (intended !== "team") return intended;
       try {
-        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path12)) ? "team" : "personal";
+        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path14)) ? "team" : "personal";
       } catch {
         return "personal";
       }
@@ -24728,14 +25072,14 @@ var ClaudeAdapter = class {
     const excludes = uniqueSorted(parsedLayers.flatMap(
       ({ settings }) => Array.isArray(settings.claudeMdExcludes) ? settings.claudeMdExcludes.filter((item) => typeof item === "string") : []
     ));
-    const isExcluded = (path12) => excludes.some(
-      (pattern) => minimatch(path12, resolveTilde(pattern, homeDir), { dot: true })
+    const isExcluded = (path14) => excludes.some(
+      (pattern) => minimatch(path14, resolveTilde(pattern, homeDir), { dot: true })
     );
-    for (const path12 of uniqueSorted(input.managedInstructionPaths ?? [])) {
-      const status = await readableFile(this.fs, path12);
+    for (const path14 of uniqueSorted(input.managedInstructionPaths ?? [])) {
+      const status = await readableFile(this.fs, path14);
       if (status === "file") {
         foundInstructions.push({
-          locator: path12,
+          locator: path14,
           sourceType: "managed-instructions",
           shareability: "managed",
           loading: "reported-only"
@@ -24745,7 +25089,7 @@ var ClaudeAdapter = class {
           "claude-managed-inaccessible",
           status === "inaccessible" ? "inaccessible" : "unknown",
           status === "inaccessible" ? "Managed instructions are unreadable." : "Managed instructions do not exist.",
-          path12
+          path14
         ));
       }
     }
@@ -24810,33 +25154,33 @@ var ClaudeAdapter = class {
       }
     }
     const descendants = await walkMarkdown(this.fs, repositoryRoot);
-    for (const path12 of descendants.files) {
-      const name = path12.slice(path12.lastIndexOf(sep2) + 1);
+    for (const path14 of descendants.files) {
+      const name = path14.slice(path14.lastIndexOf(sep2) + 1);
       if (name !== "CLAUDE.md" && name !== "CLAUDE.local.md") continue;
-      if (path12.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path12) || path12 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
-      if (isExcluded(path12)) {
-        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path12));
+      if (path14.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path14) || path14 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
+      if (isExcluded(path14)) {
+        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path14));
         continue;
       }
-      const descendantStatus = await readableFile(this.fs, path12);
+      const descendantStatus = await readableFile(this.fs, path14);
       if (descendantStatus !== "file") {
-        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path12));
+        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path14));
         continue;
       }
       foundInstructions.push({
-        locator: path12,
+        locator: path14,
         sourceType: name === "CLAUDE.local.md" ? "local-instructions" : "project-instructions",
         shareability: name === "CLAUDE.local.md" ? "personal" : "team",
         loading: "on-demand"
       });
     }
-    for (const path12 of descendants.inaccessible) {
-      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path12));
+    for (const path14 of descendants.inaccessible) {
+      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path14));
     }
-    for (const path12 of descendants.escapes) {
-      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path12));
+    for (const path14 of descendants.escapes) {
+      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path14));
     }
-    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path12) => resolve(path12)));
+    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path14) => resolve(path14)));
     if (additionalDirectories.length > 0 && !input.includeAdditionalDirectoryInstructions) {
       coverageItems.push(coverage(
         "claude-additional-directories-disabled",
@@ -24882,46 +25226,46 @@ var ClaudeAdapter = class {
     ];
     for (const ruleRoot of ruleRoots) {
       const walked = await walkMarkdown(this.fs, ruleRoot.path);
-      for (const path12 of walked.files) {
-        if (isExcluded(path12)) {
-          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path12));
+      for (const path14 of walked.files) {
+        if (isExcluded(path14)) {
+          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path14));
           continue;
         }
         let paths;
         try {
-          paths = rulePaths(await this.fs.readFile(path12));
+          paths = rulePaths(await this.fs.readFile(path14));
         } catch {
-          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path12));
+          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path14));
           continue;
         }
         sources.push({
           agent: AGENT,
           sourceType: ruleRoot.sourceType,
-          locator: path12,
-          shareability: await safeShareability(path12, ruleRoot.shareability),
+          locator: path14,
+          shareability: await safeShareability(path14, ruleRoot.shareability),
           status: "available",
           ...paths === void 0 ? {} : { pathScope: paths }
         });
       }
-      for (const path12 of walked.inaccessible) {
-        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path12));
+      for (const path14 of walked.inaccessible) {
+        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path14));
       }
-      for (const path12 of walked.escapes) {
-        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path12));
+      for (const path14 of walked.escapes) {
+        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path14));
       }
     }
     const instructionSourcePaths = foundInstructions.filter((item) => item.loading !== "reported-only").map((item) => item.locator);
     const importSources = /* @__PURE__ */ new Map();
-    const visitImports = async (path12, depth, ancestors, inheritedShareability) => {
+    const visitImports = async (path14, depth, ancestors, inheritedShareability) => {
       let canonicalPath;
       try {
-        canonicalPath = await this.fs.realpath(path12);
+        canonicalPath = await this.fs.realpath(path14);
       } catch (error51) {
         coverageItems.push(coverage(
           "claude-import-inaccessible",
           error51.code === "ENOENT" ? "unknown" : "inaccessible",
           "Import source could not be canonicalized.",
-          path12
+          path14
         ));
         return;
       }
@@ -24933,7 +25277,7 @@ var ClaudeAdapter = class {
         return;
       }
       for (const imported of importedPaths(text)) {
-        const candidate = resolve(dirname(path12), resolveTilde(imported, homeDir));
+        const candidate = resolve(dirname(path14), resolveTilde(imported, homeDir));
         if (depth >= 4) {
           coverageItems.push(coverage("claude-import-depth", "partial", "Import exceeds the maximum depth of four hops.", candidate));
           continue;
@@ -24991,7 +25335,7 @@ var ClaudeAdapter = class {
     for (const instruction of foundInstructions.filter((item) => item.loading !== "reported-only")) {
       await visitImports(instruction.locator, 0, [], instruction.shareability);
     }
-    sources.push(...[...importSources.values()].sort((left, right) => left.locator.localeCompare(right.locator)));
+    sources.push(...[...importSources.values()].sort((left, right) => compareCodeUnits(left.locator, right.locator)));
     const autoMemorySetting = parsedLayers.find(
       ({ kind, settings }) => kind === "managed" && typeof settings.autoMemoryDirectory === "string"
     ) ?? [...parsedLayers].reverse().find(({ kind, settings }) => kind !== "managed" && typeof settings.autoMemoryDirectory === "string");
@@ -25049,7 +25393,7 @@ var ClaudeAdapter = class {
         const rightIndex = instructionSourcePaths.indexOf(right.locator);
         if (leftIndex !== rightIndex) return leftIndex - rightIndex;
       }
-      return left.locator.localeCompare(right.locator);
+      return compareCodeUnits(left.locator, right.locator);
     });
     const loadPlan = orderedInstructions.map((item, order) => ({
       order,
@@ -25067,9 +25411,13 @@ var ClaudeAdapter = class {
       if (source.sourceType === "auto-memory") return 6;
       return 7;
     };
-    sources.sort((left, right) => sourceRank(left) - sourceRank(right) || left.locator.localeCompare(right.locator));
-    coverageItems.push(coverage("claude-known-sources", "covered", "Known stable Claude Code source locations were inspected."));
-    coverageItems.sort((left, right) => left.id.localeCompare(right.id) || (left.locator ?? "").localeCompare(right.locator ?? ""));
+    sources.sort((left, right) => sourceRank(left) - sourceRank(right) || compareCodeUnits(left.locator, right.locator));
+    coverageItems.push(coverage(
+      "claude-known-sources",
+      managedInputsSupplied && additionalInputsSupplied ? "covered" : "partial",
+      managedInputsSupplied && additionalInputsSupplied ? "Known stable Claude Code source locations and supplied external mechanisms were inspected." : "Known stable Claude Code source locations were inspected, but external mechanisms were not fully supplied."
+    ));
+    coverageItems.sort((left, right) => compareCodeUnits(left.id, right.id) || compareCodeUnits(left.locator ?? "", right.locator ?? ""));
     return { agent: AGENT, sources, coverage: coverageItems, loadPlan };
   }
 };
@@ -25767,9 +26115,9 @@ var AGENT2 = "codex";
 var DEFAULT_MAX_BYTES = 32 * 1024;
 var DEFAULT_FALLBACK_FILENAMES = [];
 var defaultFileSystem2 = {
-  readFile: (path12) => nodeReadFile2(path12, "utf8"),
-  readdir: (path12, options) => nodeReaddir2(path12, options),
-  realpath: (path12) => nodeRealpath2(path12)
+  readFile: (path14) => nodeReadFile2(path14, "utf8"),
+  readdir: (path14, options) => nodeReaddir2(path14, options),
+  realpath: (path14) => nodeRealpath2(path14)
 };
 function isInside2(parent, child) {
   const pathFromParent = relative2(parent, child);
@@ -25821,8 +26169,8 @@ var CodexAdapter = class {
   fs;
   env;
   constructor(options = {}) {
-    const { env, ...fs7 } = options;
-    this.fs = { ...defaultFileSystem2, ...fs7 };
+    const { env, ...fs10 } = options;
+    this.fs = { ...defaultFileSystem2, ...fs10 };
     this.env = env ?? process.env;
   }
   async discover(input) {
@@ -26043,7 +26391,7 @@ var CodexAdapter = class {
         ));
       }
     }
-    memoryEntries.sort((left, right) => left.name.localeCompare(right.name));
+    memoryEntries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of memoryEntries) {
       if (!entry.isFile() || !entry.name.endsWith(".toml")) continue;
       const locator = join2(memoriesRoot, entry.name);
@@ -26123,7 +26471,7 @@ var CodexAdapter = class {
       const rightSelected = selected.findIndex((item) => item.locator === right.locator);
       const leftRank = leftSelected === -1 ? Number.MAX_SAFE_INTEGER : leftSelected;
       const rightRank = rightSelected === -1 ? Number.MAX_SAFE_INTEGER : rightSelected;
-      return leftRank - rightRank || left.locator.localeCompare(right.locator);
+      return leftRank - rightRank || compareCodeUnits(left.locator, right.locator);
     });
     coverageItems.push(coverage2(
       "codex-known-sources",
@@ -26137,7 +26485,7 @@ var CodexAdapter = class {
         "Codex instruction content exceeds the configured UTF-8 byte limit."
       ));
     }
-    coverageItems.sort((left, right) => left.id.localeCompare(right.id) || (left.locator ?? "").localeCompare(right.locator ?? ""));
+    coverageItems.sort((left, right) => compareCodeUnits(left.id, right.id) || compareCodeUnits(left.locator ?? "", right.locator ?? ""));
     return {
       agent: AGENT2,
       sources,
@@ -26185,7 +26533,12 @@ function assessAdapterContracts(contracts) {
 }
 
 // src/commands/inspect.ts
-import path8 from "node:path";
+import * as fs6 from "node:fs/promises";
+import path10 from "node:path";
+function isInside3(parent, child) {
+  const relative3 = path10.relative(parent, child);
+  return relative3 === "" || !relative3.startsWith(`..${path10.sep}`) && relative3 !== ".." && !path10.isAbsolute(relative3);
+}
 async function inspect(input) {
   const local = await readLocalWorkspace(input.home, input.workspaceId);
   const contextPath = await assertLocalContextCheckout(
@@ -26211,14 +26564,31 @@ async function inspect(input) {
     }
   }
   const repositories = workspace.repositories.filter((repository) => local.repository_paths[repository.repo_id] !== void 0 && (requested === void 0 || requested.has(repository.repo_id)));
+  if (input.cwd !== void 0 && repositories.length !== 1) {
+    throw new Error("Option cwd requires exactly one requested local repository");
+  }
   const adapter = (input.adapterRegistry ?? defaultAdapterRegistry).adapterFor(input.agent);
   return Promise.all(repositories.map(async (repository) => {
-    const repositoryRoot = local.repository_paths[repository.repo_id];
-    return adapter.discover({
+    const recordedRoot = local.repository_paths[repository.repo_id];
+    const repositoryRoot = await fs6.realpath(recordedRoot).catch(() => void 0);
+    const [current] = repositoryRoot === void 0 ? [] : await scanRepositories(repositoryRoot, { maxDepth: 0 });
+    if (repositoryRoot === void 0 || repositoryRoot !== recordedRoot || current?.realPath !== repositoryRoot || current.repositoryId !== repository.repo_id) {
+      throw appError("REPOSITORY_ID_DRIFT", "Registered repository identity no longer matches the Workspace", {
+        repo_id: repository.repo_id
+      });
+    }
+    const cwd = input.cwd === void 0 ? repositoryRoot : await fs6.realpath(path10.resolve(input.cwd));
+    if (!isInside3(repositoryRoot, cwd)) {
+      throw appError("INVALID_CWD", "Inspection cwd must be contained in the bound repository", {
+        repo_id: repository.repo_id
+      });
+    }
+    const report = await adapter.discover({
       repositoryRoot,
-      cwd: repositoryRoot,
-      homeDir: path8.resolve(input.homeDir)
+      cwd,
+      homeDir: path10.resolve(input.homeDir)
     });
+    return { repo_id: repository.repo_id, report };
   }));
 }
 
@@ -26273,7 +26643,7 @@ async function doctor(input) {
       const shared = new Set(workspace.repositories.map((repository) => repository.repo_id));
       let drifted = false;
       for (const [repositoryId, repositoryPath] of Object.entries(local.repository_paths)) {
-        if (!shared.has(repositoryId) || await fs4.realpath(repositoryPath) !== repositoryPath) {
+        if (!shared.has(repositoryId) || await fs7.realpath(repositoryPath) !== repositoryPath) {
           drifted = true;
           break;
         }
@@ -26303,10 +26673,10 @@ async function doctor(input) {
   if (local !== void 0 && contextPath !== void 0) {
     try {
       await Promise.all([
-        fs4.access(registryPath(input.home, input.workspaceId), fsConstants.R_OK),
-        fs4.access(contextPath, fsConstants.R_OK),
+        fs7.access(registryPath(input.home, input.workspaceId), fsConstants.R_OK),
+        fs7.access(contextPath, fsConstants.R_OK),
         ...Object.values(local.repository_paths).map(
-          (repositoryPath) => fs4.access(repositoryPath, fsConstants.R_OK)
+          (repositoryPath) => fs7.access(repositoryPath, fsConstants.R_OK)
         )
       ]);
       checks.push(check2("permissions", "pass", "Required Workspace paths are readable."));
@@ -26327,7 +26697,8 @@ async function doctor(input) {
           adapterRegistry
         })
       ))).flat();
-      checks.push(reports.length === 0 ? check2("adapter-coverage", "warn", "No local repositories were available for Adapter coverage discovery.") : coverageStatus(reports) === "pass" ? check2("adapter-coverage", "pass", "Adapter discovery completed with covered diagnostics.") : check2("adapter-coverage", "warn", "Adapter discovery contains partial, unknown, or inaccessible coverage."));
+      const coverageReports = reports.map((item) => item.report);
+      checks.push(coverageReports.length === 0 ? check2("adapter-coverage", "warn", "No local repositories were available for Adapter coverage discovery.") : coverageStatus(coverageReports) === "pass" ? check2("adapter-coverage", "pass", "Adapter discovery completed with covered diagnostics.") : check2("adapter-coverage", "warn", "Adapter discovery contains partial, unknown, or inaccessible coverage."));
     } catch {
       checks.push(check2("adapter-coverage", "warn", "Adapter discovery coverage could not be completed."));
     }
@@ -26349,8 +26720,8 @@ async function doctor(input) {
 }
 
 // src/commands/init.ts
-import * as fs5 from "node:fs/promises";
-import path9 from "node:path";
+import * as fs8 from "node:fs/promises";
+import path11 from "node:path";
 function validateInitInput(input, workspaceId) {
   parseWorkspaceManifest({
     schema_version: 1,
@@ -26366,10 +26737,10 @@ function validateInitInput(input, workspaceId) {
 async function normalizeInput2(input) {
   return {
     name: input.name.trim(),
-    context_remote: input.contextRemote.trim(),
-    scan_root: await fs5.realpath(path9.resolve(input.scanRoot)),
+    context_remote: canonicalRemote(input.contextRemote),
+    scan_root: await fs8.realpath(path11.resolve(input.scanRoot)),
     max_depth: input.maxDepth,
-    home: path9.resolve(input.home)
+    home: path11.resolve(input.home)
   };
 }
 async function initWorkspace(input) {
@@ -26387,24 +26758,44 @@ async function initWorkspace(input) {
     maxDepth: normalized.max_depth
   });
   const warnings = [];
-  const repositories = [];
+  const byIdentity = /* @__PURE__ */ new Map();
   for (const repository of discovered) {
     if (repository.repositoryId === void 0) {
       warnings.push(`Repository ${repository.realPath} has no supported origin remote`);
       continue;
     }
+    const candidates = byIdentity.get(repository.repositoryId) ?? [];
+    candidates.push(repository);
+    byIdentity.set(repository.repositoryId, candidates);
+  }
+  const requestedBindings = input.bindings ?? {};
+  const repositories = [];
+  for (const [repoId, candidates] of byIdentity) {
+    const candidatePaths = candidates.map((candidate) => candidate.realPath).sort(compareCodeUnits);
+    const requested = requestedBindings[repoId] === void 0 ? void 0 : await fs8.realpath(path11.resolve(requestedBindings[repoId]));
+    if (requested !== void 0 && !candidatePaths.includes(requested)) {
+      throw appError("INVALID_BINDING", "Explicit binding is not one of the discovered candidates", { repo_id: repoId });
+    }
+    const selected = requested === void 0 ? candidates.length === 1 ? candidates[0] : void 0 : candidates.find((candidate) => candidate.realPath === requested);
+    if (selected === void 0) {
+      warnings.push(`Repository ${repoId} has ambiguous clone candidates; rerun preview with an explicit binding`);
+    }
     repositories.push({
       schema_version: 1,
-      repo_id: repository.repositoryId,
-      name: path9.basename(repository.realPath),
-      local_path: repository.realPath
+      repo_id: repoId,
+      name: repositoryDisplayName(repoId),
+      ...selected === void 0 ? {} : {
+        local_path: selected.realPath,
+        binding_hash: repositoryBindingHash(selected)
+      },
+      ...candidates.length < 2 ? {} : { candidate_paths: candidatePaths }
     });
   }
-  repositories.sort((left, right) => left.repo_id.localeCompare(right.repo_id));
+  repositories.sort((left, right) => compareCodeUnits(left.repo_id, right.repo_id));
   const filesToWrite = [
     "workspace.yaml",
     ...repositories.map((repository) => repositoryManifestFile(repository.repo_id)),
-    path9.join(normalized.home, "workspaces", `${workspaceId}.yaml`)
+    path11.join(normalized.home, "workspaces", `${workspaceId}.yaml`)
   ];
   const approval = {
     workspace_id: workspaceId,
@@ -26412,7 +26803,7 @@ async function initWorkspace(input) {
     repositories,
     warnings
   };
-  return {
+  const preview = {
     operation: "init",
     preview_id: createId("preview"),
     input_hash: previewInputHash("init", normalized, contextHead, approval),
@@ -26423,16 +26814,24 @@ async function initWorkspace(input) {
     repositories,
     warnings
   };
+  await savePreview(normalized.home, preview);
+  return preview;
 }
-async function applyInit(preview) {
+async function applyApprovedInit(preview) {
   if (preview.operation !== "init") {
     throw new TypeError("Expected an init preview");
   }
   assertPreviewIntegrity(preview);
   const input = preview.normalized_input;
   validateInitInput(input, preview.workspace_id);
+  await assertApprovedRepositoryBindings(preview);
   await assertRemoteHead(input.context_remote, preview.context_head);
-  const repositories = preview.repositories.map(({ local_path: _localPath, ...item }) => item);
+  const repositories = preview.repositories.map(({
+    local_path: _localPath,
+    candidate_paths: _candidatePaths,
+    binding_hash: _bindingHash,
+    ...item
+  }) => item);
   const workspace = parseWorkspaceManifest({
     schema_version: 1,
     workspace_id: preview.workspace_id,
@@ -26455,50 +26854,61 @@ async function applyInit(preview) {
     );
     await installContextTransaction(transaction.context_path, contextPath);
   } finally {
-    await fs5.rm(transaction.root, { recursive: true, force: true });
+    await fs8.rm(transaction.root, { recursive: true, force: true });
+  }
+  const repositoryPaths = {};
+  for (const repository of preview.repositories) {
+    if (repository.local_path !== void 0) {
+      repositoryPaths[repository.repo_id] = repository.local_path;
+    }
   }
   const local = {
     schema_version: 1,
     workspace_id: workspace.workspace_id,
-    context_path: await fs5.realpath(contextPath),
-    repository_paths: Object.fromEntries(
-      preview.repositories.filter((repository) => repository.local_path !== void 0).map((repository) => [repository.repo_id, repository.local_path])
-    )
+    context_path: await fs8.realpath(contextPath),
+    repository_paths: repositoryPaths
   };
   await writeLocalWorkspace(input.home, local);
   return { workspace, local, commit };
 }
+async function applyInit(previewId, home) {
+  const pending = await peekPreview(home, previewId, "init");
+  return withWorkspaceLock(home, pending.workspace_id, async () => {
+    const preview = await claimPreview(home, previewId, "init");
+    return applyApprovedInit(preview);
+  });
+}
 
 // src/commands/join.ts
-import * as fs6 from "node:fs/promises";
+import * as fs9 from "node:fs/promises";
 import { tmpdir } from "node:os";
-import path10 from "node:path";
+import path12 from "node:path";
 async function normalizeInput3(input) {
   if (!Number.isInteger(input.maxDepth) || input.maxDepth < 0) {
     throw new RangeError("maxDepth must be a non-negative integer");
   }
   const roots = await Promise.all(
-    input.scanRoots.map((root) => fs6.realpath(path10.resolve(root)))
+    input.scanRoots.map((root) => fs9.realpath(path12.resolve(root)))
   );
   return {
-    context_remote: input.contextRemote.trim(),
-    scan_roots: [...new Set(roots)].sort(),
+    context_remote: canonicalRemote(input.contextRemote),
+    scan_roots: [...new Set(roots)].sort(compareCodeUnits),
     max_depth: input.maxDepth,
-    home: path10.resolve(input.home)
+    home: path12.resolve(input.home)
   };
 }
 async function joinWorkspace(input) {
   const normalized = await normalizeInput3(input);
   validateContextRemote(normalized.context_remote);
   const contextHead = await remoteHead(normalized.context_remote);
-  const temporaryRoot = await fs6.mkdtemp(path10.join(tmpdir(), "acs-join-preview-"));
+  const temporaryRoot = await fs9.mkdtemp(path12.join(tmpdir(), "acs-join-preview-"));
   let workspace;
   try {
-    const temporaryContext = path10.join(temporaryRoot, "context");
+    const temporaryContext = path12.join(temporaryRoot, "context");
     await cloneContext(normalized.context_remote, temporaryContext, contextHead);
     workspace = await readWorkspaceManifest(temporaryContext);
   } finally {
-    await fs6.rm(temporaryRoot, { recursive: true, force: true });
+    await fs9.rm(temporaryRoot, { recursive: true, force: true });
   }
   if (workspace.context_remote !== normalized.context_remote) {
     throw new Error("Context remote does not match workspace manifest");
@@ -26508,17 +26918,39 @@ async function joinWorkspace(input) {
   ))).flat();
   const localPaths = /* @__PURE__ */ new Map();
   for (const repository of discovered) {
-    if (repository.repositoryId !== void 0 && !localPaths.has(repository.repositoryId)) {
-      localPaths.set(repository.repositoryId, repository.realPath);
-    }
+    if (repository.repositoryId === void 0) continue;
+    const candidates = localPaths.get(repository.repositoryId) ?? [];
+    if (!candidates.some((candidate) => candidate.realPath === repository.realPath)) candidates.push(repository);
+    localPaths.set(repository.repositoryId, candidates);
   }
-  const repositories = workspace.repositories.map((repository) => ({
-    ...repository,
-    ...localPaths.has(repository.repo_id) ? { local_path: localPaths.get(repository.repo_id) } : {}
-  }));
-  const warnings = repositories.filter((repository) => repository.local_path === void 0).map((repository) => `Repository ${repository.repo_id} is not available locally`);
+  const warnings = [];
+  const repositories = [];
+  for (const repository of workspace.repositories) {
+    const candidates = localPaths.get(repository.repo_id) ?? [];
+    const candidatePaths = candidates.map((candidate) => candidate.realPath).sort(compareCodeUnits);
+    const requestedRaw = input.bindings?.[repository.repo_id];
+    const requested = requestedRaw === void 0 ? void 0 : await fs9.realpath(path12.resolve(requestedRaw));
+    if (requested !== void 0 && !candidatePaths.includes(requested)) {
+      throw appError(
+        "INVALID_BINDING",
+        "Explicit binding is not one of the discovered candidates",
+        { repo_id: repository.repo_id, candidate_paths: candidatePaths }
+      );
+    }
+    const selected = requested === void 0 ? candidates.length === 1 ? candidates[0] : void 0 : candidates.find((candidate) => candidate.realPath === requested);
+    if (candidates.length === 0) warnings.push(`Repository ${repository.repo_id} is not available locally`);
+    else if (selected === void 0) warnings.push(`Repository ${repository.repo_id} has ambiguous clone candidates; rerun preview with an explicit binding`);
+    repositories.push({
+      ...repository,
+      ...selected === void 0 ? {} : {
+        local_path: selected.realPath,
+        binding_hash: repositoryBindingHash(selected)
+      },
+      ...candidates.length < 2 ? {} : { candidate_paths: candidatePaths }
+    });
+  }
   const filesToWrite = [
-    path10.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
+    path12.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
   ];
   const approval = {
     workspace_id: workspace.workspace_id,
@@ -26526,7 +26958,7 @@ async function joinWorkspace(input) {
     repositories,
     warnings
   };
-  return {
+  const preview = {
     operation: "join",
     preview_id: createId("preview"),
     input_hash: previewInputHash("join", normalized, contextHead, approval),
@@ -26537,13 +26969,16 @@ async function joinWorkspace(input) {
     repositories,
     warnings
   };
+  await savePreview(normalized.home, preview);
+  return preview;
 }
-async function applyJoin(preview) {
+async function applyApprovedJoin(preview) {
   if (preview.operation !== "join") {
     throw new TypeError("Expected a join preview");
   }
   assertPreviewIntegrity(preview);
   const input = preview.normalized_input;
+  await assertApprovedRepositoryBindings(preview);
   await assertRemoteHead(input.context_remote, preview.context_head);
   const contextPath = contextCheckoutPath(input.home, preview.workspace_id);
   const transaction = await createContextTransaction(
@@ -26560,18 +26995,29 @@ async function applyJoin(preview) {
     await assertRemoteHead(input.context_remote, preview.context_head);
     await installContextTransaction(transaction.context_path, contextPath);
   } finally {
-    await fs6.rm(transaction.root, { recursive: true, force: true });
+    await fs9.rm(transaction.root, { recursive: true, force: true });
+  }
+  const repositoryPaths = {};
+  for (const repository of preview.repositories) {
+    if (repository.local_path !== void 0) {
+      repositoryPaths[repository.repo_id] = repository.local_path;
+    }
   }
   const local = {
     schema_version: 1,
     workspace_id: workspace.workspace_id,
-    context_path: await fs6.realpath(contextPath),
-    repository_paths: Object.fromEntries(
-      preview.repositories.filter((repository) => repository.local_path !== void 0).map((repository) => [repository.repo_id, repository.local_path])
-    )
+    context_path: await fs9.realpath(contextPath),
+    repository_paths: repositoryPaths
   };
   await writeLocalWorkspace(input.home, local);
   return { workspace, local };
+}
+async function applyJoin(previewId, home) {
+  const pending = await peekPreview(home, previewId, "join");
+  return withWorkspaceLock(home, pending.workspace_id, async () => {
+    const preview = await claimPreview(home, previewId, "join");
+    return applyApprovedJoin(preview);
+  });
 }
 
 // src/main.ts
@@ -26605,6 +27051,27 @@ function one(args, name) {
 function many(args, name) {
   return args.options.get(name) ?? [];
 }
+function parseRepositoryBindings(values) {
+  const bindings = {};
+  for (const value of values) {
+    const separator = value.indexOf("=");
+    if (separator <= 0 || separator === value.length - 1) {
+      throw new Error("Option --binding must use repo_id=path");
+    }
+    const repositoryId = value.slice(0, separator);
+    const repositoryPath = value.slice(separator + 1);
+    if (Object.hasOwn(bindings, repositoryId)) {
+      throw new Error(`Duplicate --binding for ${repositoryId}`);
+    }
+    Object.defineProperty(bindings, repositoryId, {
+      value: repositoryPath,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  }
+  return bindings;
+}
 function assertOptions(args, allowed) {
   const allowedSet = new Set(allowed);
   for (const name of args.options.keys()) {
@@ -26617,17 +27084,10 @@ function nonNegativeInteger(value, name) {
   if (!Number.isSafeInteger(parsed)) throw new Error(`Option --${name} must be a safe integer`);
   return parsed;
 }
-function parsePreview(value) {
-  const parsed = JSON.parse(value);
-  if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error("Preview JSON must be an object");
-  }
-  return parsed;
-}
 function homePaths() {
-  const homeDir = path11.resolve(process.env.HOME ?? homedir2());
+  const homeDir = path13.resolve(process.env.HOME ?? homedir2());
   return {
-    home: path11.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path11.join(homeDir, ".agent-context-sync")),
+    home: path13.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path13.join(homeDir, ".agent-context-sync")),
     homeDir
   };
 }
@@ -26644,31 +27104,33 @@ async function dispatch(command, argv) {
       throw new Error(`${command} requires exactly one phase: preview or apply`);
     }
     if (phase === "apply") {
-      assertOptions(args, ["preview-json"]);
-      const preview = parsePreview(one(args, "preview-json"));
-      if (command === "init") return { result: await applyInit(preview) };
-      if (command === "join") return { result: await applyJoin(preview) };
-      return { result: await applyAddRepository(preview) };
+      assertOptions(args, ["preview-id"]);
+      const previewId = one(args, "preview-id");
+      if (command === "init") return { result: await applyInit(previewId, home) };
+      if (command === "join") return { result: await applyJoin(previewId, home) };
+      return { result: await applyAddRepository(previewId, home) };
     }
     if (command === "init") {
-      assertOptions(args, ["name", "context-remote", "scan-root", "max-depth"]);
+      assertOptions(args, ["name", "context-remote", "scan-root", "max-depth", "binding"]);
       return { preview: await initWorkspace({
         name: one(args, "name"),
         contextRemote: one(args, "context-remote"),
         scanRoot: one(args, "scan-root"),
         maxDepth: nonNegativeInteger(one(args, "max-depth"), "max-depth"),
-        home
+        home,
+        bindings: parseRepositoryBindings(many(args, "binding"))
       }) };
     }
     if (command === "join") {
-      assertOptions(args, ["context-remote", "scan-root", "max-depth"]);
+      assertOptions(args, ["context-remote", "scan-root", "max-depth", "binding"]);
       const scanRoots = many(args, "scan-root");
       if (scanRoots.length === 0) throw new Error("Option --scan-root is required");
       return { preview: await joinWorkspace({
         contextRemote: one(args, "context-remote"),
         scanRoots,
         maxDepth: nonNegativeInteger(one(args, "max-depth"), "max-depth"),
-        home
+        home,
+        bindings: parseRepositoryBindings(many(args, "binding"))
       }) };
     }
     assertOptions(args, ["workspace", "repository"]);
@@ -26680,7 +27142,7 @@ async function dispatch(command, argv) {
   }
   if (args.positionals.length !== 0) throw new Error(`${command} accepts no positional arguments`);
   if (command === "inspect") {
-    assertOptions(args, ["workspace", "agent", "repository"]);
+    assertOptions(args, ["workspace", "agent", "repository", "cwd"]);
     const agent = one(args, "agent");
     if (agent !== "claude-code" && agent !== "codex") {
       throw new Error("Option --agent must be claude-code or codex");
@@ -26691,7 +27153,8 @@ async function dispatch(command, argv) {
       agent,
       home,
       homeDir,
-      ...repositories.length === 0 ? {} : { repositories }
+      ...repositories.length === 0 ? {} : { repositories },
+      ...args.options.has("cwd") ? { cwd: one(args, "cwd") } : {}
     }) };
   }
   if (command === "doctor") {
@@ -26714,7 +27177,8 @@ async function run(argv, io) {
       command,
       error: {
         code,
-        message: code === "UNKNOWN_COMMAND" ? `Unknown command: ${command}` : "The command could not be completed with the supplied input."
+        message: code === "UNKNOWN_COMMAND" ? `Unknown command: ${command}` : "The command could not be completed with the supplied input.",
+        ...typeof candidate.code === "string" && sanitizedAppErrorDetails(candidate) !== void 0 ? { details: sanitizedAppErrorDetails(candidate) } : {}
       }
     }));
     return 2;
@@ -26737,6 +27201,7 @@ export {
   initWorkspace,
   inspect,
   joinWorkspace,
+  parseRepositoryBindings,
   run
 };
 /*! Bundled license information:

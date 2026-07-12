@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appError } from '../../src/domain/errors.js';
+import { appError, sanitizedAppErrorDetails } from '../../src/domain/errors.js';
 import { createId } from '../../src/domain/ids.js';
 
 describe('createId', () => {
@@ -35,6 +35,19 @@ describe('appError', () => {
     expect(appError('NOT_FOUND', 'Not found')).toEqual({
       code: 'NOT_FOUND',
       message: 'Not found',
+    });
+  });
+
+  it('preserves stable remediation details while removing unsafe values', () => {
+    const details = sanitizedAppErrorDetails(appError('STALE_PREVIEW', 'stale', {
+      expected_head: 'abc123',
+      actual_head: 'def456',
+      nested: { repo_id: 'github.com/acme/api', secret: new Error('/private/token') },
+    }));
+    expect(details).toEqual({
+      actual_head: 'def456',
+      expected_head: 'abc123',
+      nested: { repo_id: 'github.com/acme/api' },
     });
   });
 });

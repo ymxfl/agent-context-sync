@@ -2,6 +2,7 @@ import { lstat, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { runGit } from '../git/run-git.js';
+import { compareCodeUnits } from '../domain/compare.js';
 import { repositoryIdFromRemote } from './repository-id.js';
 
 export interface DiscoveredRepository {
@@ -132,7 +133,7 @@ export async function scanRepositories(
     }
 
     const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareCodeUnits(left.name, right.name));
 
     for (const entry of entries) {
       if (ignoredDirectories.has(entry.name)) {
@@ -148,6 +149,6 @@ export async function scanRepositories(
 
   await visit(path.resolve(root), 0, false);
   return [...repositories.values()].sort((left, right) =>
-    left.realPath.localeCompare(right.realPath),
+    compareCodeUnits(left.realPath, right.realPath),
   );
 }

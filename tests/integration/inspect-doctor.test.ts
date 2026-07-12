@@ -76,13 +76,14 @@ describe('inspect and doctor', () => {
     await initFixtureRepository(repository, 'https://github.com/acme/api.git');
     await fs.writeFile(path.join(repository, 'AGENTS.md'), '# API instructions\n');
     await fs.writeFile(path.join(repository, 'CLAUDE.md'), '# API instructions\n');
-    const result = await applyInit(await initWorkspace({
+    const preview = await initWorkspace({
       name: 'platform',
       contextRemote: started.remote,
       scanRoot: path.dirname(repository),
       maxDepth: 1,
       home,
-    }));
+    });
+    const result = await applyInit(preview.preview_id, home);
     workspaceId = result.workspace.workspace_id;
   });
 
@@ -104,12 +105,40 @@ describe('inspect and doctor', () => {
 
     expect(first).toEqual(second);
     expect(first).toHaveLength(1);
-    expect(first[0]).toMatchObject({ agent: 'codex' });
-    expect(first[0]?.sources.length).toBeGreaterThan(0);
+    expect(first[0]).toMatchObject({
+      repo_id: 'github.com/acme/api',
+      report: { agent: 'codex' },
+    });
+    expect(first[0]?.report.sources.length).toBeGreaterThan(0);
     expect(await fixtureGit(repository, ['status', '--porcelain=v1'])).toBe(before.status);
     expect(await fixtureGit(repository, ['rev-parse', 'HEAD'])).toBe(before.head);
     expect(await fs.readFile(path.join(repository, 'AGENTS.md'))).toEqual(before.agents);
     expect(await fs.readFile(path.join(repository, 'CLAUDE.md'))).toEqual(before.claude);
+  });
+
+  it('uses a canonical contained cwd for nested Agent discovery', async () => {
+    const nested = path.join(repository, 'packages/api');
+    await fs.mkdir(nested, { recursive: true });
+    await fs.writeFile(path.join(nested, 'AGENTS.override.md'), '# Nested API\n');
+
+    const [result] = await inspect({
+      workspaceId,
+      agent: 'codex',
+      home,
+      homeDir: agentHome,
+      repositories: ['github.com/acme/api'],
+      cwd: nested,
+    });
+
+    expect(result?.repo_id).toBe('github.com/acme/api');
+    expect(result?.report.loadPlan.map((item) => item.locator))
+      .toContain(await fs.realpath(path.join(nested, 'AGENTS.override.md')));
+  });
+
+  it('refuses to inspect a binding whose current remote identity drifted', async () => {
+    await fixtureGit(repository, ['remote', 'set-url', 'origin', 'https://github.com/other/api.git']);
+    await expect(inspect({ workspaceId, agent: 'codex', home, homeDir: agentHome }))
+      .rejects.toMatchObject({ code: 'REPOSITORY_ID_DRIFT' });
   });
 
   it('reports the fixed diagnostic set without writing', async () => {

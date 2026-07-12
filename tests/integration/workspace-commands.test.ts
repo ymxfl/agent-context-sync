@@ -9,16 +9,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   cloneContext,
+  readWorkspaceManifest,
   repositoryManifestFile,
   UNBORN_HEAD,
   type WorkspacePreview,
 } from '../../src/workspace/context-repository.js';
 import {
   addRepository,
-  applyAddRepository,
+  applyAddRepository as applyAddRepositoryById,
 } from '../../src/commands/add-repo.js';
-import { applyInit, initWorkspace } from '../../src/commands/init.js';
-import { applyJoin, joinWorkspace } from '../../src/commands/join.js';
+import { applyInit as applyInitById, initWorkspace } from '../../src/commands/init.js';
+import { applyJoin as applyJoinById, joinWorkspace } from '../../src/commands/join.js';
 import { parseWorkspaceManifest } from '../../src/schema/workspace.js';
 import {
   readLocalWorkspace,
@@ -31,6 +32,22 @@ import {
   fixtureGit,
   initFixtureRepository,
 } from '../helpers/git.js';
+
+function previewHome(preview: WorkspacePreview): string {
+  return preview.normalized_input.home;
+}
+
+function applyInit(preview: WorkspacePreview) {
+  return applyInitById(preview.preview_id, previewHome(preview));
+}
+
+function applyJoin(preview: WorkspacePreview) {
+  return applyJoinById(preview.preview_id, previewHome(preview));
+}
+
+function applyAddRepository(preview: WorkspacePreview) {
+  return applyAddRepositoryById(preview.preview_id, previewHome(preview));
+}
 
 async function availablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -176,6 +193,77 @@ describe('workspace commands', () => {
     ])).toEqual(businessLogs);
   });
 
+  it('allows only one concurrent init application of an approved preview', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const preview = await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+    });
+
+    const results = await Promise.allSettled([applyInit(preview), applyInit(preview)]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(results.find((result) => result.status === 'rejected')).toMatchObject({
+      reason: { code: 'PREVIEW_ALREADY_USED' },
+    });
+  });
+
+  it('reports duplicate clone candidates without silently selecting a binding', async () => {
+    const scanRoot = path.join(root, 'business');
+    const first = path.join(scanRoot, 'first-local-name');
+    const second = path.join(scanRoot, 'second-local-name');
+    const home = path.join(root, 'member-a');
+    await initFixtureRepository(first, 'https://github.com/acme/api.git');
+    await initFixtureRepository(second, 'git@github.com:acme/api.git');
+
+    const preview = await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+    });
+
+    expect(preview.repositories).toHaveLength(1);
+    expect(preview.repositories[0]).toMatchObject({
+      repo_id: 'github.com/acme/api',
+      name: 'api',
+      candidate_paths: [await fs.realpath(first), await fs.realpath(second)],
+    });
+    expect(preview.repositories[0]?.local_path).toBeUndefined();
+    expect(preview.warnings.join('\n')).toMatch(/ambiguous.*explicit binding/i);
+
+    await expect(applyInit(preview)).rejects.toMatchObject({
+      code: 'AMBIGUOUS_BINDING',
+      details: {
+        repo_id: 'github.com/acme/api',
+        candidate_paths: [await fs.realpath(first), await fs.realpath(second)],
+      },
+    });
+
+    const bound = await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+      bindings: { 'github.com/acme/api': second },
+    });
+    expect(bound.repositories[0]?.local_path).toBe(await fs.realpath(second));
+    const result = await applyInit(bound);
+    expect(result.local.repository_paths).toEqual({
+      'github.com/acme/api': await fs.realpath(second),
+    });
+  });
+
+  it('rejects repository identity drift before applying init', async () => {
+    const scanRoot = path.join(root, 'business');
+    const repository = path.join(scanRoot, 'api');
+    const home = path.join(root, 'member-a');
+    await initFixtureRepository(repository, 'https://github.com/acme/api.git');
+    const preview = await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+    });
+    await fixtureGit(repository, ['remote', 'set-url', 'origin', 'https://github.com/evil/api.git']);
+
+    await expect(applyInit(preview)).rejects.toMatchObject({ code: 'STALE_PREVIEW' });
+    expect(await pathExists(path.join(home, 'contexts', preview.workspace_id))).toBe(false);
+  });
+
   it('rejects an init preview when the Context HEAD changes', async () => {
     const scanRoot = path.join(root, 'business');
     const home = path.join(root, 'member-a');
@@ -219,7 +307,7 @@ describe('workspace commands', () => {
     expect(await pathExists(path.join(home, 'contexts'))).toBe(false);
   });
 
-  it('binds every approved init write field into the preview hash', async () => {
+  it('applies only authenticated locally stored preview data, not a caller payload', async () => {
     const scanRoot = path.join(root, 'business');
     const repository = path.join(scanRoot, 'api');
     const home = path.join(root, 'member-a');
@@ -231,25 +319,11 @@ describe('workspace commands', () => {
       maxDepth: 1,
       home,
     });
-    const mutations: Array<[string, (value: WorkspacePreview) => void]> = [
-      ['workspace ID', (value) => { value.workspace_id = 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV'; }],
-      ['name', (value) => {
-        (value.normalized_input as { name: string }).name = 'other';
-      }],
-      ['repository name', (value) => { value.repositories[0]!.name = 'other'; }],
-      ['local binding', (value) => { value.repositories[0]!.local_path = root; }],
-      ['file list', (value) => { value.files_to_write.push('outside.yaml'); }],
-      ['warnings', (value) => { value.warnings.push('approved warning changed'); }],
-    ];
-
-    for (const [field, mutate] of mutations) {
-      const changed = structuredClone(preview);
-      mutate(changed);
-      await expect(applyInit(changed), field).rejects.toMatchObject({
-        code: 'STALE_PREVIEW',
-      });
-    }
-    expect(await pathExists(path.join(home, 'contexts'))).toBe(false);
+    preview.workspace_id = 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV';
+    (preview.normalized_input as { name: string }).name = 'attacker-name';
+    const result = await applyInitById(preview.preview_id, home);
+    expect(result.workspace.name).toBe('platform');
+    expect(result.workspace.workspace_id).not.toBe(preview.workspace_id);
   });
 
   it('refuses to initialize a non-empty Context repository', async () => {
@@ -365,6 +439,47 @@ describe('workspace commands', () => {
     expect(await fixtureGit(bareRemote, ['rev-parse', 'main'])).toBe(contextHead);
   });
 
+  it('rejects repository identity drift before applying join', async () => {
+    const memberAHome = path.join(root, 'member-a');
+    const memberAScan = path.join(root, 'member-a-business');
+    await initFixtureRepository(path.join(memberAScan, 'api'), 'https://github.com/acme/api.git');
+    await applyInit(await initWorkspace({
+      name: 'platform', contextRemote, scanRoot: memberAScan, maxDepth: 1, home: memberAHome,
+    }));
+
+    const memberBHome = path.join(root, 'member-b');
+    const localApi = path.join(root, 'member-b-business', 'api');
+    await initFixtureRepository(localApi, 'git@github.com:acme/api.git');
+    const preview = await joinWorkspace({
+      contextRemote, scanRoots: [path.dirname(localApi)], maxDepth: 1, home: memberBHome,
+    });
+    await fixtureGit(localApi, ['remote', 'set-url', 'origin', 'https://github.com/other/api.git']);
+
+    await expect(applyJoin(preview)).rejects.toMatchObject({ code: 'STALE_PREVIEW' });
+    expect(await pathExists(path.join(memberBHome, 'contexts', preview.workspace_id))).toBe(false);
+  });
+
+  it('allows only one concurrent join application of an approved preview', async () => {
+    const memberAHome = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    await applyInit(await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home: memberAHome,
+    }));
+    const memberBHome = path.join(root, 'member-b');
+    const preview = await joinWorkspace({
+      contextRemote, scanRoots: [scanRoot], maxDepth: 1, home: memberBHome,
+    });
+
+    const results = await Promise.allSettled([applyJoin(preview), applyJoin(preview)]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(results.find((result) => result.status === 'rejected')).toMatchObject({
+      reason: { code: 'PREVIEW_ALREADY_USED' },
+    });
+  });
+
   it('rejects a raw local path as a join Context remote', async () => {
     const home = path.join(root, 'member-b');
 
@@ -373,7 +488,7 @@ describe('workspace commands', () => {
       scanRoots: [],
       maxDepth: 1,
       home,
-    })).rejects.toThrow(/shared remote/i);
+    })).rejects.toThrow(/shared remote|unsupported git remote/i);
     expect(await pathExists(path.join(home, 'contexts'))).toBe(false);
   });
 
@@ -461,6 +576,53 @@ describe('workspace commands', () => {
       .toBe(await fs.realpath(external));
     expect(await fixtureGit(external, ['log', '--format=%H'])).toBe(businessLog);
     expect(await fixtureGit(bareRemote, ['rev-list', '--count', 'main'])).toBe('2');
+  });
+
+  it('rejects repository identity drift before applying add-repo', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+    }));
+    const external = path.join(root, 'outside', 'worker');
+    await initFixtureRepository(external, 'https://github.com/acme/worker.git');
+    const preview = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    });
+    await fixtureGit(external, ['remote', 'set-url', 'origin', 'https://github.com/other/worker.git']);
+
+    await expect(applyAddRepository(preview)).rejects.toMatchObject({ code: 'STALE_PREVIEW' });
+    expect((await readWorkspaceManifest(initialized.local.context_path)).repositories).toEqual([]);
+  });
+
+  it('allows only one concurrent add-repo application of an approved preview', async () => {
+    const home = path.join(root, 'member-a');
+    const scanRoot = path.join(root, 'business');
+    await fs.mkdir(scanRoot, { recursive: true });
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform', contextRemote, scanRoot, maxDepth: 1, home,
+    }));
+    const external = path.join(root, 'outside', 'worker');
+    await initFixtureRepository(external, 'https://github.com/acme/worker.git');
+    const preview = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: external,
+      home,
+    });
+
+    const results = await Promise.allSettled([
+      applyAddRepository(preview),
+      applyAddRepository(preview),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(results.find((result) => result.status === 'rejected')).toMatchObject({
+      reason: { code: 'PREVIEW_ALREADY_USED' },
+    });
   });
 
   it('leaves persistent state unchanged on a concurrent add push and permits retry', async () => {

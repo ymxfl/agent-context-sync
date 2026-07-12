@@ -32,17 +32,20 @@ function isSupportedRemote(value: string): boolean {
   if (/^(?:https|ssh|git):\/\//i.test(value)) {
     try {
       const parsed = new URL(value);
-      return parsed.hostname.length > 0 && parsed.pathname.replace(/^\/+/, '').length > 0;
+      return parsed.username.length === 0
+        && parsed.password.length === 0
+        && parsed.hostname.length > 0
+        && parsed.pathname.replace(/^\/+/, '').length > 0;
     } catch {
       return false;
     }
   }
   if (value.includes('://')) return false;
-  return /^(?:[^@\s/:]+@)?[^\s/:\\]+:[^\s\\]+$/.test(value);
+  return /^(?:git@)?[^@\s/:\\]+:[^\s\\]+$/.test(value);
 }
 
 const sharedRemoteSchema = z.string().trim().min(1).refine(isSupportedRemote, {
-  message: 'Shared remote must be an HTTPS, SSH, Git, or SCP-like remote',
+  message: 'Shared remote must be credential-free HTTPS, SSH, Git, or git@ SCP-like remote; URL userinfo is forbidden',
 });
 
 const repositoryManifestSchema: z.ZodType<RepositoryManifest> = z.strictObject({
@@ -57,6 +60,18 @@ const workspaceManifestSchema: z.ZodType<WorkspaceManifest> = z.strictObject({
   name: z.string().trim().min(1),
   context_remote: sharedRemoteSchema,
   repositories: z.array(repositoryManifestSchema),
+}).superRefine((workspace, context) => {
+  const seen = new Set<string>();
+  for (const [index, repository] of workspace.repositories.entries()) {
+    if (seen.has(repository.repo_id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['repositories', index, 'repo_id'],
+        message: 'Repository IDs must be unique within a Workspace',
+      });
+    }
+    seen.add(repository.repo_id);
+  }
 });
 
 const localWorkspaceSchema: z.ZodType<LocalWorkspace> = z.strictObject({

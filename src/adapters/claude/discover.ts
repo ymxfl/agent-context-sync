@@ -8,6 +8,7 @@ import {
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { minimatch } from 'minimatch';
+import { compareCodeUnits } from '../../domain/compare.js';
 import { parse as parseYaml } from 'yaml';
 import {
   ADAPTER_CONTRACT_VERSION,
@@ -63,7 +64,7 @@ function isInside(parent: string, child: string): boolean {
 }
 
 function uniqueSorted(values: Iterable<string>): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort(compareCodeUnits);
 }
 
 function coverage(
@@ -126,7 +127,7 @@ async function walkMarkdown(
       inaccessible.push(directory);
       return;
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of entries) {
       if (entry.name === '.git' || entry.name === 'node_modules') continue;
       const path = join(directory, entry.name);
@@ -271,6 +272,23 @@ export class ClaudeAdapter implements AgentAdapter {
     const coverageItems: CoverageItem[] = [];
     const foundInstructions: FoundInstruction[] = [];
     let canonicalRepositoryRoot = repositoryRoot;
+    const managedInputsSupplied = input.managedSettingsPaths !== undefined
+      && input.managedInstructionPaths !== undefined;
+    const additionalInputsSupplied = input.additionalDirectories !== undefined;
+    if (!managedInputsSupplied) {
+      coverageItems.push(coverage(
+        'claude-managed-inputs',
+        'unknown',
+        'Managed settings and instruction locations were not supplied, so managed coverage cannot be confirmed.',
+      ));
+    }
+    if (!additionalInputsSupplied) {
+      coverageItems.push(coverage(
+        'claude-additional-directory-inputs',
+        'unknown',
+        'Additional-directory inputs were not supplied, so their coverage cannot be confirmed.',
+      ));
+    }
     try {
       canonicalRepositoryRoot = await this.fs.realpath(repositoryRoot);
     } catch {
@@ -620,7 +638,7 @@ export class ClaudeAdapter implements AgentAdapter {
     for (const instruction of foundInstructions.filter((item) => item.loading !== 'reported-only')) {
       await visitImports(instruction.locator, 0, [], instruction.shareability);
     }
-    sources.push(...[...importSources.values()].sort((left, right) => left.locator.localeCompare(right.locator)));
+    sources.push(...[...importSources.values()].sort((left, right) => compareCodeUnits(left.locator, right.locator)));
 
     const autoMemorySetting = parsedLayers.find(({ kind, settings }) =>
       kind === 'managed' && typeof settings.autoMemoryDirectory === 'string',
@@ -683,7 +701,7 @@ export class ClaudeAdapter implements AgentAdapter {
         const rightIndex = instructionSourcePaths.indexOf(right.locator);
         if (leftIndex !== rightIndex) return leftIndex - rightIndex;
       }
-      return left.locator.localeCompare(right.locator);
+      return compareCodeUnits(left.locator, right.locator);
     });
     const loadPlan: LoadOrder[] = orderedInstructions.map((item, order) => ({
       order,
@@ -702,9 +720,15 @@ export class ClaudeAdapter implements AgentAdapter {
       if (source.sourceType === 'auto-memory') return 6;
       return 7;
     };
-    sources.sort((left, right) => sourceRank(left) - sourceRank(right) || left.locator.localeCompare(right.locator));
-    coverageItems.push(coverage('claude-known-sources', 'covered', 'Known stable Claude Code source locations were inspected.'));
-    coverageItems.sort((left, right) => left.id.localeCompare(right.id) || (left.locator ?? '').localeCompare(right.locator ?? ''));
+    sources.sort((left, right) => sourceRank(left) - sourceRank(right) || compareCodeUnits(left.locator, right.locator));
+    coverageItems.push(coverage(
+      'claude-known-sources',
+      managedInputsSupplied && additionalInputsSupplied ? 'covered' : 'partial',
+      managedInputsSupplied && additionalInputsSupplied
+        ? 'Known stable Claude Code source locations and supplied external mechanisms were inspected.'
+        : 'Known stable Claude Code source locations were inspected, but external mechanisms were not fully supplied.',
+    ));
+    coverageItems.sort((left, right) => compareCodeUnits(left.id, right.id) || compareCodeUnits(left.locator ?? '', right.locator ?? ''));
 
     return { agent: AGENT, sources, coverage: coverageItems, loadPlan };
   }

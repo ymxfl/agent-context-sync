@@ -9,6 +9,18 @@ import type { DiscoveryInput } from '../../src/adapters/adapter.js';
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures');
 
 describe('ClaudeAdapter', () => {
+  it('does not claim full coverage when managed and additional-directory inputs are unsupplied', async () => {
+    const report = await new ClaudeAdapter().discover({
+      repositoryRoot,
+      cwd: repositoryRoot,
+      homeDir,
+    });
+    expect(report.coverage).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'claude-managed-inputs', status: 'unknown' }),
+      expect.objectContaining({ id: 'claude-additional-directory-inputs', status: 'unknown' }),
+      expect.objectContaining({ id: 'claude-known-sources', status: 'partial' }),
+    ]));
+  });
   let root: string;
   let homeDir: string;
   let repositoryRoot: string;

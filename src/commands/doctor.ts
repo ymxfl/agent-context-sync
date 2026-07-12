@@ -152,9 +152,10 @@ export async function doctor(input: DoctorInput): Promise<DoctorReport> {
           adapterRegistry,
         }),
       ))).flat();
-      checks.push(reports.length === 0
+      const coverageReports = reports.map((item) => item.report);
+      checks.push(coverageReports.length === 0
         ? check('adapter-coverage', 'warn', 'No local repositories were available for Adapter coverage discovery.')
-        : coverageStatus(reports) === 'pass'
+        : coverageStatus(coverageReports) === 'pass'
         ? check('adapter-coverage', 'pass', 'Adapter discovery completed with covered diagnostics.')
         : check('adapter-coverage', 'warn', 'Adapter discovery contains partial, unknown, or inaccessible coverage.'));
     } catch {

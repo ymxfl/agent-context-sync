@@ -3,12 +3,12 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { AgentName } from './adapters/adapter.js';
+import { sanitizedAppErrorDetails } from './domain/errors.js';
 import { addRepository, applyAddRepository } from './commands/add-repo.js';
 import { doctor } from './commands/doctor.js';
 import { applyInit, initWorkspace } from './commands/init.js';
 import { inspect } from './commands/inspect.js';
 import { applyJoin, joinWorkspace } from './commands/join.js';
-import type { WorkspacePreview } from './workspace/context-repository.js';
 
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
 export { doctor } from './commands/doctor.js';
@@ -24,6 +24,7 @@ export interface CommandIO {
 export interface AppError {
   code: string;
   message: string;
+  details?: unknown;
 }
 
 export interface JsonEnvelope {
@@ -71,6 +72,28 @@ function many(args: ParsedArguments, name: string): string[] {
   return args.options.get(name) ?? [];
 }
 
+export function parseRepositoryBindings(values: readonly string[]): Record<string, string> {
+  const bindings: Record<string, string> = {};
+  for (const value of values) {
+    const separator = value.indexOf('=');
+    if (separator <= 0 || separator === value.length - 1) {
+      throw new Error('Option --binding must use repo_id=path');
+    }
+    const repositoryId = value.slice(0, separator);
+    const repositoryPath = value.slice(separator + 1);
+    if (Object.hasOwn(bindings, repositoryId)) {
+      throw new Error(`Duplicate --binding for ${repositoryId}`);
+    }
+    Object.defineProperty(bindings, repositoryId, {
+      value: repositoryPath,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return bindings;
+}
+
 function assertOptions(args: ParsedArguments, allowed: readonly string[]): void {
   const allowedSet = new Set(allowed);
   for (const name of args.options.keys()) {
@@ -83,14 +106,6 @@ function nonNegativeInteger(value: string, name: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) throw new Error(`Option --${name} must be a safe integer`);
   return parsed;
-}
-
-function parsePreview(value: string): WorkspacePreview {
-  const parsed: unknown = JSON.parse(value);
-  if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') {
-    throw new Error('Preview JSON must be an object');
-  }
-  return parsed as WorkspacePreview;
 }
 
 function homePaths(): { home: string; homeDir: string } {
@@ -114,24 +129,25 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
       throw new Error(`${command} requires exactly one phase: preview or apply`);
     }
     if (phase === 'apply') {
-      assertOptions(args, ['preview-json']);
-      const preview = parsePreview(one(args, 'preview-json'));
-      if (command === 'init') return { result: await applyInit(preview) };
-      if (command === 'join') return { result: await applyJoin(preview) };
-      return { result: await applyAddRepository(preview) };
+      assertOptions(args, ['preview-id']);
+      const previewId = one(args, 'preview-id');
+      if (command === 'init') return { result: await applyInit(previewId, home) };
+      if (command === 'join') return { result: await applyJoin(previewId, home) };
+      return { result: await applyAddRepository(previewId, home) };
     }
     if (command === 'init') {
-      assertOptions(args, ['name', 'context-remote', 'scan-root', 'max-depth']);
+      assertOptions(args, ['name', 'context-remote', 'scan-root', 'max-depth', 'binding']);
       return { preview: await initWorkspace({
         name: one(args, 'name'),
         contextRemote: one(args, 'context-remote'),
         scanRoot: one(args, 'scan-root'),
         maxDepth: nonNegativeInteger(one(args, 'max-depth'), 'max-depth'),
         home,
+        bindings: parseRepositoryBindings(many(args, 'binding')),
       }) };
     }
     if (command === 'join') {
-      assertOptions(args, ['context-remote', 'scan-root', 'max-depth']);
+      assertOptions(args, ['context-remote', 'scan-root', 'max-depth', 'binding']);
       const scanRoots = many(args, 'scan-root');
       if (scanRoots.length === 0) throw new Error('Option --scan-root is required');
       return { preview: await joinWorkspace({
@@ -139,6 +155,7 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
         scanRoots,
         maxDepth: nonNegativeInteger(one(args, 'max-depth'), 'max-depth'),
         home,
+        bindings: parseRepositoryBindings(many(args, 'binding')),
       }) };
     }
     assertOptions(args, ['workspace', 'repository']);
@@ -150,7 +167,7 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
   }
   if (args.positionals.length !== 0) throw new Error(`${command} accepts no positional arguments`);
   if (command === 'inspect') {
-    assertOptions(args, ['workspace', 'agent', 'repository']);
+    assertOptions(args, ['workspace', 'agent', 'repository', 'cwd']);
     const agent = one(args, 'agent');
     if (agent !== 'claude-code' && agent !== 'codex') {
       throw new Error('Option --agent must be claude-code or codex');
@@ -162,6 +179,7 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
       home,
       homeDir,
       ...(repositories.length === 0 ? {} : { repositories }),
+      ...(args.options.has('cwd') ? { cwd: one(args, 'cwd') } : {}),
     }) };
   }
   if (command === 'doctor') {
@@ -178,7 +196,7 @@ export async function run(argv: string[], io: CommandIO): Promise<number> {
     io.stdout(JSON.stringify({ ok: true, command, data }));
     return 0;
   } catch (error) {
-    const candidate = error as { code?: unknown };
+    const candidate = error as { code?: unknown; details?: unknown };
     const code = typeof candidate.code === 'string'
       ? candidate.code
       : 'INVALID_ARGUMENT';
@@ -190,6 +208,10 @@ export async function run(argv: string[], io: CommandIO): Promise<number> {
         message: code === 'UNKNOWN_COMMAND'
           ? `Unknown command: ${command}`
           : 'The command could not be completed with the supplied input.',
+        ...(typeof candidate.code === 'string'
+          && sanitizedAppErrorDetails(candidate as { code: string; message: string; details?: unknown }) !== undefined
+          ? { details: sanitizedAppErrorDetails(candidate as { code: string; message: string; details?: unknown }) }
+          : {}),
       },
     }));
     return 2;

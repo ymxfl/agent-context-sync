@@ -5,6 +5,7 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 
 import { appError } from '../domain/errors.js';
+import { compareCodeUnits } from '../domain/compare.js';
 import type {
   LocalWorkspace,
   RepositoryManifest,
@@ -13,6 +14,7 @@ import type {
 import { atomicWriteFile } from '../fs/atomic-write.js';
 import { runGit } from '../git/run-git.js';
 import { parseWorkspaceManifest } from '../schema/workspace.js';
+import { scanRepositories, type DiscoveredRepository } from './scanner.js';
 
 export const UNBORN_HEAD = 'UNBORN';
 
@@ -20,6 +22,54 @@ export type WorkspaceOperation = 'init' | 'join' | 'add-repository';
 
 export interface PreviewRepository extends RepositoryManifest {
   local_path?: string;
+  candidate_paths?: string[];
+  binding_hash?: string;
+}
+
+export function repositoryDisplayName(repoId: string): string {
+  return repoId.slice(repoId.lastIndexOf('/') + 1);
+}
+
+export function repositoryBindingHash(repository: DiscoveredRepository): string {
+  return createHash('sha256').update(canonicalJson({
+    local_path: repository.realPath,
+    remote: repository.remote,
+    repo_id: repository.repositoryId,
+  })).digest('hex');
+}
+
+export async function assertApprovedRepositoryBindings(
+  preview: WorkspacePreview,
+): Promise<void> {
+  for (const approved of preview.repositories) {
+    if (approved.local_path === undefined) {
+      if (approved.candidate_paths !== undefined && approved.candidate_paths.length > 1) {
+        throw appError(
+          'AMBIGUOUS_BINDING',
+          'Multiple local clones match this repository; an explicit binding is required',
+          { repo_id: approved.repo_id, candidate_paths: approved.candidate_paths },
+        );
+      }
+      continue;
+    }
+    const canonical = await fs.realpath(approved.local_path).catch(() => undefined);
+    const [current] = canonical === undefined
+      ? []
+      : await scanRepositories(canonical, { maxDepth: 0 });
+    if (
+      current === undefined
+      || current.realPath !== approved.local_path
+      || current.repositoryId !== approved.repo_id
+      || approved.binding_hash === undefined
+      || repositoryBindingHash(current) !== approved.binding_hash
+      || (approved.candidate_paths !== undefined
+        && !approved.candidate_paths.includes(approved.local_path))
+    ) {
+      throw appError('STALE_PREVIEW', 'An approved repository binding changed after preview', {
+        repo_id: approved.repo_id,
+      });
+    }
+  }
 }
 
 export interface NormalizedInitInput {
@@ -89,7 +139,7 @@ function canonicalJson(value: unknown): string {
   }
   if (value !== null && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareCodeUnits(left, right))
       .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
       .join(',')}}`;
   }

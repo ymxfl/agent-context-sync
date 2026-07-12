@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canonicalRemote,
   normalizeRemote,
   repositoryIdFromRemote,
 } from '../../src/workspace/repository-id.js';
 
 describe('repository identity', () => {
+  it('canonicalizes a credential-free stored Context remote', () => {
+    expect(canonicalRemote('HTTPS://GitHub.com/Acme/Context.git/?token=ignored#fragment'))
+      .toBe('https://github.com/Acme/Context.git');
+    expect(canonicalRemote('git@GitHub.com:Acme/Context.git'))
+      .toBe('git@github.com:Acme/Context.git');
+  });
+
   it('normalizes SCP-like remotes without lowercasing the path', () => {
     expect(normalizeRemote('git@GitHub.com:Acme/API.git')).toBe('github.com/Acme/API');
   });

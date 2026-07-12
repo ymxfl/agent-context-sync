@@ -40,29 +40,37 @@ coverage.
 ## Commands
 
 Every command emits one JSON envelope on stdout. `init`, `join`, and `add-repo`
-require a preview followed by explicit approval and apply of the exact preview
-JSON. Examples use `ACS` for the installed launcher and `PREVIEW_JSON` for the
-exact compact object returned at `data.preview`.
+require a preview followed by explicit approval and apply by the opaque
+`preview_id`. Preview authorization is stored privately under the ACS home with
+mode `0600`, expires, and can be applied only once. Examples use `ACS` for the
+installed launcher and `PREVIEW_ID` for `data.preview.preview_id`.
+Failed envelopes may include sanitized, stable `error.details` fields for
+automation; raw OS and parser errors are not exposed there.
 
 ```sh
 ACS="$HOME/.codex/skills/agent-context-sync/scripts/acs.mjs"
 
 node "$ACS" init preview --name platform --context-remote git@github.com:acme/platform-context.git --scan-root /work/acme --max-depth 2
-node "$ACS" init apply --preview-json "$PREVIEW_JSON"
+# If preview reports duplicate clone candidates, rerun it with an explicit binding:
+node "$ACS" init preview --name platform --context-remote git@github.com:acme/platform-context.git --scan-root /work/acme --max-depth 2 --binding github.com/acme/api=/work/acme/api
+node "$ACS" init apply --preview-id "$PREVIEW_ID"
 
 node "$ACS" join preview --context-remote git@github.com:acme/platform-context.git --scan-root /work/acme --max-depth 2
-node "$ACS" join apply --preview-json "$PREVIEW_JSON"
+node "$ACS" join preview --context-remote git@github.com:acme/platform-context.git --scan-root /work/acme --max-depth 2 --binding github.com/acme/api=/work/acme/api
+node "$ACS" join apply --preview-id "$PREVIEW_ID"
 
 node "$ACS" add-repo preview --workspace "$WORKSPACE_ID" --repository /work/acme/api
-node "$ACS" add-repo apply --preview-json "$PREVIEW_JSON"
+node "$ACS" add-repo apply --preview-id "$PREVIEW_ID"
 
-node "$ACS" inspect --workspace "$WORKSPACE_ID" --agent codex
+node "$ACS" inspect --workspace "$WORKSPACE_ID" --agent codex --repository github.com/acme/api --cwd /work/acme/api/packages/api
 node "$ACS" inspect --workspace "$WORKSPACE_ID" --agent claude-code
 node "$ACS" doctor --workspace "$WORKSPACE_ID"
 ```
 
 Repeat `--scan-root` for multiple join roots and `--repository` to restrict an
-inspect request. Omit `--repository` to inspect every locally bound repository.
+inspect request. Repeat `--binding repo_id=path` when explicit clone selection is
+needed; an ambiguous preview cannot be applied until every duplicate identity is
+bound. Omit `--repository` to inspect every locally bound repository.
 The default registry root is `~/.agent-context-sync`; override it with
 `AGENT_CONTEXT_SYNC_HOME`. Agent-level discovery uses `HOME`, and Codex also
 honors `CODEX_HOME`.
@@ -71,8 +79,9 @@ honors `CODEX_HOME`.
 
 - `inspect` and `doctor` are read-only. `doctor` reports fixed diagnostics and
   does not repair anything.
-- Preview phases do not persist Workspace changes. Apply rejects altered or
-  stale preview JSON.
+- Preview phases do not persist Workspace or business-repository changes; they
+  persist only private, expiring authorization records. Apply rejects altered,
+  expired, reused, stale, or concurrently claimed preview IDs.
 - Context commits and pushes occur only in approved apply phases.
 - No v0.1 command commits, pushes, resets, cleans, or force-updates a business
   repository. Inspect and doctor do not change business file contents.
