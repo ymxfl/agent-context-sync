@@ -7,18 +7,22 @@ import * as fs from 'node:fs/promises';
 import type { AgentName } from './adapters/adapter.js';
 import { sanitizedAppErrorDetails } from './domain/errors.js';
 import { addRepository, applyAddRepository } from './commands/add-repo.js';
+import { applyRendered, previewApply } from './commands/apply.js';
 import { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
 import { doctor } from './commands/doctor.js';
 import { applyInit, initWorkspace } from './commands/init.js';
 import { inspect } from './commands/inspect.js';
 import { applyJoin, joinWorkspace } from './commands/join.js';
+import { syncPrepare } from './commands/sync.js';
 
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
+export { applyRendered, previewApply } from './commands/apply.js';
 export { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
 export { doctor } from './commands/doctor.js';
 export { applyInit, initWorkspace } from './commands/init.js';
 export { inspect } from './commands/inspect.js';
 export { applyJoin, joinWorkspace } from './commands/join.js';
+export { syncPrepare } from './commands/sync.js';
 
 export interface CommandIO {
   stdout(line: string): void;
@@ -149,12 +153,36 @@ async function readProposalArgument(value: string): Promise<unknown> {
 async function dispatch(command: string, argv: readonly string[]): Promise<unknown> {
   if (command === 'help') {
     if (argv.length > 0) throw new Error('help accepts no arguments');
-    return { commands: ['init', 'join', 'add-repo', 'inspect', 'doctor', 'capture'] };
+    return {
+      commands: ['init', 'join', 'add-repo', 'inspect', 'doctor', 'capture', 'apply', 'sync'],
+    };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
-  if (command === 'capture') {
+  if (command === 'capture' || command === 'sync') {
     const phase = args.positionals[0];
+    if (command === 'sync') {
+      if (args.positionals.length !== 1 || phase !== 'prepare') {
+        throw new Error('sync requires exactly one phase: prepare');
+      }
+      assertOptions(args, ['workspace', 'agent', 'repository', 'include-personal', 'cwd']);
+      const agent = one(args, 'agent');
+      if (agent !== 'claude-code' && agent !== 'codex') {
+        throw new Error('Option --agent must be claude-code or codex');
+      }
+      const repositories = many(args, 'repository');
+      return { packet: await syncPrepare({
+        workspaceId: one(args, 'workspace'),
+        agent: agent as AgentName,
+        home,
+        homeDir,
+        ...(repositories.length === 0 ? {} : { repositories }),
+        ...(args.options.has('include-personal')
+          ? { includePersonal: parseBooleanOption(args, 'include-personal') }
+          : {}),
+        ...(args.options.has('cwd') ? { cwd: one(args, 'cwd') } : {}),
+      }) };
+    }
     if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {
       throw new Error('capture requires exactly one phase: prepare, preview, or apply');
     }
@@ -184,6 +212,31 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
     assertOptions(args, ['packet-id', 'proposal']);
     const proposal = await readProposalArgument(one(args, 'proposal'));
     return { preview: await previewCapture(one(args, 'packet-id'), proposal, { home }) };
+  }
+  if (command === 'apply') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || (phase !== 'preview' && phase !== 'apply')) {
+      throw new Error('apply requires exactly one phase: preview or apply');
+    }
+    if (phase === 'apply') {
+      assertOptions(args, ['preview-id']);
+      return { result: await applyRendered(one(args, 'preview-id'), home) };
+    }
+    assertOptions(args, ['workspace', 'agent', 'repository']);
+    const agentValues = many(args, 'agent');
+    const agents = (agentValues.length === 0 ? ['claude-code', 'codex'] : agentValues);
+    for (const agent of agents) {
+      if (agent !== 'claude-code' && agent !== 'codex') {
+        throw new Error('Option --agent must be claude-code or codex');
+      }
+    }
+    const repositories = many(args, 'repository');
+    return { preview: await previewApply({
+      workspaceId: one(args, 'workspace'),
+      agents: agents as AgentName[],
+      home,
+      ...(repositories.length === 0 ? {} : { repositories }),
+    }) };
   }
   if (command === 'init' || command === 'join' || command === 'add-repo') {
     const phase = args.positionals[0];

@@ -1,6 +1,6 @@
 ---
 name: agent-context-sync
-description: Discover Claude Code and Codex context across a virtual multi-repository Workspace.
+description: Discover Claude Code and Codex context across a virtual multi-repository Workspace, capture shared knowledge, and apply generated Agent guidance files.
 ---
 
 # Agent Context Sync
@@ -20,11 +20,11 @@ Codex also honors `CODEX_HOME`.
 `inspect` and `doctor` are strictly read-only. They may read files and query Git,
 but must not repair, stage, commit, push, or change a business repository.
 
-`init`, `join`, and `add-repo` are two-phase operations. Always run `preview`
-first, show the user the exact `files_to_write`, repositories, and warnings, and
-preserve the opaque `data.preview.preview_id`. Ask exactly one approval question at a time.
-Run the matching `apply` command only after explicit approval of that
-exact preview. Preview IDs expire and are one-time. Never reuse or invent them.
+`init`, `join`, `add-repo`, `capture`, and `apply` are two-phase (or three-phase)
+operations. Always run the prepare/preview phase first, show the user the exact
+impact, and preserve the opaque `preview_id`. Ask exactly one approval question at a time.
+Run the matching apply command only after explicit approval of that exact preview.
+Preview IDs expire and are one-time. Never reuse or invent them.
 If a preview reports ambiguous clone candidates, do not ask for apply approval.
 Rerun the same preview command with repeatable `--binding repo_id=path` options
 until each ambiguous identity has one explicit local binding.
@@ -32,6 +32,11 @@ until each ambiguous identity has one explicit local binding.
 Coverage states are `covered`, `partial`, `unknown`, and `inaccessible`.
 Never interpret `unknown` coverage as complete. Treat `partial`, `unknown`, and
 `inaccessible` as limits that must remain visible to the user.
+
+Never silently overwrite drifted generated files. If `apply preview` reports
+`drift_candidates`, stop and either capture the manual edits or ask the user to
+discard them before rendering again. Never run `git add`, `commit`, or `push` in
+a business repository.
 
 ## Exact workflows
 
@@ -79,6 +84,48 @@ Run fixed, read-only diagnostics:
 
 ```sh
 node "$SKILL_DIR/scripts/acs.mjs" doctor --workspace ws_01J00000000000000000000000
+```
+
+### Capture knowledge into Context Git
+
+1. Prepare a redacted extraction packet.
+2. Ask the active Agent to return schema-constrained proposal JSON for that packet.
+3. Preview the capture impact and obtain approval.
+4. Apply to publish one Context Git commit (never force-push).
+
+```sh
+node "$SKILL_DIR/scripts/acs.mjs" capture prepare --workspace ws_01J00000000000000000000000 --agent claude-code
+node "$SKILL_DIR/scripts/acs.mjs" capture preview --packet-id "$PACKET_ID" --proposal /tmp/proposal.json
+node "$SKILL_DIR/scripts/acs.mjs" capture apply --preview-id "$PREVIEW_ID"
+```
+
+### Apply generated Agent files
+
+Compile Context knowledge into native `AGENTS.md` / `CLAUDE.md` files. Preview
+shows complete unified diffs, Context HEAD, business HEADs, and drift candidates.
+Apply writes backups under the local ACS home, then atomically replaces files per
+repository. Business Git history is left unchanged for the user to commit.
+
+```sh
+node "$SKILL_DIR/scripts/acs.mjs" apply preview --workspace ws_01J00000000000000000000000 --agent codex
+node "$SKILL_DIR/scripts/acs.mjs" apply preview --workspace ws_01J00000000000000000000000 --agent claude-code --agent codex
+node "$SKILL_DIR/scripts/acs.mjs" apply apply --preview-id "$PREVIEW_ID"
+```
+
+Omit `--agent` to render both Claude Code and Codex. Repeat `--agent` to choose
+one or both explicitly.
+
+### Sync workflow (Skill-orchestrated)
+
+`sync` is prepare-only in the CLI. Orchestrate the full loop yourself:
+
+1. `sync prepare` or `capture prepare` → extraction packet
+2. Ask the Agent for schema JSON proposal
+3. `capture preview` → approval → `capture apply` (Context Git publish)
+4. `apply preview` → approval → `apply apply` (business file replacement)
+
+```sh
+node "$SKILL_DIR/scripts/acs.mjs" sync prepare --workspace ws_01J00000000000000000000000 --agent claude-code
 ```
 
 Report failed JSON envelopes without inventing a repair. If a repair would

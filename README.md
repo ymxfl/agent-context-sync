@@ -1,9 +1,10 @@
 # Agent Context Sync
 
-Agent Context Sync is a portable Agent Skill for discovering the context that
-Claude Code and Codex are expected to load across a virtual multi-repository
-Workspace. v0.1 discovers and reports existing context; it does not compile or
-overwrite Agent instruction files.
+Agent Context Sync is a portable Agent Skill for discovering, capturing, and
+syncing the context that Claude Code and Codex are expected to load across a
+virtual multi-repository Workspace. Shared knowledge lives in a dedicated
+Context Git repository; generated `AGENTS.md` and `CLAUDE.md` files are derived
+tracked files in business repositories.
 
 ## Install
 
@@ -32,15 +33,15 @@ Absolute local paths remain private in
 `~/.agent-context-sync/workspaces/<workspace_id>.yaml` (or under
 `AGENT_CONTEXT_SYNC_HOME`) and are never written to the shared manifest.
 
-v0.1 supports Claude Code and Codex. Their Adapters report known context sources,
-load order, shareability, and coverage as `covered`, `partial`, `unknown`, or
-`inaccessible`. An `unknown` result is a boundary, not evidence of complete
-coverage.
+Supported agents are Claude Code and Codex. Their Adapters report known context
+sources, load order, shareability, and coverage as `covered`, `partial`,
+`unknown`, or `inaccessible`. An `unknown` result is a boundary, not evidence of
+complete coverage.
 
 ## Commands
 
-Every command emits one JSON envelope on stdout. `init`, `join`, and `add-repo`
-require a preview followed by explicit approval and apply by the opaque
+Every command emits one JSON envelope on stdout. Write operations require a
+preview (or prepare) phase followed by explicit approval and apply by the opaque
 `preview_id`. Preview authorization is stored privately under the ACS home with
 mode `0600`, expires, and can be applied only once. Examples use `ACS` for the
 installed launcher and `PREVIEW_ID` for `data.preview.preview_id`.
@@ -65,12 +66,24 @@ node "$ACS" add-repo apply --preview-id "$PREVIEW_ID"
 node "$ACS" inspect --workspace "$WORKSPACE_ID" --agent codex --repository github.com/acme/api --cwd /work/acme/api/packages/api
 node "$ACS" inspect --workspace "$WORKSPACE_ID" --agent claude-code
 node "$ACS" doctor --workspace "$WORKSPACE_ID"
+
+node "$ACS" capture prepare --workspace "$WORKSPACE_ID" --agent claude-code
+node "$ACS" capture preview --packet-id "$PACKET_ID" --proposal /tmp/proposal.json
+node "$ACS" capture apply --preview-id "$PREVIEW_ID"
+
+node "$ACS" apply preview --workspace "$WORKSPACE_ID" --agent codex
+node "$ACS" apply apply --preview-id "$PREVIEW_ID"
+
+node "$ACS" sync prepare --workspace "$WORKSPACE_ID" --agent claude-code
 ```
 
 Repeat `--scan-root` for multiple join roots and `--repository` to restrict an
-inspect request. Repeat `--binding repo_id=path` when explicit clone selection is
-needed; an ambiguous preview cannot be applied until every duplicate identity is
-bound. Omit `--repository` to inspect every locally bound repository.
+inspect or apply request. Repeat `--binding repo_id=path` when explicit clone
+selection is needed; an ambiguous preview cannot be applied until every duplicate
+identity is bound. Omit `--repository` to inspect or apply every locally bound
+repository. Omit `--agent` on `apply preview` to render both agents; repeat
+`--agent` to choose explicitly.
+
 The default registry root is `~/.agent-context-sync`; override it with
 `AGENT_CONTEXT_SYNC_HOME`. Agent-level discovery uses `HOME`, and Codex also
 honors `CODEX_HOME`.
@@ -79,6 +92,10 @@ honors `CODEX_HOME`.
 Binding an identity already present in the shared Workspace updates only the
 private local registry; an already-identical binding is a deterministic no-op.
 
+`sync prepare` is equivalent to `capture prepare`. Full sync orchestration is
+Skill-driven: prepare capture → agent proposal → capture preview/apply → apply
+preview/apply.
+
 ## Safety boundaries
 
 - `inspect` and `doctor` are read-only. `doctor` reports fixed diagnostics and
@@ -86,8 +103,8 @@ private local registry; an already-identical binding is a deterministic no-op.
 - Preview phases do not persist Workspace or business-repository changes; they
   persist only private, expiring authorization records. Apply rejects altered,
   expired, reused, stale, or concurrently claimed preview IDs.
-- Context commits and pushes occur only in approved apply phases.
-- No v0.1 command commits, pushes, resets, cleans, or force-updates a business
-  repository. Inspect and doctor do not change business file contents.
-- v0.1 does not capture knowledge, compile generated Agent files, or claim
-  complete coverage for unknown mechanisms.
+- Context commits and pushes occur only in approved capture apply phases.
+- Generated Agent files are written only in approved apply apply phases, with
+  drift detection; drifted targets are never silently overwritten.
+- No command commits, pushes, resets, cleans, or force-updates a business
+  repository.
