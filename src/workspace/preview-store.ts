@@ -43,6 +43,8 @@ const normalizedInputSchema = z.union([
   z.strictObject({
     workspace_id: z.string(), repository_path: z.string(), home: z.string(),
     context_remote: z.string(), workspace_manifest_hash: z.string().regex(HASH),
+    mode: z.enum(['add-shared', 'bind-existing']), repository_id: z.string(),
+    previous_repository_path: z.string().nullable(),
   }),
 ]);
 const workspacePreviewSchema = z.strictObject({

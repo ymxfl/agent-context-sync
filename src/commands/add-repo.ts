@@ -115,12 +115,7 @@ export async function addRepository(
   ) {
     throw appError('STALE_PREVIEW', 'Local and remote Context manifests do not match');
   }
-  const normalized: NormalizedAddRepositoryInput = {
-    ...baseInput,
-    context_remote: approvedRemote,
-    workspace_manifest_hash: approvedManifestHash,
-  };
-  const added = await repositoryAt(normalized.repository_path);
+  const added = await repositoryAt(baseInput.repository_path);
   const repositories: PreviewRepository[] = [];
   for (const repository of workspace.repositories) {
     const localPath = local.repository_paths[repository.repo_id];
@@ -143,14 +138,35 @@ export async function addRepository(
     existing.binding_hash = added.binding_hash;
   }
   repositories.sort((left, right) => compareCodeUnits(left.repo_id, right.repo_id));
-  const filesToWrite = [
-    'workspace.yaml',
-    repositoryManifestFile(added.repo_id),
-    path.join(normalized.home, 'workspaces', `${workspace.workspace_id}.yaml`),
-  ];
-  const warnings = existing === undefined
+  const previousRepositoryPath = local.repository_paths[added.repo_id] === undefined
+    ? null
+    : await fs.realpath(local.repository_paths[added.repo_id] as string);
+  const mode: NormalizedAddRepositoryInput['mode'] = existing === undefined
+    ? 'add-shared'
+    : 'bind-existing';
+  const normalized: NormalizedAddRepositoryInput = {
+    ...baseInput,
+    context_remote: approvedRemote,
+    workspace_manifest_hash: approvedManifestHash,
+    mode,
+    repository_id: added.repo_id,
+    previous_repository_path: previousRepositoryPath,
+  };
+  const registryTarget = path.join(
+    normalized.home,
+    'workspaces',
+    `${workspace.workspace_id}.yaml`,
+  );
+  const alreadyBound = mode === 'bind-existing'
+    && previousRepositoryPath === added.local_path;
+  const filesToWrite = mode === 'add-shared'
+    ? ['workspace.yaml', repositoryManifestFile(added.repo_id), registryTarget]
+    : alreadyBound ? [] : [registryTarget];
+  const warnings = mode === 'add-shared'
     ? []
-    : [`Repository ${added.repo_id} is already shared`];
+    : alreadyBound
+      ? [`Repository ${added.repo_id} is already bound to ${added.local_path}`]
+      : [`Repository ${added.repo_id} is already shared and will be bound locally`];
   const approval = {
     workspace_id: workspace.workspace_id,
     files_to_write: filesToWrite,
@@ -198,6 +214,40 @@ async function applyApprovedAddRepository(
   }
   await assertRemoteHead(input.context_remote, preview.context_head);
   const added = await repositoryAt(input.repository_path);
+  if (added.repo_id !== input.repository_id) {
+    throw appError('STALE_PREVIEW', 'Approved repository binding changed after preview', {
+      repo_id: input.repository_id,
+    });
+  }
+  const currentPreviousPath = local.repository_paths[input.repository_id] === undefined
+    ? null
+    : await fs.realpath(local.repository_paths[input.repository_id] as string).catch(() => undefined);
+  if (currentPreviousPath === undefined || currentPreviousPath !== input.previous_repository_path) {
+    throw appError('STALE_PREVIEW', 'Local repository binding changed after preview', {
+      repo_id: input.repository_id,
+    });
+  }
+  const sharedRepository = localWorkspace.repositories.find(
+    (repository) => repository.repo_id === input.repository_id,
+  );
+  if (input.mode === 'bind-existing') {
+    if (sharedRepository === undefined) {
+      throw appError('STALE_PREVIEW', 'Repository is no longer shared by the Workspace', {
+        repo_id: input.repository_id,
+      });
+    }
+    if (currentPreviousPath === input.repository_path) {
+      return { workspace: localWorkspace, local };
+    }
+    const updatedLocal = bindRepositoryPath(local, input.repository_id, input.repository_path);
+    await writeLocalWorkspace(input.home, updatedLocal);
+    return { workspace: localWorkspace, local: updatedLocal };
+  }
+  if (sharedRepository !== undefined) {
+    throw appError('STALE_PREVIEW', 'Repository became shared after preview', {
+      repo_id: input.repository_id,
+    });
+  }
   const transaction = await createContextTransaction(
     input.home,
     input.context_remote,

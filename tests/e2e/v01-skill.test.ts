@@ -67,7 +67,11 @@ async function availablePort(): Promise<number> {
   });
 }
 
-async function startGitDaemon(root: string): Promise<{ process: ChildProcess; remote: string }> {
+async function startGitDaemon(root: string): Promise<{
+  process: ChildProcess;
+  remote: string;
+  repository: string;
+}> {
   const repository = await createBareRemote(path.join(root, 'platform-context.git'));
   const port = await availablePort();
   const child = spawn('git', [
@@ -78,7 +82,7 @@ async function startGitDaemon(root: string): Promise<{ process: ChildProcess; re
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
       await fixtureGit(root, ['ls-remote', remote]);
-      return { process: child, remote };
+      return { process: child, remote, repository };
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
@@ -207,6 +211,40 @@ it('delivers the v0.1 two-repository Skill workflow without business mutations',
       expect.objectContaining({ id: 'context-git', status: 'pass' }),
       expect.objectContaining({ id: 'adapter-coverage' }),
     ]));
+
+    const webB = path.join(memberBScan, 'web');
+    await initFixtureRepository(webB, 'git@github.com:acme/web.git');
+    const webBefore = {
+      head: await fixtureGit(webB, ['rev-parse', 'HEAD']),
+      status: await fixtureGit(webB, ['status', '--porcelain=v1']),
+    };
+    const contextHeadBeforeBind = await fixtureGit(daemon.repository, ['rev-parse', 'main']);
+    const contextPathB = joinResult.json.data.result.local.context_path as string;
+    const workspaceBeforeBind = await fs.readFile(path.join(contextPathB, 'workspace.yaml'));
+    const webManifest = path.join(contextPathB, 'repositories/github.com/acme/web.yaml');
+    const webManifestBeforeBind = await fs.readFile(webManifest);
+    const bindPreview = await invoke([
+      'add-repo', 'preview', '--workspace', workspaceId, '--repository', webB,
+    ], memberBEnv);
+    expect(bindPreview.exitCode).toBe(0);
+    expect(bindPreview.json.data.preview.normalized_input.mode).toBe('bind-existing');
+    expect(bindPreview.json.data.preview.files_to_write).toEqual([
+      path.join(memberBHome, 'workspaces', `${workspaceId}.yaml`),
+    ]);
+    const bindResult = await invoke([
+      'add-repo', 'apply', '--preview-id', bindPreview.json.data.preview.preview_id,
+    ], memberBEnv);
+    expect(bindResult.exitCode).toBe(0);
+    expect(bindResult.json.data.result.commit).toBeUndefined();
+    expect(bindResult.json.data.result.local.repository_paths['github.com/acme/web'])
+      .toBe(await fs.realpath(webB));
+    expect(await fixtureGit(daemon.repository, ['rev-parse', 'main'])).toBe(contextHeadBeforeBind);
+    expect(await fs.readFile(path.join(contextPathB, 'workspace.yaml'))).toEqual(workspaceBeforeBind);
+    expect(await fs.readFile(webManifest)).toEqual(webManifestBeforeBind);
+    expect({
+      head: await fixtureGit(webB, ['rev-parse', 'HEAD']),
+      status: await fixtureGit(webB, ['status', '--porcelain=v1']),
+    }).toEqual(webBefore);
 
     expect(await Promise.all([apiA, webA].map(async (repository) => ({
       head: await fixtureGit(repository, ['rev-parse', 'HEAD']),

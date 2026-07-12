@@ -22656,7 +22656,10 @@ var normalizedInputSchema = external_exports.union([
     repository_path: external_exports.string(),
     home: external_exports.string(),
     context_remote: external_exports.string(),
-    workspace_manifest_hash: external_exports.string().regex(HASH)
+    workspace_manifest_hash: external_exports.string().regex(HASH),
+    mode: external_exports.enum(["add-shared", "bind-existing"]),
+    repository_id: external_exports.string(),
+    previous_repository_path: external_exports.string().nullable()
   })
 ]);
 var workspacePreviewSchema = external_exports.strictObject({
@@ -23032,12 +23035,7 @@ async function addRepository(input) {
   if (workspace.workspace_id !== baseInput.workspace_id || canonicalRemote(workspace.context_remote) !== approvedRemote || workspaceManifestHash(workspace) !== approvedManifestHash) {
     throw appError("STALE_PREVIEW", "Local and remote Context manifests do not match");
   }
-  const normalized = {
-    ...baseInput,
-    context_remote: approvedRemote,
-    workspace_manifest_hash: approvedManifestHash
-  };
-  const added = await repositoryAt(normalized.repository_path);
+  const added = await repositoryAt(baseInput.repository_path);
   const repositories = [];
   for (const repository of workspace.repositories) {
     const localPath = local.repository_paths[repository.repo_id];
@@ -23060,12 +23058,24 @@ async function addRepository(input) {
     existing.binding_hash = added.binding_hash;
   }
   repositories.sort((left, right) => compareCodeUnits(left.repo_id, right.repo_id));
-  const filesToWrite = [
-    "workspace.yaml",
-    repositoryManifestFile(added.repo_id),
-    path8.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
-  ];
-  const warnings = existing === void 0 ? [] : [`Repository ${added.repo_id} is already shared`];
+  const previousRepositoryPath = local.repository_paths[added.repo_id] === void 0 ? null : await fs5.realpath(local.repository_paths[added.repo_id]);
+  const mode = existing === void 0 ? "add-shared" : "bind-existing";
+  const normalized = {
+    ...baseInput,
+    context_remote: approvedRemote,
+    workspace_manifest_hash: approvedManifestHash,
+    mode,
+    repository_id: added.repo_id,
+    previous_repository_path: previousRepositoryPath
+  };
+  const registryTarget = path8.join(
+    normalized.home,
+    "workspaces",
+    `${workspace.workspace_id}.yaml`
+  );
+  const alreadyBound = mode === "bind-existing" && previousRepositoryPath === added.local_path;
+  const filesToWrite = mode === "add-shared" ? ["workspace.yaml", repositoryManifestFile(added.repo_id), registryTarget] : alreadyBound ? [] : [registryTarget];
+  const warnings = mode === "add-shared" ? [] : alreadyBound ? [`Repository ${added.repo_id} is already bound to ${added.local_path}`] : [`Repository ${added.repo_id} is already shared and will be bound locally`];
   const approval = {
     workspace_id: workspace.workspace_id,
     files_to_write: filesToWrite,
@@ -23110,6 +23120,38 @@ async function applyApprovedAddRepository(preview) {
   }
   await assertRemoteHead(input.context_remote, preview.context_head);
   const added = await repositoryAt(input.repository_path);
+  if (added.repo_id !== input.repository_id) {
+    throw appError("STALE_PREVIEW", "Approved repository binding changed after preview", {
+      repo_id: input.repository_id
+    });
+  }
+  const currentPreviousPath = local.repository_paths[input.repository_id] === void 0 ? null : await fs5.realpath(local.repository_paths[input.repository_id]).catch(() => void 0);
+  if (currentPreviousPath === void 0 || currentPreviousPath !== input.previous_repository_path) {
+    throw appError("STALE_PREVIEW", "Local repository binding changed after preview", {
+      repo_id: input.repository_id
+    });
+  }
+  const sharedRepository = localWorkspace.repositories.find(
+    (repository) => repository.repo_id === input.repository_id
+  );
+  if (input.mode === "bind-existing") {
+    if (sharedRepository === void 0) {
+      throw appError("STALE_PREVIEW", "Repository is no longer shared by the Workspace", {
+        repo_id: input.repository_id
+      });
+    }
+    if (currentPreviousPath === input.repository_path) {
+      return { workspace: localWorkspace, local };
+    }
+    const updatedLocal2 = bindRepositoryPath(local, input.repository_id, input.repository_path);
+    await writeLocalWorkspace(input.home, updatedLocal2);
+    return { workspace: localWorkspace, local: updatedLocal2 };
+  }
+  if (sharedRepository !== void 0) {
+    throw appError("STALE_PREVIEW", "Repository became shared after preview", {
+      repo_id: input.repository_id
+    });
+  }
   const transaction = await createContextTransaction(
     input.home,
     input.context_remote,

@@ -93,6 +93,9 @@ export interface NormalizedAddRepositoryInput {
   home: string;
   context_remote: string;
   workspace_manifest_hash: string;
+  mode: 'add-shared' | 'bind-existing';
+  repository_id: string;
+  previous_repository_path: string | null;
 }
 
 export type NormalizedWorkspaceInput =

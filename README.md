@@ -75,6 +75,10 @@ The default registry root is `~/.agent-context-sync`; override it with
 `AGENT_CONTEXT_SYNC_HOME`. Agent-level discovery uses `HOME`, and Codex also
 honors `CODEX_HOME`.
 
+`add-repo` previews authenticate a `mode` of `add-shared` or `bind-existing`.
+Binding an identity already present in the shared Workspace updates only the
+private local registry; an already-identical binding is a deterministic no-op.
+
 ## Safety boundaries
 
 - `inspect` and `doctor` are read-only. `doctor` reports fixed diagnostics and

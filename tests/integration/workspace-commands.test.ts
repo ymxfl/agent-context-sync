@@ -566,6 +566,7 @@ describe('workspace commands', () => {
 
     expect(preview.repositories.map((repository) => repository.repo_id))
       .toContain('github.com/acme/worker');
+    expect(preview.normalized_input).toMatchObject({ mode: 'add-shared' });
     expect(await fs.readFile(manifestPath)).toEqual(before);
 
     const result = await applyAddRepository(preview);
@@ -576,6 +577,87 @@ describe('workspace commands', () => {
       .toBe(await fs.realpath(external));
     expect(await fixtureGit(external, ['log', '--format=%H'])).toBe(businessLog);
     expect(await fixtureGit(bareRemote, ['rev-list', '--count', 'main'])).toBe('2');
+  });
+
+  it('binds an existing shared repository through the local registry only', async () => {
+    const memberAHome = path.join(root, 'member-a');
+    const memberAScan = path.join(root, 'member-a-business');
+    const apiA = path.join(memberAScan, 'api');
+    await initFixtureRepository(apiA, 'https://github.com/acme/api.git');
+    const initialized = await applyInit(await initWorkspace({
+      name: 'platform', contextRemote, scanRoot: memberAScan, maxDepth: 1, home: memberAHome,
+    }));
+
+    const memberBHome = path.join(root, 'member-b');
+    const memberBScan = path.join(root, 'member-b-business');
+    await fs.mkdir(memberBScan, { recursive: true });
+    const joined = await applyJoin(await joinWorkspace({
+      contextRemote, scanRoots: [memberBScan], maxDepth: 1, home: memberBHome,
+    }));
+    expect(joined.local.repository_paths).toEqual({});
+
+    const apiB = path.join(memberBScan, 'api');
+    await initFixtureRepository(apiB, 'git@github.com:acme/api.git');
+    const businessBefore = {
+      log: await fixtureGit(apiB, ['log', '--format=%H']),
+      status: await fixtureGit(apiB, ['status', '--porcelain=v1']),
+    };
+    const remoteHeadBefore = await fixtureGit(bareRemote, ['rev-parse', 'main']);
+    const contextManifest = path.join(joined.local.context_path, 'workspace.yaml');
+    const repositoryManifest = path.join(
+      joined.local.context_path,
+      repositoryManifestFile('github.com/acme/api'),
+    );
+    const contextBefore = await fs.readFile(contextManifest);
+    const repositoryBefore = await fs.readFile(repositoryManifest);
+
+    const preview = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: apiB,
+      home: memberBHome,
+    });
+    expect(preview.normalized_input).toMatchObject({
+      mode: 'bind-existing',
+      repository_id: 'github.com/acme/api',
+      previous_repository_path: null,
+    });
+    expect(preview.files_to_write).toEqual([
+      registryPath(memberBHome, initialized.workspace.workspace_id),
+    ]);
+
+    const bound = await applyAddRepository(preview);
+    expect(bound.commit).toBeUndefined();
+    expect(bound.local.repository_paths).toEqual({
+      'github.com/acme/api': await fs.realpath(apiB),
+    });
+    expect(await fixtureGit(bareRemote, ['rev-parse', 'main'])).toBe(remoteHeadBefore);
+    expect(await fs.readFile(contextManifest)).toEqual(contextBefore);
+    expect(await fs.readFile(repositoryManifest)).toEqual(repositoryBefore);
+    expect({
+      log: await fixtureGit(apiB, ['log', '--format=%H']),
+      status: await fixtureGit(apiB, ['status', '--porcelain=v1']),
+    }).toEqual(businessBefore);
+
+    const registryBefore = await fs.readFile(registryPath(
+      memberBHome,
+      initialized.workspace.workspace_id,
+    ));
+    const noOp = await addRepository({
+      workspaceId: initialized.workspace.workspace_id,
+      repositoryPath: apiB,
+      home: memberBHome,
+    });
+    expect(noOp.normalized_input).toMatchObject({
+      mode: 'bind-existing',
+      previous_repository_path: await fs.realpath(apiB),
+    });
+    expect(noOp.files_to_write).toEqual([]);
+    expect(noOp.warnings.join('\n')).toMatch(/already bound/i);
+    const noOpResult = await applyAddRepository(noOp);
+    expect(noOpResult.commit).toBeUndefined();
+    expect(await fs.readFile(registryPath(memberBHome, initialized.workspace.workspace_id)))
+      .toEqual(registryBefore);
+    expect(await fixtureGit(bareRemote, ['rev-parse', 'main'])).toBe(remoteHeadBefore);
   });
 
   it('rejects repository identity drift before applying add-repo', async () => {

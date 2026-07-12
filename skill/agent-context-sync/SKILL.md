@@ -62,6 +62,10 @@ node "$SKILL_DIR/scripts/acs.mjs" add-repo preview --workspace ws_01J00000000000
 node "$SKILL_DIR/scripts/acs.mjs" add-repo apply --preview-id "$PREVIEW_ID"
 ```
 
+Show the authenticated `normalized_input.mode` from the preview. `add-shared`
+may write and push Context files. `bind-existing` may update only the private
+local registry, and an already-identical binding is a no-op.
+
 Inspect locally bound repositories for one supported Agent. Repeat
 `--repository` to restrict the request; omit it to inspect every local binding:
 
