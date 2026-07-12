@@ -134,7 +134,7 @@ export class CodexAdapter implements AgentAdapter {
     const sources: ContextSource[] = [];
     const coverageItems: CoverageItem[] = [];
     const selected: InstructionCandidate[] = [];
-    let canonicalRepositoryRoot = repositoryRoot;
+    let canonicalRepositoryRoot: string | undefined;
 
     try {
       canonicalRepositoryRoot = await this.fs.realpath(repositoryRoot);
@@ -158,7 +158,11 @@ export class CodexAdapter implements AgentAdapter {
         cwd,
       ));
     }
-    if (canonicalCwd !== undefined && !isInside(canonicalRepositoryRoot, canonicalCwd)) {
+    if (
+      canonicalRepositoryRoot !== undefined
+      && canonicalCwd !== undefined
+      && !isInside(canonicalRepositoryRoot, canonicalCwd)
+    ) {
       coverageItems.push(coverage(
         'codex-cwd-outside-repository',
         'unknown',
@@ -171,10 +175,39 @@ export class CodexAdapter implements AgentAdapter {
       maxBytes: DEFAULT_MAX_BYTES,
       fallbackFilenames: DEFAULT_FALLBACK_FILENAMES,
     };
-    for (const locator of [join(codexHome, 'config.toml'), join(repositoryRoot, '.codex/config.toml')]) {
+    const settingsLayers = [
+      { locator: join(codexHome, 'config.toml'), enforceRepositoryContainment: false },
+      { locator: join(repositoryRoot, '.codex/config.toml'), enforceRepositoryContainment: true },
+    ];
+    for (const { locator, enforceRepositoryContainment } of settingsLayers) {
+      let readLocator = locator;
+      if (enforceRepositoryContainment) {
+        if (canonicalRepositoryRoot === undefined) continue;
+        try {
+          readLocator = await this.fs.realpath(locator);
+        } catch (error) {
+          if (isMissing(error)) continue;
+          coverageItems.push(coverage(
+            'codex-settings-inaccessible',
+            'inaccessible',
+            'Codex settings are unreadable.',
+            locator,
+          ));
+          continue;
+        }
+        if (!isInside(canonicalRepositoryRoot, readLocator)) {
+          coverageItems.push(coverage(
+            'codex-settings-root-escape',
+            'unknown',
+            'Repository Codex settings resolve outside the repository root.',
+            locator,
+          ));
+          continue;
+        }
+      }
       let text: string;
       try {
-        text = await this.fs.readFile(locator);
+        text = await this.fs.readFile(readLocator);
       } catch (error) {
         if (isMissing(error)) continue;
         coverageItems.push(coverage(
@@ -214,18 +247,25 @@ export class CodexAdapter implements AgentAdapter {
       paths: ReadonlyArray<{ locator: string; sourceType: string; shareability: Shareability }>,
       enforceRepositoryContainment: boolean,
     ): Promise<void> => {
-      const available: InstructionCandidate[] = [];
+      if (enforceRepositoryContainment && canonicalRepositoryRoot === undefined) return;
+      let winner: InstructionCandidate | undefined;
+      let precedenceBlocked = false;
+      let blockedLocator: string | undefined;
       for (const candidate of paths) {
         if (enforceRepositoryContainment) {
           try {
             const canonical = await this.fs.realpath(candidate.locator);
-            if (!isInside(canonicalRepositoryRoot, canonical)) {
+            if (!isInside(canonicalRepositoryRoot as string, canonical)) {
               coverageItems.push(coverage(
                 'codex-root-escape',
                 'partial',
                 'A repository instruction candidate resolves outside the repository root.',
                 candidate.locator,
               ));
+              if (winner === undefined) {
+                precedenceBlocked = true;
+                blockedLocator ??= candidate.locator;
+              }
               continue;
             }
           } catch (error) {
@@ -236,6 +276,10 @@ export class CodexAdapter implements AgentAdapter {
               'Codex instruction file is unreadable.',
               candidate.locator,
             ));
+            if (winner === undefined) {
+              precedenceBlocked = true;
+              blockedLocator ??= candidate.locator;
+            }
             continue;
           }
         }
@@ -250,21 +294,38 @@ export class CodexAdapter implements AgentAdapter {
             'Codex instruction file is unreadable.',
             candidate.locator,
           ));
+          if (winner === undefined) {
+            precedenceBlocked = true;
+            blockedLocator ??= candidate.locator;
+          }
           continue;
         }
         if (text.trim().length === 0) continue;
-        available.push({ ...candidate, text });
-      }
-      const winner = available[0];
-      if (winner !== undefined) selected.push(winner);
-      for (const candidate of available) {
+        const available = { ...candidate, text };
+        const status = winner !== undefined
+          ? 'excluded-by-precedence'
+          : precedenceBlocked
+            ? 'unresolved-by-precedence'
+            : 'available';
+        if (status === 'available') {
+          winner = available;
+          selected.push(available);
+        }
         sources.push({
           agent: AGENT,
-          sourceType: candidate.sourceType,
-          locator: candidate.locator,
-          shareability: candidate.shareability,
-          status: candidate === winner ? 'available' : 'excluded-by-precedence',
+          sourceType: available.sourceType,
+          locator: available.locator,
+          shareability: available.shareability,
+          status,
         });
+      }
+      if (precedenceBlocked && winner === undefined) {
+        coverageItems.push(coverage(
+          'codex-precedence-unresolved',
+          'unknown',
+          'Instruction precedence could not be resolved because a higher-priority candidate is inaccessible.',
+          blockedLocator,
+        ));
       }
     };
 
@@ -273,7 +334,17 @@ export class CodexAdapter implements AgentAdapter {
       { locator: join(codexHome, 'AGENTS.md'), sourceType: 'global-instructions', shareability: 'personal' },
     ], false);
 
-    for (const directory of directoryChain(repositoryRoot, cwd)) {
+    const canonicalProjectDirectories = canonicalRepositoryRoot !== undefined
+      && canonicalCwd !== undefined
+      && isInside(canonicalRepositoryRoot, canonicalCwd)
+      ? directoryChain(canonicalRepositoryRoot, canonicalCwd)
+      : [];
+    const projectDirectories = canonicalRepositoryRoot === undefined
+      ? []
+      : canonicalProjectDirectories.map((directory) => (
+          join(repositoryRoot, relative(canonicalRepositoryRoot, directory))
+        ));
+    for (const directory of projectDirectories) {
       const candidates: Array<{ locator: string; sourceType: string; shareability: Shareability }> = [
         { locator: join(directory, 'AGENTS.override.md'), sourceType: 'project-instructions', shareability: 'team' as const },
         { locator: join(directory, 'AGENTS.md'), sourceType: 'project-instructions', shareability: 'team' as const },

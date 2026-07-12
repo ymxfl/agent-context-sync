@@ -2,7 +2,7 @@ import type { CoverageStatus } from '../domain/model.js';
 
 export type AgentName = 'claude-code' | 'codex';
 export type Shareability = 'team' | 'personal' | 'managed';
-export type SourceStatus = 'available' | 'reported-only' | 'excluded-by-precedence';
+export type SourceStatus = 'available' | 'reported-only' | 'excluded-by-precedence' | 'unresolved-by-precedence';
 export type LoadingMode = 'eager' | 'on-demand' | 'reported-only';
 
 export interface ContextSource {

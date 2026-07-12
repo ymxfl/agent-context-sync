@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readFile, realpath, stat, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -116,6 +116,37 @@ describe('CodexAdapter', () => {
     expect(JSON.stringify(report)).not.toMatch(/nope-secret|OS secret/);
   });
 
+  it('does not read or apply a project config that resolves outside the repository', async () => {
+    const projectConfig = join(repositoryRoot, '.codex/config.toml');
+    const externalConfig = join(root, 'external-config.toml');
+    await writeFile(externalConfig, [
+      'project_doc_max_bytes = 1',
+      'project_doc_fallback_filenames = ["PRIVATE.md"]',
+    ].join('\n'));
+    await rm(projectConfig);
+    await symlink(externalConfig, projectConfig);
+    const reads: string[] = [];
+    const adapter = new CodexAdapter({
+      env: { CODEX_HOME: codexHome },
+      readFile: async (path) => {
+        reads.push(path);
+        return readFile(path, 'utf8');
+      },
+    });
+
+    const report = await adapter.discover(input);
+
+    expect(report.limits?.maxBytes).toBe(32768);
+    expect(reads).not.toContain(projectConfig);
+    expect(reads).not.toContain(externalConfig);
+    expect(report.coverage).toContainEqual(expect.objectContaining({
+      id: 'codex-settings-root-escape',
+      locator: projectConfig,
+      status: 'unknown',
+      detail: 'Repository Codex settings resolve outside the repository root.',
+    }));
+  });
+
   it('rejects invalid discovery setting values with fixed diagnostics', async () => {
     const projectConfig = join(repositoryRoot, '.codex/config.toml');
     await writeFile(projectConfig, [
@@ -183,6 +214,81 @@ describe('CodexAdapter', () => {
       locator: join(repositoryRoot, 'packages/AGENTS.md'),
       status: 'partial',
     }));
+  });
+
+  it('does not select lower-precedence instructions when a higher candidate is unreadable', async () => {
+    const blocked = join(codexHome, 'AGENTS.override.md');
+    const lower = join(codexHome, 'AGENTS.md');
+    const denied = (): NodeJS.ErrnoException => Object.assign(new Error('private override'), { code: 'EACCES' });
+    const adapter = new CodexAdapter({
+      env: { CODEX_HOME: codexHome },
+      readFile: async (path) => {
+        if (path === blocked) throw denied();
+        return readFile(path, 'utf8');
+      },
+    });
+
+    const report = await adapter.discover(input);
+
+    expect(report.loadPlan).not.toContainEqual(expect.objectContaining({ locator: lower }));
+    expect(report.sources).toContainEqual(expect.objectContaining({
+      locator: lower,
+      status: 'unresolved-by-precedence',
+    }));
+    expect(report.coverage).toContainEqual(expect.objectContaining({
+      id: 'codex-instruction-inaccessible',
+      locator: blocked,
+      status: 'inaccessible',
+    }));
+    expect(JSON.stringify(report)).not.toContain('private override');
+  });
+
+  it('reports the fallback that blocks resolution of a lower fallback', async () => {
+    const blocked = join(repositoryRoot, 'packages/TEAM.md');
+    const lower = join(repositoryRoot, 'packages/INSTRUCTIONS.md');
+    await writeFile(lower, '# Lower fallback\n');
+    const denied = (): NodeJS.ErrnoException => Object.assign(new Error('private fallback'), { code: 'EACCES' });
+    const adapter = new CodexAdapter({
+      env: { CODEX_HOME: codexHome },
+      readFile: async (path) => {
+        if (path === blocked) throw denied();
+        return readFile(path, 'utf8');
+      },
+    });
+
+    const report = await adapter.discover(input);
+
+    expect(report.loadPlan).not.toContainEqual(expect.objectContaining({ locator: lower }));
+    expect(report.sources).toContainEqual(expect.objectContaining({
+      locator: lower,
+      status: 'unresolved-by-precedence',
+    }));
+    expect(report.coverage).toContainEqual(expect.objectContaining({
+      id: 'codex-precedence-unresolved',
+      locator: blocked,
+      status: 'unknown',
+    }));
+  });
+
+  it('builds the root-to-cwd chain from canonical paths across different aliases', async () => {
+    const rootAlias = join(root, 'repo-alias');
+    const cwdAlias = join(root, 'api-alias');
+    await symlink(repositoryRoot, rootAlias);
+    await symlink(join(repositoryRoot, 'packages/api'), cwdAlias);
+
+    const report = await new CodexAdapter({ env: { CODEX_HOME: codexHome } }).discover({
+      ...input,
+      repositoryRoot: rootAlias,
+      cwd: cwdAlias,
+    });
+
+    expect(report.loadPlan.map((item) => item.locator)).toEqual([
+      join(codexHome, 'AGENTS.override.md'),
+      join(rootAlias, 'AGENTS.md'),
+      join(rootAlias, 'packages/TEAM.md'),
+      join(rootAlias, 'packages/api/AGENTS.override.md'),
+    ]);
+    expect(report.coverage).not.toContainEqual(expect.objectContaining({ id: 'codex-cwd-outside-repository' }));
   });
 
   it('reports inaccessible candidates without throwing and returns deterministic, read-only results', async () => {
