@@ -1,6 +1,9 @@
 import * as fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { build } from 'esbuild';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { KnowledgeEntry } from '../../src/domain/model.js';
 import {
@@ -14,7 +17,38 @@ const hash = `sha256:${'a'.repeat(64)}`;
 const ids = {
   a: 'kn_01J00000000000000000000000',
   b: 'kn_01J00000000000000000000001',
+  c: 'kn_01J00000000000000000000002',
 };
+
+function sha256(contents: string | Uint8Array): string {
+  return `sha256:${createHash('sha256').update(contents).digest('hex')}`;
+}
+
+async function waitForFiles(files: string[], timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await Promise.all(files.map(async (file) => {
+      try {
+        await fs.access(file);
+        return true;
+      } catch {
+        return false;
+      }
+    }))).every(Boolean)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function childExit(child: ReturnType<typeof spawn>): Promise<void> {
+  let stderr = '';
+  child.stderr?.setEncoding('utf8');
+  child.stderr?.on('data', (chunk: string) => { stderr += chunk; });
+  const code = await new Promise<number | null>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', resolve);
+  });
+  if (code !== 0) throw new Error(`Knowledge child exited ${code}: ${stderr}`);
+}
 
 function entry(overrides: Partial<KnowledgeEntry> = {}): KnowledgeEntry {
   return {
@@ -119,6 +153,36 @@ describe('canonical Knowledge Markdown', () => {
       statement: 'Serve GET /api/users and URI: /v1/health.',
       reason: 'These are API routes, not local paths.',
     }))).not.toThrow();
+  });
+
+  it.each([
+    'See `/Users/alice/private.md`.',
+    'See,/Users/alice/private.md',
+    'See;/Users/alice/private.md',
+    'See{/Users/alice/private.md}',
+    'See|/Users/alice/private.md|',
+    'See!/Users/alice/private.md!',
+    'See#/Users/alice/private.md#',
+    'See"/Users/alice/private.md"',
+    "See'/Users/alice/private.md'",
+    'Serve GET /api/users, then read /Users/alice/private.md.',
+    'Serve route: /health; then read /Users/alice/private.md.',
+    'See https://example.com/docs,/Users/alice/private.md.',
+    'See (https://example.com/docs)/Users/alice/private.md.',
+    'Serve GET /health)/Users/alice/private.md.',
+  ])('rejects punctuation-surrounded POSIX path bypass %j', (statement) => {
+    expect(() => serializeKnowledge(entry({ statement }))).toThrow(/private local path/i);
+  });
+
+  it.each([
+    'Serve GET /api/users.',
+    'Use URI: /v1/health.',
+    'Use route: /accounts/:id.',
+    'Use endpoint: /ready?full=true.',
+    'See https://example.com/docs/install.',
+    'See HTTP://example.com/a/b?c=d.',
+  ])('allows only explicit HTTP route or web URL span %j', (statement) => {
+    expect(() => serializeKnowledge(entry({ statement }))).not.toThrow();
   });
 
   it.each([
@@ -266,7 +330,8 @@ describe('KnowledgeStore', () => {
     await fs.mkdir(path.dirname(backup), { recursive: true });
     await fs.mkdir(path.dirname(staged), { recursive: true });
     await fs.copyFile(target, backup);
-    await fs.writeFile(target, serializeKnowledge(entry({ status: 'archived' })));
+    const committed = serializeKnowledge(entry({ status: 'archived' }));
+    await fs.writeFile(target, committed);
     await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
       schema_version: 1,
       owner_pid: 999_999_999,
@@ -277,12 +342,138 @@ describe('KnowledgeStore', () => {
         staged: path.relative(path.join(root, 'knowledge'), staged),
         backup: path.relative(path.join(root, 'knowledge'), backup),
         existed: true,
+        committed_sha256: sha256(committed),
       }],
     })}\n`);
 
     expect((await store.get(ids.a))?.status).toBe('archived');
     await expect(fs.access(transaction)).rejects.toThrow();
     expect((await store.get(ids.a))?.status).toBe('archived');
+  });
+
+  it.each([
+    ['previously existing target', true],
+    ['new target', false],
+  ] as const)('rejects a committed journal when its %s is missing and preserves evidence', async (
+    _name,
+    existed,
+  ) => {
+    if (existed) await store.put(entry());
+    const knowledge = path.join(root, 'knowledge');
+    const target = path.join(knowledge, 'workspace', `${ids.a}.md`);
+    const transaction = path.join(knowledge, '.transaction');
+    const backup = path.join(transaction, 'backups/0.backup');
+    const staged = path.join(transaction, 'staged/0.stage');
+    const committed = serializeKnowledge(entry({ status: 'archived' }));
+    await fs.mkdir(path.dirname(backup), { recursive: true });
+    await fs.mkdir(path.dirname(staged), { recursive: true });
+    if (existed) await fs.writeFile(backup, serializeKnowledge(entry()));
+    await fs.writeFile(staged, committed);
+    await fs.rm(target, { force: true });
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: null,
+      applied_count: 1,
+      operations: [{
+        target: path.relative(knowledge, target),
+        staged: path.relative(knowledge, staged),
+        backup: path.relative(knowledge, backup),
+        existed,
+      }],
+    })}\n`);
+
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(staged, 'utf8')).toBe(committed);
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.a);
+  });
+
+  it('rejects a committed journal whose target bytes differ from its staged bytes', async () => {
+    await store.put(entry());
+    const knowledge = path.join(root, 'knowledge');
+    const target = path.join(knowledge, 'workspace', `${ids.a}.md`);
+    const transaction = path.join(knowledge, '.transaction');
+    const backup = path.join(transaction, 'backups/0.backup');
+    const staged = path.join(transaction, 'staged/0.stage');
+    const committed = serializeKnowledge(entry({ status: 'archived' }));
+    await fs.mkdir(path.dirname(backup), { recursive: true });
+    await fs.mkdir(path.dirname(staged), { recursive: true });
+    await fs.writeFile(backup, serializeKnowledge(entry()));
+    await fs.writeFile(staged, committed);
+    await fs.writeFile(target, serializeKnowledge(entry({ reason: 'Unexpected replacement.' })));
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: null,
+      applied_count: 1,
+      operations: [{
+        target: path.relative(knowledge, target),
+        staged: path.relative(knowledge, staged),
+        backup: path.relative(knowledge, backup),
+        existed: true,
+      }],
+    })}\n`);
+
+    await expect(store.get(ids.a)).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.get(ids.a)).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(staged, 'utf8')).toBe(committed);
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.a);
+  });
+
+  it('compares committed hashes to raw target bytes rather than decoded text', async () => {
+    const committed = serializeKnowledge(entry({ reason: 'Contains replacement: �' }));
+    const targetBytes = Buffer.from(committed);
+    const replacement = Buffer.from('�');
+    const offset = targetBytes.indexOf(replacement);
+    expect(offset).toBeGreaterThanOrEqual(0);
+    const invalidBytes = Buffer.concat([
+      targetBytes.subarray(0, offset),
+      Buffer.from([0xff]),
+      targetBytes.subarray(offset + replacement.length),
+    ]);
+    const knowledge = path.join(root, 'knowledge');
+    const target = path.join(knowledge, 'workspace', `${ids.a}.md`);
+    const transaction = path.join(knowledge, '.transaction');
+    const backup = path.join(transaction, 'backups/0.backup');
+    const staged = path.join(transaction, 'staged/0.stage');
+    await fs.mkdir(path.dirname(backup), { recursive: true });
+    await fs.mkdir(path.dirname(staged), { recursive: true });
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, invalidBytes);
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: null,
+      applied_count: 1,
+      operations: [{
+        target: path.relative(knowledge, target),
+        staged: path.relative(knowledge, staged),
+        backup: path.relative(knowledge, backup),
+        existed: false,
+        committed_sha256: sha256(targetBytes),
+      }],
+    })}\n`);
+
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(store.list()).rejects.toThrow(/transaction journal.*corrupt/i);
+    expect(await fs.readFile(target)).toEqual(invalidBytes);
+    expect(await fs.readFile(path.join(transaction, 'journal.json'), 'utf8')).toContain(ids.a);
+  });
+
+  it('validates committed targets before normal-path cleanup and preserves corrupt evidence', async () => {
+    await store.put(entry());
+    const transaction = path.join(root, 'knowledge/.transaction');
+    const broken = new KnowledgeStore(root, undefined, {
+      async rename() {
+        // Simulate an adapter reporting success without installing staged bytes.
+      },
+    });
+
+    await expect(broken.put(entry({ status: 'archived' })))
+      .rejects.toThrow(/transaction journal.*corrupt/i);
+    await expect(fs.access(transaction)).resolves.toBeUndefined();
+    await expect(broken.get(ids.a)).rejects.toThrow(/transaction journal.*corrupt/i);
   });
 
   it('rolls back an applying journal before exposing entries and recovery is idempotent', async () => {
@@ -414,6 +605,107 @@ describe('KnowledgeStore', () => {
       [ids.a, [ids.b]],
       [ids.b, [ids.a]],
     ]);
+  });
+
+  it('serializes conflicting graph writes across real child processes', async () => {
+    await store.put(entry());
+    await store.put(entry({ id: ids.b }));
+    await store.put(entry({ id: ids.c }));
+    const helper = path.join(root, 'knowledge-child.mjs');
+    const storeModule = path.resolve(import.meta.dirname, '../../src/knowledge/store.ts');
+    await build({
+      stdin: {
+        contents: `
+          import * as fs from 'node:fs/promises';
+          import { KnowledgeStore } from ${JSON.stringify(storeModule)};
+          const [root, entryId, ready, release] = process.argv.slice(2);
+          const base = JSON.parse(process.env.KNOWLEDGE_ENTRY);
+          let first = true;
+          const store = new KnowledgeStore(root, undefined, {
+            async rename(staged, target) {
+              if (first) {
+                first = false;
+                await fs.writeFile(ready, 'ready');
+                while (true) {
+                  try { await fs.access(release); break; }
+                  catch { await new Promise((resolve) => setTimeout(resolve, 5)); }
+                }
+              }
+              await fs.rename(staged, target);
+            },
+          });
+          await store.put({ ...base, id: entryId, conflicts_with: [base.id] });
+        `,
+        resolveDir: process.cwd(),
+        sourcefile: 'knowledge-child.ts',
+        loader: 'ts',
+      },
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      banner: {
+        js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+      },
+      outfile: helper,
+    });
+    const release = path.join(root, 'release');
+    const readyB = path.join(root, 'ready-b');
+    const readyC = path.join(root, 'ready-c');
+    const env = { ...process.env, KNOWLEDGE_ENTRY: JSON.stringify(entry()) };
+    const childB = spawn(process.execPath, [helper, root, ids.b, readyB, release], { env });
+    const childC = spawn(process.execPath, [helper, root, ids.c, readyC, release], { env });
+    const exits = [childExit(childB), childExit(childC)]
+      .map(async (exit) => exit.then(() => undefined, (error: unknown) => error));
+    await waitForFiles([readyB, readyC], 750);
+    await fs.writeFile(release, 'release');
+    const exitErrors = (await Promise.all(exits)).filter((error) => error !== undefined);
+    if (exitErrors.length > 0) throw exitErrors[0];
+
+    expect((await store.list()).map((item) => [item.id, item.conflicts_with])).toEqual([
+      [ids.a, [ids.b, ids.c]],
+      [ids.b, [ids.a]],
+      [ids.c, [ids.a]],
+    ]);
+    await expect(fs.access(path.join(root, 'knowledge/.writer-lock'))).rejects.toThrow();
+    await expect(fs.access(path.join(root, 'knowledge/.transaction'))).rejects.toThrow();
+    expect((await fs.readdir(path.join(root, 'knowledge')))
+      .filter((name) => name.startsWith('.writer-lock'))).toEqual([]);
+  });
+
+  it('recovers a stale token-owned writer lock without leaving residue', async () => {
+    const lock = path.join(root, 'knowledge/.writer-lock');
+    await fs.mkdir(lock, { recursive: true });
+    await fs.writeFile(path.join(lock, 'owner.json'), `${JSON.stringify({
+      owner_pid: 999_999_999,
+      token: 'stale-owner-token',
+    })}\n`);
+
+    expect(await store.list()).toEqual([]);
+    await expect(fs.access(lock)).rejects.toThrow();
+  });
+
+  it('lets only one contender claim a stale lock and preserves the replacement owner', async () => {
+    const lock = path.join(root, 'knowledge/.writer-lock');
+    await fs.mkdir(lock, { recursive: true });
+    await fs.writeFile(path.join(lock, 'owner.json'), `${JSON.stringify({
+      owner_pid: 999_999_999,
+      token: 'stale-owner-token',
+    })}\n`);
+    const contenders = Array.from({ length: 8 }, () => new KnowledgeStore(root));
+
+    expect(await Promise.all(contenders.map((candidate) => candidate.list())))
+      .toEqual(Array.from({ length: 8 }, () => []));
+    expect((await fs.readdir(path.join(root, 'knowledge')))
+      .filter((name) => name.startsWith('.writer-lock'))).toEqual([]);
+  });
+
+  it('never follows a symbolic writer lock', async () => {
+    const knowledge = path.join(root, 'knowledge');
+    const external = await fs.mkdtemp(path.join(tmpdir(), 'acs-external-lock-'));
+    await fs.mkdir(knowledge, { recursive: true });
+    await fs.symlink(external, path.join(knowledge, '.writer-lock'));
+
+    await expect(store.list()).rejects.toThrow(/writer lock.*non-symbolic directory/i);
   });
 
   it('rejects a directly symlinked Context root', async () => {

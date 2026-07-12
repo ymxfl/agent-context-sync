@@ -1,4 +1,6 @@
 import * as fs from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { KnowledgeEntry, KnowledgeParseContext } from '../domain/model.js';
 import { compareCodeUnits } from '../domain/compare.js';
@@ -25,6 +27,7 @@ interface TransactionOperation {
   staged: string;
   backup: string;
   existed: boolean;
+  committed_sha256?: string;
 }
 
 interface TransactionJournal {
@@ -36,6 +39,11 @@ interface TransactionJournal {
 }
 
 const storeTails = new Map<string, Promise<void>>();
+
+interface WriterLockOwner {
+  owner_pid: number;
+  token: string;
+}
 
 async function physicalContextRoot(contextRoot: string): Promise<string> {
   const lexicalRoot = path.resolve(contextRoot);
@@ -68,11 +76,17 @@ async function withStoreExclusive<T>(root: string, action: () => Promise<T>): Pr
   const tail = previous.then(() => gate);
   storeTails.set(root, tail);
   await previous;
+  let releaseWriterLock: (() => Promise<void>) | undefined;
   try {
+    releaseWriterLock = await acquireWriterLock(root);
     return await action();
   } finally {
-    release();
-    if (storeTails.get(root) === tail) storeTails.delete(root);
+    try {
+      await releaseWriterLock?.();
+    } finally {
+      release();
+      if (storeTails.get(root) === tail) storeTails.delete(root);
+    }
   }
 }
 
@@ -146,8 +160,121 @@ function corruptJournal(cause?: unknown): Error {
   return new Error('Knowledge transaction journal is corrupt', { cause });
 }
 
+function corruptWriterLock(cause?: unknown): Error {
+  return new Error('Knowledge writer lock is corrupt or not a non-symbolic directory', { cause });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function writerLockDirectory(root: string): string {
+  return path.join(root, '.writer-lock');
+}
+
+function parseWriterLockOwner(value: unknown): WriterLockOwner {
+  if (!isRecord(value)) throw corruptWriterLock();
+  const keys = Object.keys(value).sort(compareCodeUnits);
+  if (keys.join('\0') !== ['owner_pid', 'token'].join('\0')) throw corruptWriterLock();
+  if (
+    !Number.isSafeInteger(value.owner_pid)
+    || (value.owner_pid as number) <= 0
+    || typeof value.token !== 'string'
+    || !/^[a-z0-9-]{8,128}$/i.test(value.token)
+  ) throw corruptWriterLock();
+  return { owner_pid: value.owner_pid as number, token: value.token };
+}
+
+async function readWriterLockOwner(lock: string): Promise<WriterLockOwner | undefined> {
+  const ownerFile = path.join(lock, 'owner.json');
+  const info = await lstatIfExists(ownerFile);
+  if (info === undefined) return undefined;
+  if (info.isSymbolicLink() || !info.isFile()) throw corruptWriterLock();
+  try {
+    return parseWriterLockOwner(JSON.parse(await fs.readFile(ownerFile, 'utf8')));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Knowledge writer lock')) throw error;
+    throw corruptWriterLock(error);
+  }
+}
+
+async function assertWriterLockOwned(lock: string, owner: WriterLockOwner): Promise<void> {
+  const info = await lstatIfExists(lock);
+  if (info === undefined || info.isSymbolicLink() || !info.isDirectory()) {
+    throw corruptWriterLock();
+  }
+  const names = (await fs.readdir(lock)).sort(compareCodeUnits);
+  if (names.join('\0') !== 'owner.json') throw corruptWriterLock();
+  const current = await readWriterLockOwner(lock);
+  if (current?.owner_pid !== owner.owner_pid || current.token !== owner.token) {
+    throw corruptWriterLock();
+  }
+}
+
+async function claimStaleWriterLock(lock: string, observed: WriterLockOwner): Promise<boolean> {
+  const claim = path.join(lock, 'reclaim.json');
+  const claimToken = randomUUID();
+  try {
+    await fs.writeFile(
+      claim,
+      `${JSON.stringify({ observed_token: observed.token, claim_token: claimToken })}\n`,
+      { flag: 'wx', mode: 0o600 },
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+  const current = await readWriterLockOwner(lock);
+  if (current?.owner_pid !== observed.owner_pid || current.token !== observed.token) {
+    throw corruptWriterLock();
+  }
+  await fs.rm(lock, { recursive: true });
+  return true;
+}
+
+async function acquireWriterLock(root: string): Promise<() => Promise<void>> {
+  const rootInfo = await lstatIfExists(root);
+  if (rootInfo === undefined) await fs.mkdir(root, { recursive: true, mode: 0o700 });
+  await assertSafePath(root, root, 'directory');
+  const lock = writerLockDirectory(root);
+  const owner = { owner_pid: process.pid, token: randomUUID() };
+  while (true) {
+    const candidate = path.join(root, `.writer-lock-candidate-${owner.token}`);
+    try {
+      await fs.mkdir(candidate, { mode: 0o700 });
+      await fs.writeFile(
+        path.join(candidate, 'owner.json'),
+        `${JSON.stringify(owner)}\n`,
+        { flag: 'wx', mode: 0o600 },
+      );
+      await fs.rename(candidate, lock);
+      return async () => {
+        await assertWriterLockOwned(lock, owner);
+        await fs.rm(lock, { recursive: true });
+      };
+    } catch (error) {
+      await fs.rm(candidate, { recursive: true, force: true });
+      if (!new Set(['EEXIST', 'ENOTDIR', 'ENOTEMPTY']).has(
+        (error as NodeJS.ErrnoException).code ?? '',
+      )) {
+        throw error;
+      }
+    }
+
+    const lockInfo = await lstatIfExists(lock);
+    if (lockInfo === undefined) continue;
+    if (lockInfo.isSymbolicLink() || !lockInfo.isDirectory()) throw corruptWriterLock();
+    const current = await readWriterLockOwner(lock);
+    if (current === undefined) throw corruptWriterLock();
+    if (isProcessAlive(current.owner_pid)) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      continue;
+    }
+    if (!await claimStaleWriterLock(lock, current)) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
 }
 
 function assertJournalRelativePath(root: string, value: unknown): string {
@@ -194,10 +321,24 @@ function parseTransactionJournal(value: unknown, root: string): TransactionJourn
   const operations = value.operations.map((candidate, index): TransactionOperation => {
     if (!isRecord(candidate)) throw corruptJournal();
     const operationKeys = Object.keys(candidate).sort(compareCodeUnits);
-    if (operationKeys.join('\0') !== ['backup', 'existed', 'staged', 'target'].join('\0')) {
+    if (
+      operationKeys.join('\0') !== ['backup', 'existed', 'staged', 'target'].join('\0')
+      && operationKeys.join('\0') !== [
+        'backup',
+        'committed_sha256',
+        'existed',
+        'staged',
+        'target',
+      ].join('\0')
+    ) {
       throw corruptJournal();
     }
     if (typeof candidate.existed !== 'boolean') throw corruptJournal();
+    if (
+      candidate.committed_sha256 !== undefined
+      && (typeof candidate.committed_sha256 !== 'string'
+        || !/^sha256:[a-f0-9]{64}$/.test(candidate.committed_sha256))
+    ) throw corruptJournal();
     const target = assertJournalRelativePath(root, candidate.target);
     const staged = assertJournalRelativePath(root, candidate.staged);
     const backup = assertJournalRelativePath(root, candidate.backup);
@@ -210,7 +351,15 @@ function parseTransactionJournal(value: unknown, root: string): TransactionJourn
       || targets.has(target)
     ) throw corruptJournal();
     targets.add(target);
-    return { target, staged, backup, existed: candidate.existed };
+    return {
+      target,
+      staged,
+      backup,
+      existed: candidate.existed,
+      ...(candidate.committed_sha256 === undefined
+        ? {}
+        : { committed_sha256: candidate.committed_sha256 }),
+    };
   });
 
   return {
@@ -259,6 +408,31 @@ function expectedTarget(entry: Pick<KnowledgeEntry, 'id' | 'scope'>): string {
     : path.join('repositories', entry.scope.slice('repository:'.length), `${entry.id}.md`);
 }
 
+function sha256(contents: string | Uint8Array): string {
+  return `sha256:${createHash('sha256').update(contents).digest('hex')}`;
+}
+
+async function readRegularFileNoFollow(root: string, file: string): Promise<Buffer> {
+  const expected = await assertSafePath(root, file, 'regular');
+  if (expected === undefined) throw corruptJournal();
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const opened = await handle.stat();
+    if (!opened.isFile() || opened.dev !== expected.dev || opened.ino !== expected.ino) {
+      throw corruptJournal();
+    }
+    return await handle.readFile();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Knowledge transaction journal is corrupt') {
+      throw error;
+    }
+    throw corruptJournal(error);
+  } finally {
+    await handle?.close();
+  }
+}
+
 async function validateTransactionTree(root: string): Promise<void> {
   const directory = transactionDirectory(root);
   async function walk(current: string): Promise<void> {
@@ -302,6 +476,36 @@ async function validateJournalPaths(
       metadataCount += 1;
     }
     if (metadataCount === 0) throw corruptJournal();
+  }
+}
+
+async function validateCommittedTargets(
+  root: string,
+  journal: TransactionJournal,
+  context?: KnowledgeParseContext,
+): Promise<void> {
+  for (const operation of journal.operations) {
+    const target = resolvedJournalPath(root, operation.target);
+    const targetInfo = await assertSafePath(root, target, 'regular');
+    if (targetInfo === undefined) throw corruptJournal();
+    let targetBytes: Buffer;
+    let parsed: KnowledgeEntry;
+    try {
+      targetBytes = await readRegularFileNoFollow(root, target);
+      parsed = parseKnowledgeMarkdown(targetBytes.toString('utf8'), context);
+    } catch (error) {
+      throw corruptJournal(error);
+    }
+    if (expectedTarget(parsed) !== operation.target) throw corruptJournal();
+
+    let expectedHash = operation.committed_sha256;
+    if (expectedHash === undefined) {
+      const staged = resolvedJournalPath(root, operation.staged);
+      const stagedInfo = await assertSafePath(root, staged, 'regular');
+      if (stagedInfo === undefined) throw corruptJournal();
+      expectedHash = sha256(await readRegularFileNoFollow(root, staged));
+    }
+    if (sha256(targetBytes) !== expectedHash) throw corruptJournal();
   }
 }
 
@@ -358,6 +562,7 @@ async function recoverIncompleteTransaction(
       journal.applying_index === null
       && journal.applied_count === journal.operations.length
     ) {
+      await validateCommittedTargets(root, journal, context);
       await fs.rm(directory, { recursive: true, force: true });
       return;
     }
@@ -522,6 +727,7 @@ export class KnowledgeStore {
           staged: relativeContained(root, staged),
           backup: relativeContained(root, backup),
           existed: previous !== undefined,
+          committed_sha256: sha256(change.contents),
         });
       }
       await writeJournal(root, journal);
@@ -541,8 +747,15 @@ export class KnowledgeStore {
         journal.applying_index = null;
         await writeJournal(root, journal);
       }
+      await validateCommittedTargets(root, journal, this.context);
       await fs.rm(directory, { recursive: true, force: true });
     } catch (error) {
+      if (
+        error instanceof Error
+        && error.message === 'Knowledge transaction journal is corrupt'
+        && journal.applying_index === null
+        && journal.applied_count === journal.operations.length
+      ) throw error;
       try {
         if (journal.operations.length > 0) await rollbackJournal(root, journal, this.context);
         await fs.rm(directory, { recursive: true, force: true });

@@ -15,14 +15,14 @@ function contextForScope(scope: unknown): KnowledgeParseContext | undefined {
 }
 
 function containsPrivateLocalPath(value: string): boolean {
-  // A leading slash is treated as a filesystem path unless its syntax explicitly
-  // identifies an HTTP request target or URI-like field. This deliberately does
-  // not infer routes from broad prefixes such as /api or /v1.
-  const withoutWebUrls = value.replace(/https?:\/\/[^\s<>"']+/gi, '');
+  // Remove only narrowly identifiable web spans. Route targets intentionally stop
+  // at prose punctuation so a later absolute path cannot hide inside the match.
+  const withoutWebUrls = value.replace(/\bhttps?:\/\/[^\s<>`"'{},;()[\]]+/gi, '');
   const withoutExplicitRoutes = withoutWebUrls
-    .replace(/\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|CONNECT|TRACE)\s+\/(?!\/)[^\s<>"']*/gi, '')
-    .replace(/\b(?:URI|route|endpoint)\s*[:=]\s*\/(?!\/)[^\s<>"']*/gi, '');
-  return /(?:^|[\s('"=:\[])\/{1,2}(?:[^\s)\]}>"']+|(?=[\s)\]}>"']|$))/.test(withoutExplicitRoutes)
+    .replace(/\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|CONNECT|TRACE)\s+\/(?!\/)[a-z0-9._~!$&*+\-\/=:@%?#]*/gi, '')
+    .replace(/\b(?:URI|route|endpoint)\s*[:=]\s*\/(?!\/)[a-z0-9._~!$&*+\-\/=:@%?#]*/gi, '');
+  return /(?:^|[^a-z0-9._*?+\-])\/{1,2}(?=[^\s/]|\/(?=[^\s/])|\s|$)/i
+    .test(withoutExplicitRoutes)
     || /(?:^|[^a-z0-9])[a-z]:[\\/]/i.test(value)
     || /\\\\[^\\\s]+\\[^\\\s]+/.test(value)
     || /(?:^|[^a-z0-9])file:/i.test(value);
