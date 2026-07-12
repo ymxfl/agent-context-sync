@@ -221,4 +221,33 @@ describe('apply preview and atomic apply', () => {
     await expect(fs.access(existingAgents)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(fs.access(existingClaude)).rejects.toMatchObject({ code: 'ENOENT' });
   });
+
+  it('projects path-scoped knowledge into Claude rules or nested Codex AGENTS.md', async () => {
+    const local = await readLocalWorkspace(home, workspaceId);
+    const store = new KnowledgeStore(local.context_path, {
+      registeredRepositoryIds: new Set(['github.com/acme/api']),
+    });
+    await store.put(knowledge({
+      id: 'kn_01J0000000000000000000000B',
+      scope: 'repository:github.com/acme/api',
+      applies_to: { paths: ['src/auth/**'], agents: [] },
+      statement: 'Keep auth sessions server-side only.',
+      reason: 'Path-scoped guidance must appear in repo projections.',
+    }));
+    await fixtureGit(local.context_path, ['add', 'knowledge']);
+    await fixtureGit(local.context_path, ['commit', '-m', 'seed path-scoped knowledge']);
+    await fixtureGit(local.context_path, ['push', 'origin', 'main']);
+
+    const preview = await previewApply({
+      workspaceId,
+      agents: ['claude-code', 'codex'],
+      home,
+    });
+    const relativePaths = preview.files.map((file) => file.relativePath);
+    const hasClaudeRules = relativePaths.some((item) => item.startsWith('.claude/rules/'));
+    const hasNestedAgents = relativePaths.some(
+      (item) => item !== 'AGENTS.md' && item.endsWith('/AGENTS.md'),
+    );
+    expect(hasClaudeRules || hasNestedAgents).toBe(true);
+  });
 });

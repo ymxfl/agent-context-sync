@@ -140,6 +140,25 @@ describe('selectKnowledge', () => {
     expect(selected.map((item) => item.id)).toEqual([nested.id]);
   });
 
+  it('includes all path-scoped entries when relativePath is omitted (repo projection)', () => {
+    const selected = selectKnowledge({
+      entries,
+      repoId: 'github.com/acme/api',
+      agent: 'codex',
+    });
+    const selectedIds = new Set(selected.map((item) => item.id));
+    expect(selectedIds.has(pathRule.id)).toBe(true);
+    expect(selectedIds.has(unmatchedPathRule.id)).toBe(true);
+    expect(selected.map((item) => item.id)).toEqual([
+      workspaceRule.id,
+      repoRule.id,
+      pathRule.id,
+      unmatchedPathRule.id,
+      agentRule.id,
+      activeWork.id,
+    ]);
+  });
+
   it('orders entries within a section by stable ID', () => {
     const later = entry('kn_01J0000000000000000000000b', { scope: 'workspace' });
     const earlier = entry('kn_01J0000000000000000000000a', { scope: 'workspace' });

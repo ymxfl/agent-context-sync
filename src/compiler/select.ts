@@ -47,7 +47,10 @@ function agentMatches(entry: KnowledgeEntry, agent: string): boolean {
 function pathMatches(entry: KnowledgeEntry, relativePath: string | undefined): boolean {
   const paths = entry.applies_to.paths;
   if (paths.length === 0) return true;
-  if (relativePath === undefined) return false;
+  // Repo-level projections omit relativePath and must include all path-scoped
+  // entries (still filtered by scope/agent/status). Path-level queries filter
+  // with POSIX globs.
+  if (relativePath === undefined) return true;
   return paths.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
 }
 

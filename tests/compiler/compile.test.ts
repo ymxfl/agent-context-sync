@@ -203,6 +203,24 @@ describe('compileSections', () => {
     expect(compiled.sections[0]?.entries.map((item) => item.id)).toEqual([pathAndAgent.id]);
   });
 
+  it('includes path-scoped knowledge in the path section when relativePath is omitted', () => {
+    const pathOnly = entry(ids.path, {
+      scope: 'repository:github.com/acme/api',
+      applies_to: { paths: ['src/auth/**'], agents: [] },
+    });
+    const compiled = compileSections({
+      entries: [workspaceRule, pathOnly],
+      target: {
+        repoId: target.repoId,
+        agent: target.agent,
+        workspaceId: target.workspaceId,
+        contextHead: target.contextHead,
+      },
+    });
+    expect(compiled.sections.map((section) => section.id)).toEqual(['workspace', 'path']);
+    expect(compiled.sections[1]?.entries.map((item) => item.id)).toEqual([pathOnly.id]);
+  });
+
   it('produces one unique SHA-256 across 100 deterministic runs', () => {
     const entries = [activeWork, agentRule, pathRule, repoRule, workspaceRule];
     const hashes = new Set<string>();

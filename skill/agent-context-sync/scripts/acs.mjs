@@ -26373,7 +26373,7 @@ function agentMatches(entry, agent) {
 function pathMatches(entry, relativePath) {
   const paths = entry.applies_to.paths;
   if (paths.length === 0) return true;
-  if (relativePath === void 0) return false;
+  if (relativePath === void 0) return true;
   return paths.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
 }
 function scopeMatches(entry, repoId) {
