@@ -293,30 +293,68 @@ function writerLockQuarantine(root: string, token: string): string {
   return path.join(root, `.writer-lock-quarantine-${token}`);
 }
 
+function writerLockReleaseQuarantine(root: string, token: string): string {
+  return path.join(root, `.writer-lock-release-quarantine-${token}`);
+}
+
+function isAllowedWriterQuarantineChild(name: string): boolean {
+  return name === 'owner.json'
+    || name === 'reclaim.json'
+    || /^\.reclaim-[a-z0-9-]{8,128}\.tmp$/i.test(name)
+    || /^\.reclaim-stale-[a-z0-9-]{8,128}\.json$/i.test(name);
+}
+
+async function assertWriterQuarantineComponents(quarantine: string): Promise<void> {
+  for (const child of await fs.readdir(quarantine)) {
+    if (!isAllowedWriterQuarantineChild(child)) throw corruptWriterLock();
+    const childInfo = await lstatIfExists(path.join(quarantine, child));
+    if (childInfo === undefined) continue;
+    if (childInfo.isSymbolicLink() || !childInfo.isFile()) throw corruptWriterLock();
+  }
+}
+
 async function cleanupWriterLockQuarantines(root: string): Promise<void> {
-  const prefix = '.writer-lock-quarantine-';
   for (const name of await fs.readdir(root)) {
-    if (!name.startsWith(prefix)) continue;
+    const match = /^\.writer-lock-(release-)?quarantine-([a-z0-9-]{8,128})$/i.exec(name);
+    if (match === null) continue;
     const quarantine = path.join(root, name);
     const info = await lstatIfExists(quarantine);
     if (info === undefined) continue;
     if (info.isSymbolicLink() || !info.isDirectory()) throw corruptWriterLock();
+    await assertWriterQuarantineComponents(quarantine);
     const owner = await readWriterLockOwner(quarantine);
     const claim = await readWriterReclaimClaim(path.join(quarantine, 'reclaim.json'));
-    if (
-      owner === undefined
-      || claim === undefined
-      || claim.observed_token !== owner.token
-    ) throw corruptWriterLock();
-    for (const child of await fs.readdir(quarantine)) {
-      const childInfo = await lstatIfExists(path.join(quarantine, child));
-      if (childInfo === undefined) continue;
-      if (childInfo.isSymbolicLink() || !childInfo.isFile()) throw corruptWriterLock();
+    if (owner !== undefined && claim !== undefined && claim.observed_token !== owner.token) {
+      throw corruptWriterLock();
     }
-    if (!isProcessAlive(claim.owner_pid)) {
-      await fs.rm(quarantine, { recursive: true });
-    }
+    if (claim !== undefined && isProcessAlive(claim.owner_pid)) continue;
+    if (match[1] !== undefined && owner !== undefined && isProcessAlive(owner.owner_pid)) continue;
+    await fs.rm(quarantine, { recursive: true, force: true });
   }
+}
+
+async function quarantineOwnerlessWriterLock(root: string, lock: string): Promise<void> {
+  await assertWriterQuarantineComponents(lock);
+  const quarantine = writerLockReleaseQuarantine(root, randomUUID());
+  try {
+    await fs.rename(lock, quarantine);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  await fs.rm(quarantine, { recursive: true, force: true });
+}
+
+async function releaseWriterLock(lock: string, owner: WriterLockOwner): Promise<void> {
+  await assertWriterLockOwned(lock, owner);
+  const quarantine = writerLockReleaseQuarantine(path.dirname(lock), randomUUID());
+  await fs.rename(lock, quarantine);
+  const quarantinedOwner = await readWriterLockOwner(quarantine);
+  if (quarantinedOwner === undefined) return;
+  if (quarantinedOwner.owner_pid !== owner.owner_pid || quarantinedOwner.token !== owner.token) {
+    throw corruptWriterLock();
+  }
+  await fs.rm(quarantine, { recursive: true, force: true });
 }
 
 async function claimStaleWriterLock(lock: string, observed: WriterLockOwner): Promise<boolean> {
@@ -384,8 +422,7 @@ async function acquireWriterLock(root: string): Promise<() => Promise<void>> {
       );
       await fs.rename(candidate, lock);
       return async () => {
-        await assertWriterLockOwned(lock, owner);
-        await fs.rm(lock, { recursive: true });
+        await releaseWriterLock(lock, owner);
       };
     } catch (error) {
       await fs.rm(candidate, { recursive: true, force: true });
@@ -400,7 +437,10 @@ async function acquireWriterLock(root: string): Promise<() => Promise<void>> {
     if (lockInfo === undefined) continue;
     if (lockInfo.isSymbolicLink() || !lockInfo.isDirectory()) throw corruptWriterLock();
     const current = await readWriterLockOwner(lock);
-    if (current === undefined) throw corruptWriterLock();
+    if (current === undefined) {
+      await quarantineOwnerlessWriterLock(root, lock);
+      continue;
+    }
     if (isProcessAlive(current.owner_pid)) {
       await new Promise((resolve) => setTimeout(resolve, 10));
       continue;

@@ -791,6 +791,27 @@ describe('KnowledgeStore', () => {
     await expect(fs.access(path.join(knowledge, '.writer-lock'))).rejects.toThrow();
   });
 
+  it('recovers an ownerless canonical lock left by interrupted release cleanup', async () => {
+    const lock = path.join(root, 'knowledge/.writer-lock');
+    await fs.mkdir(lock, { recursive: true });
+
+    expect(await store.list()).toEqual([]);
+    await expect(fs.access(lock)).rejects.toThrow();
+  });
+
+  it.each([
+    ['ownerless release quarantine', '.writer-lock-release-quarantine-12345678-abcd'],
+    ['claimless reclaim quarantine', '.writer-lock-quarantine-12345678-abcd'],
+  ])('cleans a partial %s without blocking lock acquisition', async (_name, quarantineName) => {
+    const knowledge = path.join(root, 'knowledge');
+    const quarantine = path.join(knowledge, quarantineName);
+    await fs.mkdir(quarantine, { recursive: true });
+
+    expect(await store.list()).toEqual([]);
+    await expect(fs.access(quarantine)).rejects.toThrow();
+    await expect(fs.access(path.join(knowledge, '.writer-lock'))).rejects.toThrow();
+  });
+
   it('never follows a symbolic writer lock', async () => {
     const knowledge = path.join(root, 'knowledge');
     const external = await fs.mkdtemp(path.join(tmpdir(), 'acs-external-lock-'));
