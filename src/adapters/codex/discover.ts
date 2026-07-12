@@ -17,8 +17,11 @@ import {
   type CoverageReport,
   type DiscoveryInput,
   type LoadOrder,
+  type RenderInput,
+  type RenderedFile,
   type Shareability,
 } from '../adapter.js';
+import { renderCodex } from './render.js';
 
 const AGENT = 'codex' as const;
 const DEFAULT_MAX_BYTES = 32 * 1024;
@@ -136,6 +139,10 @@ export class CodexAdapter implements AgentAdapter {
     const { env, ...fs } = options;
     this.fs = { ...defaultFileSystem, ...fs };
     this.env = env ?? process.env;
+  }
+
+  render(input: RenderInput): RenderedFile[] {
+    return renderCodex(input);
   }
 
   async discover(input: DiscoveryInput): Promise<CoverageReport> {

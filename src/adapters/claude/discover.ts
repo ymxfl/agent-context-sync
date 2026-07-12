@@ -20,8 +20,11 @@ import {
   type CoverageReport,
   type DiscoveryInput,
   type LoadOrder,
+  type RenderInput,
+  type RenderedFile,
   type Shareability,
 } from '../adapter.js';
+import { renderClaude } from './render.js';
 
 interface ClaudeSettings {
   claudeMd?: unknown;
@@ -262,6 +265,10 @@ export class ClaudeAdapter implements AgentAdapter {
 
   constructor(fs: Partial<ClaudeFileSystem> = {}) {
     this.fs = { ...defaultFileSystem, ...fs };
+  }
+
+  render(input: RenderInput): RenderedFile[] {
+    return renderClaude(input);
   }
 
   async discover(input: DiscoveryInput): Promise<CoverageReport> {
