@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import type { AgentName, CoverageReport } from '../adapters/adapter.js';
-import { adapterFor } from '../adapters/registry.js';
+import { defaultAdapterRegistry, type AdapterRegistry } from '../adapters/registry.js';
 import { assertLocalContextCheckout, readWorkspaceManifest } from '../workspace/context-repository.js';
 import { readLocalWorkspace } from '../workspace/local-registry.js';
 
@@ -11,6 +11,7 @@ export interface InspectInput {
   home: string;
   homeDir: string;
   repositories?: readonly string[];
+  adapterRegistry?: AdapterRegistry;
 }
 
 export async function inspect(input: InspectInput): Promise<CoverageReport[]> {
@@ -45,7 +46,7 @@ export async function inspect(input: InspectInput): Promise<CoverageReport[]> {
     local.repository_paths[repository.repo_id] !== undefined
     && (requested === undefined || requested.has(repository.repo_id))
   ));
-  const adapter = adapterFor(input.agent);
+  const adapter = (input.adapterRegistry ?? defaultAdapterRegistry).adapterFor(input.agent);
   return Promise.all(repositories.map(async (repository) => {
     const repositoryRoot = local.repository_paths[repository.repo_id] as string;
     return adapter.discover({

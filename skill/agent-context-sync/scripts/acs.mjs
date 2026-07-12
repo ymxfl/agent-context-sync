@@ -22658,8 +22658,9 @@ async function applyAddRepository(preview) {
 import { constants as fsConstants } from "node:fs";
 import * as fs4 from "node:fs/promises";
 
-// src/commands/inspect.ts
-import path8 from "node:path";
+// src/adapters/adapter.ts
+var ADAPTER_CONTRACT_VERSION = 1;
+var COVERAGE_CONTRACT_VERSION = 1;
 
 // src/adapters/claude/discover.ts
 import {
@@ -24654,6 +24655,12 @@ function rulePaths(markdown) {
   return void 0;
 }
 var ClaudeAdapter = class {
+  metadata = {
+    agent: AGENT,
+    contractVersion: ADAPTER_CONTRACT_VERSION,
+    coverageVersion: COVERAGE_CONTRACT_VERSION,
+    supported: true
+  };
   fs;
   constructor(fs7 = {}) {
     this.fs = { ...defaultFileSystem, ...fs7 };
@@ -25805,6 +25812,12 @@ function directoryChain(repositoryRoot, cwd) {
   return directories;
 }
 var CodexAdapter = class {
+  metadata = {
+    agent: AGENT2,
+    contractVersion: ADAPTER_CONTRACT_VERSION,
+    coverageVersion: COVERAGE_CONTRACT_VERSION,
+    supported: true
+  };
   fs;
   env;
   constructor(options = {}) {
@@ -26136,11 +26149,43 @@ var CodexAdapter = class {
 };
 
 // src/adapters/registry.ts
-function adapterFor(name) {
+var AGENT_NAMES = ["claude-code", "codex"];
+function createAdapter(name) {
   return name === "claude-code" ? new ClaudeAdapter() : new CodexAdapter();
+}
+var defaultAdapterRegistry = {
+  adapterFor: createAdapter,
+  contracts: () => AGENT_NAMES.map((name) => createAdapter(name).metadata)
+};
+function assessAdapterContracts(contracts) {
+  const byAgent = /* @__PURE__ */ new Map();
+  let duplicate = false;
+  for (const metadata of contracts) {
+    if (metadata === void 0 || !AGENT_NAMES.includes(metadata.agent)) continue;
+    if (byAgent.has(metadata.agent)) duplicate = true;
+    byAgent.set(metadata.agent, metadata);
+  }
+  const present = AGENT_NAMES.map((agent) => byAgent.get(agent));
+  if (present.some((metadata) => metadata !== void 0 && (!metadata.supported || metadata.contractVersion !== ADAPTER_CONTRACT_VERSION || metadata.coverageVersion !== COVERAGE_CONTRACT_VERSION))) {
+    return {
+      status: "fail",
+      detail: "One or more Adapter contracts do not support coverage contract version 1."
+    };
+  }
+  if (duplicate || contracts.length !== AGENT_NAMES.length || present.some((metadata) => metadata === void 0)) {
+    return {
+      status: "warn",
+      detail: "Adapter contract metadata is incomplete for Claude Code and Codex."
+    };
+  }
+  return {
+    status: "pass",
+    detail: "Claude Code and Codex Adapters declare support for Adapter and coverage contract version 1."
+  };
 }
 
 // src/commands/inspect.ts
+import path8 from "node:path";
 async function inspect(input) {
   const local = await readLocalWorkspace(input.home, input.workspaceId);
   const contextPath = await assertLocalContextCheckout(
@@ -26166,7 +26211,7 @@ async function inspect(input) {
     }
   }
   const repositories = workspace.repositories.filter((repository) => local.repository_paths[repository.repo_id] !== void 0 && (requested === void 0 || requested.has(repository.repo_id)));
-  const adapter = adapterFor(input.agent);
+  const adapter = (input.adapterRegistry ?? defaultAdapterRegistry).adapterFor(input.agent);
   return Promise.all(repositories.map(async (repository) => {
     const repositoryRoot = local.repository_paths[repository.repo_id];
     return adapter.discover({
@@ -26188,6 +26233,7 @@ function coverageStatus(reports) {
 }
 async function doctor(input) {
   const checks = [];
+  const adapterRegistry = input.adapterRegistry ?? defaultAdapterRegistry;
   const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "", 10);
   checks.push(Number.isSafeInteger(nodeMajor) && nodeMajor >= 20 ? check2("node-version", "pass", "Node.js 20 or newer is available.") : check2("node-version", "fail", "Node.js 20 or newer is required."));
   try {
@@ -26244,11 +26290,16 @@ async function doctor(input) {
   } else {
     checks.push(check2("repository-path-drift", "warn", "Repository path drift could not be checked."));
   }
-  checks.push(check2(
-    "adapter-version-support",
-    "pass",
-    "The v0.1 Claude Code and Codex Adapter contracts are supported."
-  ));
+  try {
+    const assessment = assessAdapterContracts(adapterRegistry.contracts());
+    checks.push(check2("adapter-version-support", assessment.status, assessment.detail));
+  } catch {
+    checks.push(check2(
+      "adapter-version-support",
+      "warn",
+      "Adapter contract metadata is incomplete for Claude Code and Codex."
+    ));
+  }
   if (local !== void 0 && contextPath !== void 0) {
     try {
       await Promise.all([
@@ -26272,10 +26323,11 @@ async function doctor(input) {
           workspaceId: input.workspaceId,
           agent,
           home: input.home,
-          homeDir: input.homeDir
+          homeDir: input.homeDir,
+          adapterRegistry
         })
       ))).flat();
-      checks.push(coverageStatus(reports) === "pass" ? check2("adapter-coverage", "pass", "Adapter discovery completed with covered diagnostics.") : check2("adapter-coverage", "warn", "Adapter discovery contains partial, unknown, or inaccessible coverage."));
+      checks.push(reports.length === 0 ? check2("adapter-coverage", "warn", "No local repositories were available for Adapter coverage discovery.") : coverageStatus(reports) === "pass" ? check2("adapter-coverage", "pass", "Adapter discovery completed with covered diagnostics.") : check2("adapter-coverage", "warn", "Adapter discovery contains partial, unknown, or inaccessible coverage."));
     } catch {
       checks.push(check2("adapter-coverage", "warn", "Adapter discovery coverage could not be completed."));
     }

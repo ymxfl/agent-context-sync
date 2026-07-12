@@ -2,6 +2,11 @@ import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 
 import type { CoverageReport } from '../adapters/adapter.js';
+import {
+  assessAdapterContracts,
+  defaultAdapterRegistry,
+  type AdapterRegistry,
+} from '../adapters/registry.js';
 import { runGit } from '../git/run-git.js';
 import { assertLocalContextCheckout, readWorkspaceManifest, remoteHead } from '../workspace/context-repository.js';
 import { readLocalWorkspace, registryPath } from '../workspace/local-registry.js';
@@ -27,6 +32,7 @@ export interface DoctorInput {
   workspaceId: string;
   home: string;
   homeDir: string;
+  adapterRegistry?: AdapterRegistry;
 }
 
 function check(id: DoctorCheck['id'], status: DoctorStatus, detail: string): DoctorCheck {
@@ -41,6 +47,7 @@ function coverageStatus(reports: readonly CoverageReport[]): DoctorStatus {
 
 export async function doctor(input: DoctorInput): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
+  const adapterRegistry = input.adapterRegistry ?? defaultAdapterRegistry;
   const nodeMajor = Number.parseInt(process.versions.node.split('.')[0] ?? '', 10);
   checks.push(Number.isSafeInteger(nodeMajor) && nodeMajor >= 20
     ? check('node-version', 'pass', 'Node.js 20 or newer is available.')
@@ -106,11 +113,16 @@ export async function doctor(input: DoctorInput): Promise<DoctorReport> {
     checks.push(check('repository-path-drift', 'warn', 'Repository path drift could not be checked.'));
   }
 
-  checks.push(check(
-    'adapter-version-support',
-    'pass',
-    'The v0.1 Claude Code and Codex Adapter contracts are supported.',
-  ));
+  try {
+    const assessment = assessAdapterContracts(adapterRegistry.contracts());
+    checks.push(check('adapter-version-support', assessment.status, assessment.detail));
+  } catch {
+    checks.push(check(
+      'adapter-version-support',
+      'warn',
+      'Adapter contract metadata is incomplete for Claude Code and Codex.',
+    ));
+  }
 
   if (local !== undefined && contextPath !== undefined) {
     try {
@@ -137,9 +149,12 @@ export async function doctor(input: DoctorInput): Promise<DoctorReport> {
           agent,
           home: input.home,
           homeDir: input.homeDir,
+          adapterRegistry,
         }),
       ))).flat();
-      checks.push(coverageStatus(reports) === 'pass'
+      checks.push(reports.length === 0
+        ? check('adapter-coverage', 'warn', 'No local repositories were available for Adapter coverage discovery.')
+        : coverageStatus(reports) === 'pass'
         ? check('adapter-coverage', 'pass', 'Adapter discovery completed with covered diagnostics.')
         : check('adapter-coverage', 'warn', 'Adapter discovery contains partial, unknown, or inaccessible coverage.'));
     } catch {

@@ -9,14 +9,17 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { minimatch } from 'minimatch';
 import { parse as parseYaml } from 'yaml';
-import type {
-  AgentAdapter,
-  ContextSource,
-  CoverageItem,
-  CoverageReport,
-  DiscoveryInput,
-  LoadOrder,
-  Shareability,
+import {
+  ADAPTER_CONTRACT_VERSION,
+  COVERAGE_CONTRACT_VERSION,
+  type AdapterContractMetadata,
+  type AgentAdapter,
+  type ContextSource,
+  type CoverageItem,
+  type CoverageReport,
+  type DiscoveryInput,
+  type LoadOrder,
+  type Shareability,
 } from '../adapter.js';
 
 interface ClaudeSettings {
@@ -247,6 +250,13 @@ function rulePaths(markdown: string): string[] | undefined {
 }
 
 export class ClaudeAdapter implements AgentAdapter {
+  readonly metadata: AdapterContractMetadata = {
+    agent: AGENT,
+    contractVersion: ADAPTER_CONTRACT_VERSION,
+    coverageVersion: COVERAGE_CONTRACT_VERSION,
+    supported: true,
+  };
+
   private readonly fs: ClaudeFileSystem;
 
   constructor(fs: Partial<ClaudeFileSystem> = {}) {

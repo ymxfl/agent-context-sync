@@ -1,13 +1,16 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 import { expect, it } from 'vitest';
 
 import { createBareRemote, fixtureGit, initFixtureRepository } from '../helpers/git.js';
 import { invoke } from '../helpers/invoke.js';
+
+const execFileAsync = promisify(execFile);
 
 it('documents the exact Skill approval workflow and v0.1 boundaries', async () => {
   const skill = await fs.readFile(
@@ -19,14 +22,32 @@ it('documents the exact Skill approval workflow and v0.1 boundaries', async () =
   expect(skill).toContain('Ask exactly one approval question at a time.');
   expect(skill).toContain('Never interpret `unknown` coverage as complete.');
   expect(skill).toContain('init preview --name');
-  expect(skill).toContain("init apply --preview-json '$PREVIEW_JSON'");
   expect(skill).toContain('join preview --context-remote');
-  expect(skill).toContain("join apply --preview-json '$PREVIEW_JSON'");
   expect(skill).toContain('add-repo preview --workspace');
-  expect(skill).toContain("add-repo apply --preview-json '$PREVIEW_JSON'");
   expect(readme).toContain('~/.codex/skills/agent-context-sync');
   expect(readme).toContain('~/.claude/skills/agent-context-sync');
   expect(readme).toContain('Claude Code and Codex');
+
+  const mockSkill = await fs.mkdtemp(path.join(tmpdir(), 'acs-documented-skill-'));
+  try {
+    await fs.mkdir(path.join(mockSkill, 'scripts'));
+    await fs.writeFile(
+      path.join(mockSkill, 'scripts/acs.mjs'),
+      'process.stdout.write(JSON.stringify(process.argv.slice(2)));\n',
+    );
+    const previewJson = JSON.stringify({ preview_id: 'preview_exact', nested: { value: '$literal' } });
+    const applyInvocations = skill.match(/^node .* (?:init|join|add-repo) apply .*$/gm) ?? [];
+    expect(applyInvocations).toHaveLength(3);
+    for (const invocation of applyInvocations) {
+      const { stdout } = await execFileAsync('/bin/sh', ['-c', invocation], {
+        env: { ...process.env, SKILL_DIR: mockSkill, PREVIEW_JSON: previewJson },
+      });
+      const args = JSON.parse(stdout) as string[];
+      expect(args.slice(-2)).toEqual(['--preview-json', previewJson]);
+    }
+  } finally {
+    await fs.rm(mockSkill, { recursive: true, force: true });
+  }
 });
 
 async function availablePort(): Promise<number> {

@@ -6,14 +6,17 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import type {
-  AgentAdapter,
-  ContextSource,
-  CoverageItem,
-  CoverageReport,
-  DiscoveryInput,
-  LoadOrder,
-  Shareability,
+import {
+  ADAPTER_CONTRACT_VERSION,
+  COVERAGE_CONTRACT_VERSION,
+  type AdapterContractMetadata,
+  type AgentAdapter,
+  type ContextSource,
+  type CoverageItem,
+  type CoverageReport,
+  type DiscoveryInput,
+  type LoadOrder,
+  type Shareability,
 } from '../adapter.js';
 
 const AGENT = 'codex' as const;
@@ -118,6 +121,13 @@ function directoryChain(repositoryRoot: string, cwd: string): string[] {
 }
 
 export class CodexAdapter implements AgentAdapter {
+  readonly metadata: AdapterContractMetadata = {
+    agent: AGENT,
+    contractVersion: ADAPTER_CONTRACT_VERSION,
+    coverageVersion: COVERAGE_CONTRACT_VERSION,
+    supported: true,
+  };
+
   private readonly fs: CodexFileSystem;
   private readonly env: NodeJS.ProcessEnv;
 

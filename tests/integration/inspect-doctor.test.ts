@@ -6,9 +6,11 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { adapterFor, type AdapterRegistry } from '../../src/adapters/registry.js';
 import { doctor } from '../../src/commands/doctor.js';
 import { inspect } from '../../src/commands/inspect.js';
 import { applyInit, initWorkspace } from '../../src/commands/init.js';
+import { readLocalWorkspace, writeLocalWorkspace } from '../../src/workspace/local-registry.js';
 import { createBareRemote, fixtureGit, initFixtureRepository } from '../helpers/git.js';
 
 async function availablePort(): Promise<number> {
@@ -128,5 +130,63 @@ describe('inspect and doctor', () => {
     ]));
     expect(report.checks.map((check) => check.id)).toHaveLength(8);
     expect(await fixtureGit(repository, ['rev-parse', 'HEAD'])).toBe(beforeHead);
+  });
+
+  it('does not report Adapter coverage as complete with zero local bindings', async () => {
+    const local = await readLocalWorkspace(home, workspaceId);
+    await writeLocalWorkspace(home, { ...local, repository_paths: {} });
+
+    const report = await doctor({ workspaceId, home, homeDir: agentHome });
+
+    expect(report.checks).toContainEqual(expect.objectContaining({
+      id: 'adapter-coverage',
+      status: 'warn',
+      detail: 'No local repositories were available for Adapter coverage discovery.',
+    }));
+  });
+
+  it('fails Adapter contract support when registered metadata is unsupported', async () => {
+    const adapterRegistry = {
+      adapterFor,
+      contracts: () => [
+        { agent: 'claude-code', contractVersion: 1, coverageVersion: 1, supported: true },
+        { agent: 'codex', contractVersion: 1, coverageVersion: 1, supported: false },
+      ] as const,
+    } satisfies AdapterRegistry;
+
+    const report = await doctor({
+      workspaceId,
+      home,
+      homeDir: agentHome,
+      adapterRegistry,
+    });
+
+    expect(report.checks).toContainEqual(expect.objectContaining({
+      id: 'adapter-version-support',
+      status: 'fail',
+      detail: 'One or more Adapter contracts do not support coverage contract version 1.',
+    }));
+  });
+
+  it('warns when registered Adapter contract metadata is missing', async () => {
+    const adapterRegistry = {
+      adapterFor,
+      contracts: () => [
+        { agent: 'codex', contractVersion: 1, coverageVersion: 1, supported: true },
+      ] as const,
+    } satisfies AdapterRegistry;
+
+    const report = await doctor({
+      workspaceId,
+      home,
+      homeDir: agentHome,
+      adapterRegistry,
+    });
+
+    expect(report.checks).toContainEqual(expect.objectContaining({
+      id: 'adapter-version-support',
+      status: 'warn',
+      detail: 'Adapter contract metadata is incomplete for Claude Code and Codex.',
+    }));
   });
 });

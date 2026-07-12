@@ -39,21 +39,21 @@ Initialize a Workspace:
 
 ```sh
 node "$SKILL_DIR/scripts/acs.mjs" init preview --name platform --context-remote git@github.com:acme/platform-context.git --scan-root /work/acme --max-depth 2
-node "$SKILL_DIR/scripts/acs.mjs" init apply --preview-json '$PREVIEW_JSON'
+node "$SKILL_DIR/scripts/acs.mjs" init apply --preview-json "$PREVIEW_JSON"
 ```
 
 Join an existing Workspace. Repeat `--scan-root` when needed:
 
 ```sh
 node "$SKILL_DIR/scripts/acs.mjs" join preview --context-remote git@github.com:acme/platform-context.git --scan-root /work/acme --max-depth 2
-node "$SKILL_DIR/scripts/acs.mjs" join apply --preview-json '$PREVIEW_JSON'
+node "$SKILL_DIR/scripts/acs.mjs" join apply --preview-json "$PREVIEW_JSON"
 ```
 
 Add or bind a repository:
 
 ```sh
 node "$SKILL_DIR/scripts/acs.mjs" add-repo preview --workspace ws_01J00000000000000000000000 --repository /work/acme/api
-node "$SKILL_DIR/scripts/acs.mjs" add-repo apply --preview-json '$PREVIEW_JSON'
+node "$SKILL_DIR/scripts/acs.mjs" add-repo apply --preview-json "$PREVIEW_JSON"
 ```
 
 Inspect locally bound repositories for one supported Agent. Repeat

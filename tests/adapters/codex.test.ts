@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { DiscoveryInput } from '../../src/adapters/adapter.js';
 import { CodexAdapter } from '../../src/adapters/codex/discover.js';
-import { adapterFor } from '../../src/adapters/registry.js';
+import {
+  adapterContracts,
+  adapterFor,
+  assessAdapterContracts,
+} from '../../src/adapters/registry.js';
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures');
 
@@ -342,8 +346,28 @@ describe('CodexAdapter', () => {
 });
 
 describe('adapterFor', () => {
-  it('returns the requested adapter', () => {
-    expect(adapterFor('codex')).toBeInstanceOf(CodexAdapter);
-    expect(adapterFor('claude-code').constructor.name).toBe('ClaudeAdapter');
+  it('returns adapters with validated v1 contract metadata', () => {
+    const codex = adapterFor('codex');
+    const claude = adapterFor('claude-code');
+
+    expect(codex).toBeInstanceOf(CodexAdapter);
+    expect(claude.constructor.name).toBe('ClaudeAdapter');
+    expect(codex.metadata).toEqual({
+      agent: 'codex',
+      contractVersion: 1,
+      coverageVersion: 1,
+      supported: true,
+    });
+    expect(claude.metadata).toEqual({
+      agent: 'claude-code',
+      contractVersion: 1,
+      coverageVersion: 1,
+      supported: true,
+    });
+    expect(adapterContracts()).toEqual([claude.metadata, codex.metadata]);
+    expect(assessAdapterContracts(adapterContracts())).toEqual({
+      status: 'pass',
+      detail: 'Claude Code and Codex Adapters declare support for Adapter and coverage contract version 1.',
+    });
   });
 });
