@@ -1,0 +1,4 @@
+{
+  "claudeMd": "Managed inline content must only be reported.",
+  "claudeMdExcludes": ["**/managed-excluded/**"]
+}
