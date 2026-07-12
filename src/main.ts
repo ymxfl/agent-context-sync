@@ -7,14 +7,14 @@ import * as fs from 'node:fs/promises';
 import type { AgentName } from './adapters/adapter.js';
 import { sanitizedAppErrorDetails } from './domain/errors.js';
 import { addRepository, applyAddRepository } from './commands/add-repo.js';
-import { prepareCapture, previewCapture } from './commands/capture.js';
+import { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
 import { doctor } from './commands/doctor.js';
 import { applyInit, initWorkspace } from './commands/init.js';
 import { inspect } from './commands/inspect.js';
 import { applyJoin, joinWorkspace } from './commands/join.js';
 
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
-export { prepareCapture, previewCapture } from './commands/capture.js';
+export { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
 export { doctor } from './commands/doctor.js';
 export { applyInit, initWorkspace } from './commands/init.js';
 export { inspect } from './commands/inspect.js';
@@ -159,7 +159,8 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
       throw new Error('capture requires exactly one phase: prepare, preview, or apply');
     }
     if (phase === 'apply') {
-      throw new Error('capture apply is not implemented yet; approve a preview after capture preview');
+      assertOptions(args, ['preview-id']);
+      return { result: await applyCapture(one(args, 'preview-id'), home) };
     }
     if (phase === 'prepare') {
       assertOptions(args, ['workspace', 'agent', 'repository', 'include-personal', 'cwd']);

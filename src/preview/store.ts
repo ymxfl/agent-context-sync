@@ -12,6 +12,7 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1_000;
 const PREVIEW_ID = /^preview_[0-9A-HJKMNP-TV-Z]{26}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const PACKET_HASH = /^sha256:[0-9a-f]{64}$/;
+const WORKSPACE_ID = /^ws_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 interface ClockOptions {
   now?: number;
@@ -61,6 +62,7 @@ const capturePreviewSchema = z.strictObject({
   preview_id: z.string().regex(PREVIEW_ID),
   packet_hash: z.string().regex(PACKET_HASH),
   context_head: z.string().min(1),
+  workspace_id: z.string().regex(WORKSPACE_ID),
   creates: z.array(z.strictObject({
     entry: knowledgeEntrySchema,
     path: z.string().min(1),
@@ -107,6 +109,11 @@ function previewsDirectory(home: string): string {
 export function capturePreviewRecordPath(home: string, previewId: string): string {
   assertPreviewId(previewId);
   return path.join(previewsDirectory(home), `${previewId}.json`);
+}
+
+function usedCapturePreviewPath(home: string, previewId: string): string {
+  assertPreviewId(previewId);
+  return path.join(previewsDirectory(home), `${previewId}.used`);
 }
 
 function keyPath(home: string): string {
@@ -298,10 +305,47 @@ export async function peekCapturePreview(
   options: Pick<ClockOptions, 'now'> = {},
 ): Promise<CapturePreview> {
   await ensurePreviewDirectory(home);
-  return readAuthenticatedPreview(
-    home,
-    capturePreviewRecordPath(home, previewId),
-    previewId,
-    options.now,
-  );
+  const pending = capturePreviewRecordPath(home, previewId);
+  try {
+    return await readAuthenticatedPreview(
+      home,
+      pending,
+      previewId,
+      options.now,
+    );
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'INVALID_PREVIEW') throw error;
+    try {
+      await fs.access(usedCapturePreviewPath(home, previewId));
+      throw appError('PREVIEW_ALREADY_USED', 'Capture preview has already been applied');
+    } catch (usedError) {
+      if ((usedError as { code?: string }).code === 'PREVIEW_ALREADY_USED') throw usedError;
+      throw error;
+    }
+  }
+}
+
+/** Atomically claim a pending capture preview for one-time apply. */
+export async function claimCapturePreview(
+  home: string,
+  previewId: string,
+  options: Pick<ClockOptions, 'now'> = {},
+): Promise<CapturePreview> {
+  await ensurePreviewDirectory(home);
+  const pending = capturePreviewRecordPath(home, previewId);
+  const used = usedCapturePreviewPath(home, previewId);
+  try {
+    await fs.rename(pending, used);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    try {
+      await fs.access(used);
+      throw appError('PREVIEW_ALREADY_USED', 'Capture preview has already been applied');
+    } catch (usedError) {
+      if ((usedError as { code?: string }).code === 'PREVIEW_ALREADY_USED') throw usedError;
+      throw appError('INVALID_PREVIEW', 'Capture preview does not exist');
+    }
+  }
+
+  return readAuthenticatedPreview(home, used, previewId, options.now);
 }

@@ -5,7 +5,13 @@ import path from 'node:path';
 import type { AgentName, CoverageReport, Shareability } from '../adapters/adapter.js';
 import { createId } from '../domain/ids.js';
 import { appError } from '../domain/errors.js';
+import type { KnowledgeEntry } from '../domain/model.js';
 import { atomicWriteFile } from '../fs/atomic-write.js';
+import {
+  commitAndPushKnowledge,
+  preflightContextRemote,
+  type PublishResult,
+} from '../git/context-publisher.js';
 import { KnowledgeStore } from '../knowledge/store.js';
 import {
   assertLocalContextCheckout,
@@ -13,6 +19,7 @@ import {
   readWorkspaceManifest,
 } from '../workspace/context-repository.js';
 import { readLocalWorkspace } from '../workspace/local-registry.js';
+import { withWorkspaceLock } from '../workspace/workspace-lock.js';
 import { inspect } from './inspect.js';
 import {
   createExtractionPacket,
@@ -23,7 +30,9 @@ import {
   previewKnowledgeProposal,
   type CapturePreview,
 } from '../extraction/proposal.js';
-import { saveCapturePreview } from '../preview/store.js';
+import { claimCapturePreview, peekCapturePreview, saveCapturePreview } from '../preview/store.js';
+
+export type { PublishResult } from '../git/context-publisher.js';
 
 const PACKET_ID = /^packet_[0-9A-HJKMNP-TV-Z]{26}$/;
 const MAX_EXCERPT_BYTES = 64 * 1024;
@@ -267,7 +276,79 @@ export async function previewCapture(
   const preview = previewKnowledgeProposal(record.packet, proposal, {
     includePersonal: record.includePersonal,
     registeredRepositoryIds: new Set(record.registeredRepositoryIds),
+    workspaceId: record.workspaceId,
   });
   await saveCapturePreview(home, preview);
   return preview;
+}
+
+async function applyApprovedCapture(
+  preview: CapturePreview,
+  home: string,
+): Promise<PublishResult> {
+  const local = await readLocalWorkspace(home, preview.workspace_id);
+  const contextPath = await assertLocalContextCheckout(
+    home,
+    preview.workspace_id,
+    local.context_path,
+  );
+  const workspace = await readWorkspaceManifest(contextPath);
+  if (workspace.workspace_id !== preview.workspace_id) {
+    throw appError('STALE_PREVIEW', 'Workspace identity changed after preview generation');
+  }
+
+  await preflightContextRemote(contextPath);
+  const head = await localHead(contextPath);
+  if (head !== preview.context_head) {
+    throw appError('STALE_PREVIEW', 'Context HEAD changed after preview generation', {
+      expected_head: preview.context_head,
+      actual_head: head,
+    });
+  }
+
+  const registeredRepositoryIds = new Set(workspace.repositories.map((item) => item.repo_id));
+  const store = new KnowledgeStore(contextPath, { registeredRepositoryIds });
+  const nowIso = new Date().toISOString();
+
+  for (const create of preview.creates) {
+    await store.put(create.entry);
+  }
+  for (const archive of preview.archives) {
+    const existing = await store.get(archive.id);
+    if (existing === undefined) {
+      throw appError('INVALID_KNOWLEDGE', 'Archive target is missing from Context knowledge', {
+        id: archive.id,
+      });
+    }
+    const archived: KnowledgeEntry = {
+      ...existing,
+      status: 'archived',
+      updated_at: nowIso,
+    };
+    await store.put(archived);
+  }
+
+  // Final graph validation via list() after all mutations.
+  await store.list();
+
+  return commitAndPushKnowledge(
+    contextPath,
+    `Publish capture preview ${preview.preview_id}`,
+  );
+}
+
+/**
+ * Claim an approved capture preview, write knowledge into Context Git, and push once.
+ * Never force-pushes; push races preserve the local commit and return REMOTE_CHANGED.
+ */
+export async function applyCapture(
+  previewId: string,
+  home: string,
+): Promise<PublishResult> {
+  const resolvedHome = path.resolve(home);
+  const pending = await peekCapturePreview(resolvedHome, previewId);
+  return withWorkspaceLock(resolvedHome, pending.workspace_id, async () => {
+    const preview = await claimCapturePreview(resolvedHome, previewId);
+    return applyApprovedCapture(preview, resolvedHome);
+  });
 }

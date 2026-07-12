@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CapturePreview } from '../../src/extraction/proposal.js';
 import {
   capturePreviewRecordPath,
+  claimCapturePreview,
   peekCapturePreview,
   saveCapturePreview,
 } from '../../src/preview/store.js';
@@ -64,6 +65,7 @@ function capturePreview(overrides: Partial<CapturePreview> = {}): CapturePreview
     }],
     context_head: 'abc123def',
     packet_hash: `sha256:${'b'.repeat(64)}`,
+    workspace_id: 'ws_01ARZ3NDEKTSV4RRFFQ69G5FAV',
     preview_id: 'preview_01ARZ3NDEKTSV4RRFFQ69G5FAV',
     ...overrides,
   };
@@ -115,5 +117,16 @@ describe('capture preview store', () => {
 
     await expect(peekCapturePreview(home, preview.preview_id, { now: 1_101 }))
       .rejects.toMatchObject({ code: 'PREVIEW_EXPIRED' });
+  });
+
+  it('allows exactly one claim and then reports PREVIEW_ALREADY_USED', async () => {
+    await saveCapturePreview(home, preview, { now: 1_000, ttlMs: 10_000 });
+
+    await expect(claimCapturePreview(home, preview.preview_id, { now: 2_000 }))
+      .resolves.toEqual(preview);
+    await expect(claimCapturePreview(home, preview.preview_id, { now: 2_001 }))
+      .rejects.toMatchObject({ code: 'PREVIEW_ALREADY_USED' });
+    await expect(peekCapturePreview(home, preview.preview_id, { now: 2_002 }))
+      .rejects.toMatchObject({ code: 'PREVIEW_ALREADY_USED' });
   });
 });

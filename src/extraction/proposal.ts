@@ -44,6 +44,7 @@ export interface CapturePreview {
   readonly preview_id: string;
   readonly packet_hash: string;
   readonly context_head: string;
+  readonly workspace_id: string;
   readonly creates: readonly CapturePreviewCreate[];
   readonly updates: readonly [];
   readonly archives: readonly CapturePreviewArchive[];
@@ -55,6 +56,7 @@ export interface CapturePreview {
 export interface PreviewProposalOptions {
   readonly includePersonal: boolean;
   readonly registeredRepositoryIds: ReadonlySet<string>;
+  readonly workspaceId: string;
   readonly now?: Date;
 }
 
@@ -208,6 +210,7 @@ export function previewKnowledgeProposal(
     preview_id: createId('preview'),
     packet_hash: packet.packet_hash,
     context_head: packet.context_head,
+    workspace_id: options.workspaceId,
     creates,
     updates: [],
     archives,
