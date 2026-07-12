@@ -142,6 +142,25 @@ describe('compileSections', () => {
     );
   });
 
+  it('fails when active conflicts involve a non-applicable agent-scoped entry', () => {
+    const applicable = entry(ids.left, {
+      scope: 'workspace',
+      applies_to: { paths: [], agents: ['codex'] },
+      conflicts_with: [ids.right],
+    });
+    const otherAgentOnly = entry(ids.right, {
+      scope: 'workspace',
+      applies_to: { paths: [], agents: ['claude-code'] },
+      conflicts_with: [ids.left],
+    });
+    expect(() => compileSections({
+      entries: [applicable, otherAgentOnly],
+      target,
+    })).toThrowError(
+      expect.objectContaining({ code: 'ACTIVE_KNOWLEDGE_CONFLICT' }),
+    );
+  });
+
   it('emits deterministic sections in priority order', () => {
     const compiled = compileSections({
       entries: [activeWork, agentRule, pathRule, repoRule, workspaceRule],

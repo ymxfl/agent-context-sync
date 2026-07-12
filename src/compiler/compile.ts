@@ -54,14 +54,15 @@ function selectionFromTarget(target: CompileTarget): Omit<SelectionInput, 'entri
   };
 }
 
-function conflictCheckEntries(
-  selected: KnowledgeEntry[],
-  allEntries: KnowledgeEntry[],
-): KnowledgeEntry[] {
+/**
+ * Conflict gate uses the full active graph from compile input, not just
+ * selected/applicable entries. Disputed targets referenced by conflicts_with
+ * are included so active→disputed edges still fail compilation.
+ */
+function conflictCheckEntries(allEntries: KnowledgeEntry[]): KnowledgeEntry[] {
   const byId = new Map<string, KnowledgeEntry>();
-  for (const entry of selected) byId.set(entry.id, entry);
   for (const entry of allEntries) {
-    if (entry.status === 'disputed' && !byId.has(entry.id)) {
+    if (entry.status === 'active' || entry.status === 'disputed') {
       byId.set(entry.id, entry);
     }
   }
@@ -101,9 +102,7 @@ export function compileSections(input: CompileInput): CompiledContext {
     ...selectionFromTarget(input.target),
   });
 
-  const conflicts = detectActiveConflicts(
-    conflictCheckEntries(selected, input.entries),
-  );
+  const conflicts = detectActiveConflicts(conflictCheckEntries(input.entries));
   if (conflicts.length > 0) {
     throw appError(
       'ACTIVE_KNOWLEDGE_CONFLICT',
