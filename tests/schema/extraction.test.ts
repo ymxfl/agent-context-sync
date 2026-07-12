@@ -3,6 +3,8 @@ import { parseExtractionProposal } from '../../src/schema/extraction.js';
 
 const hash = `sha256:${'b'.repeat(64)}`;
 const now = '2026-07-11T10:00:00Z';
+const context = { registeredRepositoryIds: new Set(['github.com/acme/api']) };
+const otherKnowledgeId = 'kn_01J00000000000000000000001';
 const source = {
   agent: 'third-party-agent',
   source_type: 'project-instruction',
@@ -58,6 +60,51 @@ describe('parseExtractionProposal', () => {
       ...proposal,
       rejected: [{ source, reason: '' }],
     })).toThrow();
+  });
+
+  it('requires context and registration for repository-scoped candidates', () => {
+    const repositoryProposal = {
+      ...proposal,
+      accepted: [{ ...proposed, scope: 'repository:github.com/acme/api' }],
+    };
+    expect(() => parseExtractionProposal(repositoryProposal)).toThrow(/repository scope.*context/i);
+    expect(() => parseExtractionProposal(repositoryProposal, {
+      registeredRepositoryIds: new Set(['github.com/acme/other']),
+    })).toThrow(/repository scope.*registered/i);
+    expect(parseExtractionProposal(repositoryProposal, context).accepted[0]?.scope)
+      .toBe('repository:github.com/acme/api');
+  });
+
+  it('rejects duplicate and overlapping proposed relations', () => {
+    expect(() => parseExtractionProposal({
+      ...proposal,
+      accepted: [{
+        ...proposed,
+        supersedes: [otherKnowledgeId, otherKnowledgeId],
+      }],
+    })).toThrow(/unique/i);
+    expect(() => parseExtractionProposal({
+      ...proposal,
+      accepted: [{
+        ...proposed,
+        supersedes: [otherKnowledgeId],
+        conflicts_with: [otherKnowledgeId],
+      }],
+    })).toThrow(/overlap/i);
+  });
+
+  it('rejects unsafe locators in accepted and rejected candidates', () => {
+    expect(() => parseExtractionProposal({
+      ...proposal,
+      accepted: [{ ...proposed, source: { ...source, locator: '../memory.md' } }],
+    })).toThrow(/locator/i);
+    expect(() => parseExtractionProposal({
+      ...proposal,
+      rejected: [{
+        source: { ...source, locator: String.raw`C:\Users\alice\memory.md` },
+        reason: 'private',
+      }],
+    })).toThrow(/locator/i);
   });
 
   it('rejects unknown proposal and rejection fields', () => {

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import type {
   ExtractionProposal,
+  KnowledgeParseContext,
   RejectedCandidate,
 } from '../domain/model.js';
 import {
+  assertRegisteredKnowledgeScope,
   proposedKnowledgeSchema,
   sourceReferenceSchema,
 } from './knowledge.js';
@@ -25,6 +27,13 @@ const extractionProposalSchema: z.ZodType<ExtractionProposal> = z.strictObject({
   rejected: z.array(rejectedCandidateSchema),
 });
 
-export function parseExtractionProposal(value: unknown): ExtractionProposal {
-  return extractionProposalSchema.parse(value);
+export function parseExtractionProposal(
+  value: unknown,
+  context?: KnowledgeParseContext,
+): ExtractionProposal {
+  const proposal = extractionProposalSchema.parse(value);
+  for (const candidate of proposal.accepted) {
+    assertRegisteredKnowledgeScope(candidate.scope, context);
+  }
+  return proposal;
 }

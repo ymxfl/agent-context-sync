@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type {
   KnowledgeEntry,
+  KnowledgeParseContext,
   KnowledgeScope,
   ProposedKnowledge,
   SourceReference,
@@ -36,10 +37,25 @@ export const contentHashSchema = z.string().regex(
 const timestampSchema = z.iso.datetime({ offset: true });
 const nonEmptyStringSchema = z.string().trim().min(1);
 
+function isLogicalLocator(value: string): boolean {
+  if (
+    value.startsWith('/')
+    || value.startsWith('\\')
+    || /^[a-z]:/i.test(value)
+    || /^file:/i.test(value)
+    || value.includes('\\')
+  ) return false;
+  return value.split('/').every((segment) => segment !== '.' && segment !== '..');
+}
+
+const logicalLocatorSchema = nonEmptyStringSchema.refine(isLogicalLocator, {
+  message: 'Source locator must be a redacted logical locator',
+});
+
 export const sourceReferenceSchema: z.ZodType<SourceReference> = z.strictObject({
   agent: nonEmptyStringSchema,
   source_type: kebabCaseSchema,
-  locator: nonEmptyStringSchema,
+  locator: logicalLocatorSchema,
   content_hash: contentHashSchema,
   observed_at: timestampSchema,
 });
@@ -60,16 +76,49 @@ const scopeSchema = z.custom<KnowledgeScope>(
   'Scope must be workspace or repository:<normalized-repo-id>',
 );
 
+function uniqueRelationsSchema(relation: string) {
+  return z.array(knowledgeIdSchema).superRefine((values, context) => {
+    const seen = new Set<string>();
+    for (const [index, value] of values.entries()) {
+      if (seen.has(value)) {
+        context.addIssue({
+          code: 'custom',
+          path: [index],
+          message: `${relation} relations must be unique`,
+        });
+      }
+      seen.add(value);
+    }
+  });
+}
+
+function overlappingRelationIndexes(
+  value: Pick<ProposedKnowledge, 'supersedes' | 'conflicts_with'>,
+): number[] {
+  const supersedes = new Set(value.supersedes);
+  return value.conflicts_with
+    .map((target, index) => supersedes.has(target) ? index : -1)
+    .filter((index) => index !== -1);
+}
+
 export const proposedKnowledgeSchema: z.ZodType<ProposedKnowledge> = z.strictObject({
   kind: kebabCaseSchema,
   scope: scopeSchema,
   applies_to: appliesToSchema,
   source: sourceReferenceSchema,
   confidence: z.number().finite().min(0).max(1),
-  supersedes: z.array(knowledgeIdSchema),
-  conflicts_with: z.array(knowledgeIdSchema),
+  supersedes: uniqueRelationsSchema('supersedes'),
+  conflicts_with: uniqueRelationsSchema('conflicts_with'),
   statement: nonEmptyStringSchema,
   reason: nonEmptyStringSchema,
+}).superRefine((candidate, context) => {
+  for (const index of overlappingRelationIndexes(candidate)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['conflicts_with', index],
+      message: 'supersedes and conflicts_with relations must not overlap',
+    });
+  }
 });
 
 const knowledgeEntrySchema: z.ZodType<KnowledgeEntry> = z.strictObject({
@@ -81,15 +130,89 @@ const knowledgeEntrySchema: z.ZodType<KnowledgeEntry> = z.strictObject({
   applies_to: appliesToSchema,
   source: sourceReferenceSchema,
   confidence: z.number().finite().min(0).max(1),
-  supersedes: z.array(knowledgeIdSchema),
-  conflicts_with: z.array(knowledgeIdSchema),
+  supersedes: uniqueRelationsSchema('supersedes'),
+  conflicts_with: uniqueRelationsSchema('conflicts_with'),
   created_at: timestampSchema,
   updated_at: timestampSchema,
   last_verified_at: timestampSchema.nullable(),
   statement: nonEmptyStringSchema,
   reason: nonEmptyStringSchema,
+}).superRefine((entry, context) => {
+  for (const index of overlappingRelationIndexes(entry)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['conflicts_with', index],
+      message: 'supersedes and conflicts_with relations must not overlap',
+    });
+  }
+
+  for (const relation of ['supersedes', 'conflicts_with'] as const) {
+    for (const [index, target] of entry[relation].entries()) {
+      if (target === entry.id) {
+        context.addIssue({
+          code: 'custom',
+          path: [relation, index],
+          message: `${relation} must not reference the entry itself`,
+        });
+      }
+    }
+  }
+
+  const observedAt = Date.parse(entry.source.observed_at);
+  const createdAt = Date.parse(entry.created_at);
+  const updatedAt = Date.parse(entry.updated_at);
+  if (observedAt > updatedAt) {
+    context.addIssue({
+      code: 'custom',
+      path: ['source', 'observed_at'],
+      message: 'observed_at must be on or before updated_at',
+    });
+  }
+  if (createdAt > updatedAt) {
+    context.addIssue({
+      code: 'custom',
+      path: ['created_at'],
+      message: 'created_at must be on or before updated_at',
+    });
+  }
+  if (entry.last_verified_at !== null) {
+    const lastVerifiedAt = Date.parse(entry.last_verified_at);
+    if (lastVerifiedAt < createdAt) {
+      context.addIssue({
+        code: 'custom',
+        path: ['last_verified_at'],
+        message: 'last_verified_at must be on or after created_at',
+      });
+    }
+    if (lastVerifiedAt > updatedAt) {
+      context.addIssue({
+        code: 'custom',
+        path: ['last_verified_at'],
+        message: 'last_verified_at must be on or before updated_at',
+      });
+    }
+  }
 });
 
-export function parseKnowledgeEntry(value: unknown): KnowledgeEntry {
-  return knowledgeEntrySchema.parse(value);
+export function assertRegisteredKnowledgeScope(
+  scope: KnowledgeScope,
+  context?: KnowledgeParseContext,
+): void {
+  if (scope === 'workspace') return;
+  if (context === undefined) {
+    throw new Error('Repository scope requires KnowledgeParseContext');
+  }
+  const repositoryId = scope.slice('repository:'.length);
+  if (!context.registeredRepositoryIds.has(repositoryId)) {
+    throw new Error('Repository scope is not registered in KnowledgeParseContext');
+  }
+}
+
+export function parseKnowledgeEntry(
+  value: unknown,
+  context?: KnowledgeParseContext,
+): KnowledgeEntry {
+  const entry = knowledgeEntrySchema.parse(value);
+  assertRegisteredKnowledgeScope(entry.scope, context);
+  return entry;
 }

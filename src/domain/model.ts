@@ -24,6 +24,10 @@ export interface LocalWorkspace {
 export type KnowledgeStatus = 'active' | 'superseded' | 'archived' | 'disputed';
 export type KnowledgeScope = 'workspace' | `repository:${string}`;
 
+export interface KnowledgeParseContext {
+  readonly registeredRepositoryIds: ReadonlySet<string>;
+}
+
 export interface KnowledgeApplicability {
   paths: string[];
   agents: string[];
