@@ -32,7 +32,7 @@ function containsPrivateLocalPath(value: string): boolean {
   const withoutExplicitRoutes = withoutWebUrls
     .replace(/\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|CONNECT|TRACE)\s+\/(?!\/)[a-z0-9._~&+\-\/=:@%?]*/gi, '')
     .replace(/\b(?:URI|route|endpoint)\s*[:=]\s*\/(?!\/)[a-z0-9._~&+\-\/=:@%?]*/gi, '');
-  return /(?:^|[^a-z0-9._*?+\-])\/{1,2}(?=[^\s/]|\/(?=[^\s/])|\s|$)/i
+  return /(?:^|[^a-z0-9])\/{1,2}(?=[^\s/]|\/(?=[^\s/])|\s|$)/i
     .test(withoutExplicitRoutes)
     || /(?:^|[^a-z0-9])[a-z]:[\\/]/i.test(value)
     || /\\\\[^\\\s]+\\[^\\\s]+/.test(value)
@@ -53,6 +53,13 @@ function assertNoPrivateLocalPaths(value: unknown): void {
   if (value !== null && typeof value === 'object') {
     for (const item of Object.values(value)) assertNoPrivateLocalPaths(item);
   }
+}
+
+function assertEntryPrivacy(entry: KnowledgeEntry): void {
+  assertNoPrivateLocalPaths({
+    ...entry,
+    applies_to: { ...entry.applies_to, paths: [] },
+  });
 }
 
 function normalizeText(value: string): string {
@@ -76,7 +83,7 @@ function canonicalEntry(entry: KnowledgeEntry): KnowledgeEntry {
 
 export function serializeKnowledge(entry: KnowledgeEntry): string {
   const canonical = canonicalEntry(entry);
-  assertNoPrivateLocalPaths(canonical);
+  assertEntryPrivacy(canonical);
   const yaml = stringify(canonical, {
     lineWidth: 0,
     sortMapEntries: true,
@@ -89,7 +96,6 @@ export function parseKnowledgeMarkdown(
   context?: KnowledgeParseContext,
 ): KnowledgeEntry {
   const normalized = text.replace(/\r\n?/g, '\n');
-  assertNoPrivateLocalPaths(normalized);
   if (!normalized.startsWith('---\n')) {
     throw new Error('Knowledge Markdown must begin with YAML frontmatter');
   }
@@ -103,6 +109,7 @@ export function parseKnowledgeMarkdown(
   }
   const scope = raw.scope as KnowledgeScope | undefined;
   const entry = parseKnowledgeEntry(raw, context ?? contextForScope(scope));
-  assertNoPrivateLocalPaths(entry);
+  assertEntryPrivacy(entry);
+  assertNoPrivateLocalPaths(normalized.slice(frontmatterEnd + '\n---\n'.length));
   return entry;
 }

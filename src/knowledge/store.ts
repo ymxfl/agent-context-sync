@@ -257,6 +257,68 @@ async function readWriterReclaimClaim(file: string): Promise<WriterReclaimClaim 
   }
 }
 
+async function publishWriterReclaimClaim(
+  lock: string,
+  claim: WriterReclaimClaim,
+): Promise<boolean> {
+  const claimFile = path.join(lock, 'reclaim.json');
+  const temporary = path.join(lock, `.reclaim-${claim.token}.tmp`);
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(
+      temporary,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    await handle.writeFile(`${JSON.stringify(claim)}\n`, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    try {
+      await fs.link(temporary, claimFile);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw error;
+    }
+    await syncDirectory(lock);
+    return true;
+  } finally {
+    await handle?.close();
+    await fs.rm(temporary, { force: true });
+  }
+}
+
+function writerLockQuarantine(root: string, token: string): string {
+  return path.join(root, `.writer-lock-quarantine-${token}`);
+}
+
+async function cleanupWriterLockQuarantines(root: string): Promise<void> {
+  const prefix = '.writer-lock-quarantine-';
+  for (const name of await fs.readdir(root)) {
+    if (!name.startsWith(prefix)) continue;
+    const quarantine = path.join(root, name);
+    const info = await lstatIfExists(quarantine);
+    if (info === undefined) continue;
+    if (info.isSymbolicLink() || !info.isDirectory()) throw corruptWriterLock();
+    const owner = await readWriterLockOwner(quarantine);
+    const claim = await readWriterReclaimClaim(path.join(quarantine, 'reclaim.json'));
+    if (
+      owner === undefined
+      || claim === undefined
+      || claim.observed_token !== owner.token
+    ) throw corruptWriterLock();
+    for (const child of await fs.readdir(quarantine)) {
+      const childInfo = await lstatIfExists(path.join(quarantine, child));
+      if (childInfo === undefined) continue;
+      if (childInfo.isSymbolicLink() || !childInfo.isFile()) throw corruptWriterLock();
+    }
+    if (!isProcessAlive(claim.owner_pid)) {
+      await fs.rm(quarantine, { recursive: true });
+    }
+  }
+}
+
 async function claimStaleWriterLock(lock: string, observed: WriterLockOwner): Promise<boolean> {
   const claimFile = path.join(lock, 'reclaim.json');
   const claim: WriterReclaimClaim = {
@@ -265,15 +327,7 @@ async function claimStaleWriterLock(lock: string, observed: WriterLockOwner): Pr
     observed_token: observed.token,
     created_at_ms: Date.now(),
   };
-  try {
-    await fs.writeFile(
-      claimFile,
-      `${JSON.stringify(claim)}\n`,
-      { flag: 'wx', mode: 0o600 },
-    );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+  if (!await publishWriterReclaimClaim(lock, claim)) {
     const existing = await readWriterReclaimClaim(claimFile);
     if (existing === undefined) return false;
     if (existing.observed_token !== observed.token) throw corruptWriterLock();
@@ -298,7 +352,17 @@ async function claimStaleWriterLock(lock: string, observed: WriterLockOwner): Pr
   if (current?.owner_pid !== observed.owner_pid || current.token !== observed.token) {
     throw corruptWriterLock();
   }
-  await fs.rm(lock, { recursive: true });
+  const quarantine = writerLockQuarantine(path.dirname(lock), claim.token);
+  await fs.rename(lock, quarantine);
+  const quarantinedOwner = await readWriterLockOwner(quarantine);
+  const quarantinedClaim = await readWriterReclaimClaim(path.join(quarantine, 'reclaim.json'));
+  if (
+    quarantinedOwner?.owner_pid !== observed.owner_pid
+    || quarantinedOwner.token !== observed.token
+    || quarantinedClaim?.token !== claim.token
+    || quarantinedClaim.observed_token !== observed.token
+  ) throw corruptWriterLock();
+  await fs.rm(quarantine, { recursive: true });
   return true;
 }
 
@@ -306,6 +370,7 @@ async function acquireWriterLock(root: string): Promise<() => Promise<void>> {
   const rootInfo = await lstatIfExists(root);
   if (rootInfo === undefined) await fs.mkdir(root, { recursive: true, mode: 0o700 });
   await assertSafePath(root, root, 'directory');
+  await cleanupWriterLockQuarantines(root);
   const lock = writerLockDirectory(root);
   const owner = { owner_pid: process.pid, token: randomUUID() };
   while (true) {
@@ -451,18 +516,10 @@ function isProcessAlive(pid: number): boolean {
 
 async function readJournal(root: string): Promise<TransactionJournal | undefined> {
   const file = journalFile(root);
-  const info = await lstatIfExists(file);
-  if (info === undefined) return undefined;
-  if (info.isSymbolicLink() || !info.isFile()) throw corruptJournal();
-  let text: string;
+  const bytes = await readRegularFileNoFollowIfExists(root, file);
+  if (bytes === undefined) return undefined;
   try {
-    text = await fs.readFile(file, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw error;
-  }
-  try {
-    return parseTransactionJournal(JSON.parse(text), root);
+    return parseTransactionJournal(JSON.parse(bytes.toString('utf8')), root);
   } catch (error) {
     if (error instanceof Error && error.message === 'Knowledge transaction journal is corrupt') {
       throw error;
@@ -482,8 +539,17 @@ function sha256(contents: string | Uint8Array): string {
 }
 
 async function readRegularFileNoFollow(root: string, file: string): Promise<Buffer> {
+  const bytes = await readRegularFileNoFollowIfExists(root, file);
+  if (bytes === undefined) throw corruptJournal();
+  return bytes;
+}
+
+async function readRegularFileNoFollowIfExists(
+  root: string,
+  file: string,
+): Promise<Buffer | undefined> {
   const expected = await assertSafePath(root, file, 'regular');
-  if (expected === undefined) throw corruptJournal();
+  if (expected === undefined) return undefined;
   let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
     handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -499,6 +565,32 @@ async function readRegularFileNoFollow(root: string, file: string): Promise<Buff
     throw corruptJournal(error);
   } finally {
     await handle?.close();
+  }
+}
+
+async function atomicWriteBytes(file: string, contents: Uint8Array): Promise<void> {
+  const directory = path.dirname(file);
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  const temporary = path.join(directory, `.${path.basename(file)}.${randomUUID()}.tmp`);
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  let renamed = false;
+  try {
+    handle = await fs.open(
+      temporary,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    await handle.chmod(0o600);
+    await handle.writeFile(contents);
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    await fs.rename(temporary, file);
+    renamed = true;
+    await syncDirectory(directory);
+  } finally {
+    await handle?.close();
+    if (!renamed) await fs.rm(temporary, { force: true });
   }
 }
 
@@ -530,14 +622,14 @@ async function validateJournalPaths(
     ];
     let metadataCount = 0;
     for (const artifact of artifacts) {
-      const info = await assertSafePath(root, artifact.file, 'regular');
-      if (info === undefined) {
+      const bytes = await readRegularFileNoFollowIfExists(root, artifact.file);
+      if (bytes === undefined) {
         if (artifact.required) throw corruptJournal();
         continue;
       }
       let parsed: KnowledgeEntry;
       try {
-        parsed = parseKnowledgeMarkdown(await fs.readFile(artifact.file, 'utf8'), context);
+        parsed = parseKnowledgeMarkdown(bytes.toString('utf8'), context);
       } catch (error) {
         throw corruptJournal(error);
       }
@@ -593,9 +685,8 @@ async function rollbackJournal(
     await assertSafePath(root, target, 'regular');
     if (operation.existed) {
       const backup = resolvedJournalPath(root, operation.backup);
-      await assertSafePath(root, backup, 'regular');
-      const contents = await fs.readFile(backup, 'utf8');
-      await atomicWriteFile(target, contents);
+      const contents = await readRegularFileNoFollow(root, backup);
+      await atomicWriteBytes(target, contents);
     } else {
       await fs.rm(target, { force: true });
     }
@@ -789,7 +880,7 @@ export class KnowledgeStore {
         await fs.mkdir(path.dirname(change.file), { recursive: true, mode: 0o700 });
         await atomicWriteFile(staged, change.contents);
         if (previous !== undefined) {
-          await atomicWriteFile(backup, await fs.readFile(change.file, 'utf8'));
+          await atomicWriteBytes(backup, await readRegularFileNoFollow(root, change.file));
         }
         journal.operations.push({
           target: relativeContained(root, change.file),

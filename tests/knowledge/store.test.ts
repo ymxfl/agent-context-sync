@@ -174,6 +174,10 @@ describe('canonical Knowledge Markdown', () => {
     'Serve route: /health$/Users/alice/private.md.',
     'See https://example.com!/Users/alice/private.md.',
     'See https:///Users/alice/private.md.',
+    'Read **/Users/alice/private.md**.',
+    'Read _/Users/alice/private.md_.',
+    'Read +/Users/alice/private.md+.',
+    'Read ?/Users/alice/private.md?.',
   ])('rejects punctuation-surrounded POSIX path bypass %j', (statement) => {
     expect(() => serializeKnowledge(entry({ statement }))).toThrow(/private local path/i);
   });
@@ -187,6 +191,12 @@ describe('canonical Knowledge Markdown', () => {
     'See HTTP://example.com/a/b?c=d.',
   ])('allows only explicit HTTP route or web URL span %j', (statement) => {
     expect(() => serializeKnowledge(entry({ statement }))).not.toThrow();
+  });
+
+  it('allows schema-validated relative globs only in applies_to.paths', () => {
+    expect(() => serializeKnowledge(entry({
+      applies_to: { ...entry().applies_to, paths: ['**/Users/**', '_/Users/**'] },
+    }))).not.toThrow();
   });
 
   it.each([
@@ -510,6 +520,45 @@ describe('KnowledgeStore', () => {
     expect((await store.list()).map((item) => item.status)).toEqual(['active']);
   });
 
+  it('restores exact raw backup bytes during applying recovery', async () => {
+    const original = Buffer.from(serializeKnowledge(entry({ reason: 'Contains replacement: �' })));
+    const replacement = Buffer.from('�');
+    const offset = original.indexOf(replacement);
+    expect(offset).toBeGreaterThanOrEqual(0);
+    const originalBytes = Buffer.concat([
+      original.subarray(0, offset),
+      Buffer.from([0xff]),
+      original.subarray(offset + replacement.length),
+    ]);
+    const knowledge = path.join(root, 'knowledge');
+    const target = path.join(knowledge, 'workspace', `${ids.a}.md`);
+    const transaction = path.join(knowledge, '.transaction');
+    const backup = path.join(transaction, 'backups/0.backup');
+    const staged = path.join(transaction, 'staged/0.stage');
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.mkdir(path.dirname(backup), { recursive: true });
+    await fs.mkdir(path.dirname(staged), { recursive: true });
+    await fs.writeFile(target, serializeKnowledge(entry({ status: 'archived' })));
+    await fs.writeFile(backup, originalBytes);
+    await fs.writeFile(staged, serializeKnowledge(entry({ status: 'archived' })));
+    await fs.writeFile(path.join(transaction, 'journal.json'), `${JSON.stringify({
+      schema_version: 1,
+      owner_pid: 999_999_999,
+      applying_index: 0,
+      applied_count: 0,
+      operations: [{
+        target: path.relative(knowledge, target),
+        staged: path.relative(knowledge, staged),
+        backup: path.relative(knowledge, backup),
+        existed: true,
+      }],
+    })}\n`);
+
+    expect((await store.get(ids.a))?.reason).toBe('Contains replacement: �');
+    expect(await fs.readFile(target)).toEqual(originalBytes);
+    await expect(fs.access(transaction)).rejects.toThrow();
+  });
+
   it('rejects a corrupt journal repeatedly without changing stored bytes', async () => {
     await store.put(entry());
     const target = path.join(root, 'knowledge/workspace', `${ids.a}.md`);
@@ -721,6 +770,26 @@ describe('KnowledgeStore', () => {
     expect((await fs.readdir(path.join(root, 'knowledge')))
       .filter((name) => name.startsWith('.writer-lock'))).toEqual([]);
   }, 2_000);
+
+  it('cleans a dead reclaimer quarantine without occupying the canonical lock', async () => {
+    const knowledge = path.join(root, 'knowledge');
+    const quarantine = path.join(knowledge, '.writer-lock-quarantine-stale-owner-token');
+    await fs.mkdir(quarantine, { recursive: true });
+    await fs.writeFile(path.join(quarantine, 'owner.json'), `${JSON.stringify({
+      owner_pid: 999_999_999,
+      token: 'stale-owner-token',
+    })}\n`);
+    await fs.writeFile(path.join(quarantine, 'reclaim.json'), `${JSON.stringify({
+      owner_pid: 999_999_998,
+      token: 'crashed-reclaimer-token',
+      observed_token: 'stale-owner-token',
+      created_at_ms: Date.now() - 10_000,
+    })}\n`);
+
+    expect(await store.list()).toEqual([]);
+    await expect(fs.access(quarantine)).rejects.toThrow();
+    await expect(fs.access(path.join(knowledge, '.writer-lock'))).rejects.toThrow();
+  });
 
   it('never follows a symbolic writer lock', async () => {
     const knowledge = path.join(root, 'knowledge');
