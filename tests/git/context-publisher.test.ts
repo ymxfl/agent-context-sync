@@ -251,4 +251,38 @@ describe('context publisher', () => {
     expect(await fixtureGit(bare, ['rev-parse', 'main'])).toBe(rivalHead);
     expect(await isAncestor(bare, localHead, rivalHead)).toBe(false);
   });
+
+  it('does not wrap permission push failures as REMOTE_CHANGED', async () => {
+    const hook = path.join(bare, 'hooks', 'update');
+    await fs.writeFile(hook, `#!/bin/sh
+echo "remote: error: insufficient permission for adding an object to repository database" >&2
+echo "fatal: Unable to create temporary file: Permission denied" >&2
+exit 1
+`);
+    await fs.chmod(hook, 0o755);
+
+    await fs.writeFile(
+      path.join(contextPath, 'knowledge', 'workspace', 'denied.md'),
+      'denied knowledge\n',
+    );
+
+    await expect(commitAndPushKnowledge(
+      contextPath,
+      'Publish with permission denial',
+    )).rejects.toSatisfy((error: unknown) => {
+      const code = (error as { code?: string }).code;
+      expect(code).not.toBe('REMOTE_CHANGED');
+      const text = [
+        error instanceof Error ? error.message : String(error),
+        typeof (error as { stderr?: unknown }).stderr === 'string'
+          ? (error as { stderr: string }).stderr
+          : '',
+      ].join('\n').toLowerCase();
+      expect(text).toMatch(/permission|denied|insufficient/i);
+      return true;
+    });
+
+    // Local commit still exists (push failed after commit), but was not remapped.
+    expect(await fixtureGit(contextPath, ['rev-parse', 'HEAD'])).toMatch(/^[0-9a-f]{40}$/);
+  });
 });

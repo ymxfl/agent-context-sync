@@ -144,11 +144,13 @@ function isNonFastForwardPushError(error: unknown): boolean {
     ? (error as { stderr: string }).stderr
     : '';
   const message = error instanceof Error ? error.message : String(error);
-  const text = `${stderr}\n${message}`.toLowerCase();
-  return text.includes('non-fast-forward')
-    || text.includes('failed to push')
-    || text.includes('fetch first')
-    || text.includes('rejected');
+  const text = `${stderr}\n${message}`;
+  // Match only true non-fast-forward rejections. Do not treat generic
+  // "failed to push" / permission / hook denials as REMOTE_CHANGED.
+  return /non-fast-forward/i.test(text)
+    || /\[rejected\].*\(non-fast-forward\)/i.test(text)
+    || /fetch first/i.test(text)
+    || /updates were rejected because the (?:remote|tip of your current branch)/i.test(text);
 }
 
 /**

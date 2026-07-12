@@ -23307,8 +23307,8 @@ function isNonFastForwardPushError(error51) {
   const stderr = typeof error51.stderr === "string" ? error51.stderr : "";
   const message = error51 instanceof Error ? error51.message : String(error51);
   const text = `${stderr}
-${message}`.toLowerCase();
-  return text.includes("non-fast-forward") || text.includes("failed to push") || text.includes("fetch first") || text.includes("rejected");
+${message}`;
+  return /non-fast-forward/i.test(text) || /\[rejected\].*\(non-fast-forward\)/i.test(text) || /fetch first/i.test(text) || /updates were rejected because the (?:remote|tip of your current branch)/i.test(text);
 }
 async function commitAndPushKnowledge(contextPath, message) {
   await configureCommitter(contextPath);
@@ -29424,6 +29424,27 @@ async function previewCapture(packetId, proposal, options) {
   await saveCapturePreview(home, preview);
   return preview;
 }
+async function discardKnowledgeWorkingTree(contextPath) {
+  try {
+    await runGit(contextPath, ["reset", "HEAD", "--", "knowledge"]);
+  } catch {
+  }
+  try {
+    await runGit(contextPath, ["checkout", "HEAD", "--", "knowledge"]);
+  } catch {
+  }
+  await runGit(contextPath, ["clean", "-fd", "--", "knowledge"]);
+}
+function mapKnowledgeWriteError(error51) {
+  if (error51 !== null && typeof error51 === "object" && typeof error51.code === "string" && typeof error51.message === "string") {
+    throw error51;
+  }
+  const message = error51 instanceof Error ? error51.message : String(error51);
+  if (/Invalid Knowledge graph/i.test(message)) {
+    throw appError("INVALID_KNOWLEDGE_GRAPH", message);
+  }
+  throw appError("INVALID_KNOWLEDGE", message);
+}
 async function applyApprovedCapture(preview, home) {
   const local = await readLocalWorkspace(home, preview.workspace_id);
   const contextPath = await assertLocalContextCheckout(
@@ -29446,24 +29467,29 @@ async function applyApprovedCapture(preview, home) {
   const registeredRepositoryIds = new Set(workspace.repositories.map((item) => item.repo_id));
   const store = new KnowledgeStore(contextPath, { registeredRepositoryIds });
   const nowIso = (/* @__PURE__ */ new Date()).toISOString();
-  for (const create of preview.creates) {
-    await store.put(create.entry);
-  }
-  for (const archive of preview.archives) {
-    const existing = await store.get(archive.id);
-    if (existing === void 0) {
-      throw appError("INVALID_KNOWLEDGE", "Archive target is missing from Context knowledge", {
-        id: archive.id
-      });
+  try {
+    for (const create of preview.creates) {
+      await store.put(create.entry);
     }
-    const archived = {
-      ...existing,
-      status: "archived",
-      updated_at: nowIso
-    };
-    await store.put(archived);
+    for (const archive of preview.archives) {
+      const existing = await store.get(archive.id);
+      if (existing === void 0) {
+        throw appError("INVALID_KNOWLEDGE", "Archive target is missing from Context knowledge", {
+          id: archive.id
+        });
+      }
+      const archived = {
+        ...existing,
+        status: "archived",
+        updated_at: nowIso
+      };
+      await store.put(archived);
+    }
+    await store.list();
+  } catch (error51) {
+    await discardKnowledgeWorkingTree(contextPath);
+    mapKnowledgeWriteError(error51);
   }
-  await store.list();
   return commitAndPushKnowledge(
     contextPath,
     `Publish capture preview ${preview.preview_id}`

@@ -280,6 +280,7 @@ describe('capture apply', () => {
 
   it('archives superseded knowledge and keeps business repos untouched on push race', async () => {
     const businessHeadBefore = await fixtureGit(repository, ['rev-parse', 'HEAD']);
+    const previousMain = await fixtureGit(bare, ['rev-parse', 'main']);
     const packet = await prepareCapture({
       workspaceId,
       agent: 'codex',
@@ -326,10 +327,71 @@ describe('capture apply', () => {
     await fs.writeFile(path.join(root, 'advance-main-on-next-push'), rivalHead);
 
     await expect(applyCapture(preview.preview_id, home)).rejects.toMatchObject({
-      code: expect.stringMatching(/^(STALE_PREVIEW|REMOTE_CHANGED)$/),
+      code: 'REMOTE_CHANGED',
     });
     expect(await fixtureGit(repository, ['rev-parse', 'HEAD'])).toBe(businessHeadBefore);
-    expect(await currentBranchWasForcePushed(bare, await fixtureGit(bare, ['rev-parse', 'main'])))
-      .toBe(false);
+    const finalMain = await fixtureGit(bare, ['rev-parse', 'main']);
+    expect(finalMain).toBe(rivalHead);
+    expect(await currentBranchWasForcePushed(bare, previousMain)).toBe(false);
+  });
+
+  it('rolls back knowledge writes and maps graph failures to INVALID_KNOWLEDGE_GRAPH', async () => {
+    const { saveCapturePreview } = await import('../../src/preview/store.js');
+    const { serializeKnowledge } = await import('../../src/knowledge/markdown.js');
+    const head = await fixtureGit(contextPath, ['rev-parse', 'HEAD']);
+    const beforeStatus = await fixtureGit(contextPath, ['status', '--porcelain=v1', '--', 'knowledge']);
+    const missingId = 'kn_01J00000000000000000000099';
+    const entry: KnowledgeEntry = {
+      schema_version: 1,
+      id: 'kn_01J00000000000000000000050',
+      kind: 'workflow',
+      scope: 'workspace',
+      status: 'active',
+      applies_to: { paths: ['src/**'], agents: ['codex'] },
+      source: {
+        agent: 'codex',
+        source_type: 'project-instructions',
+        locator: 'AGENTS.md',
+        content_hash: `sha256:${'a'.repeat(64)}`,
+        observed_at: now,
+      },
+      confidence: 0.5,
+      supersedes: [missingId],
+      conflicts_with: [],
+      created_at: now,
+      updated_at: now,
+      last_verified_at: null,
+      statement: 'This create intentionally breaks the knowledge graph.',
+      reason: 'Missing supersedes target should fail apply.',
+    };
+    const relativePath = `knowledge/workspace/${entry.id}.md`;
+    const bytes = serializeKnowledge(entry);
+    await saveCapturePreview(home, {
+      preview_id: 'preview_01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      packet_hash: `sha256:${'b'.repeat(64)}`,
+      context_head: head,
+      workspace_id: workspaceId,
+      creates: [{
+        entry,
+        path: relativePath,
+        bytes,
+        diff: `--- ${relativePath}\n+++ ${relativePath}\n`,
+      }],
+      updates: [],
+      archives: [],
+      rejections: [],
+      duplicates: [],
+      warnings: [],
+    });
+
+    await expect(applyCapture('preview_01ARZ3NDEKTSV4RRFFQ69G5FAV', home)).rejects.toMatchObject({
+      code: 'INVALID_KNOWLEDGE_GRAPH',
+    });
+
+    expect(await fixtureGit(contextPath, ['rev-parse', 'HEAD'])).toBe(head);
+    expect(await fixtureGit(contextPath, ['status', '--porcelain=v1', '--', 'knowledge']))
+      .toBe(beforeStatus);
+    await expect(fs.access(path.join(contextPath, relativePath)))
+      .rejects.toMatchObject({ code: 'ENOENT' });
   });
 });

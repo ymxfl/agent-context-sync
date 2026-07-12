@@ -12,6 +12,7 @@ import {
   preflightContextRemote,
   type PublishResult,
 } from '../git/context-publisher.js';
+import { runGit } from '../git/run-git.js';
 import { KnowledgeStore } from '../knowledge/store.js';
 import {
   assertLocalContextCheckout,
@@ -282,6 +283,36 @@ export async function previewCapture(
   return preview;
 }
 
+async function discardKnowledgeWorkingTree(contextPath: string): Promise<void> {
+  try {
+    await runGit(contextPath, ['reset', 'HEAD', '--', 'knowledge']);
+  } catch {
+    // Nothing may be staged under knowledge yet.
+  }
+  try {
+    await runGit(contextPath, ['checkout', 'HEAD', '--', 'knowledge']);
+  } catch {
+    // knowledge/ may be absent from HEAD; untracked files are cleaned below.
+  }
+  await runGit(contextPath, ['clean', '-fd', '--', 'knowledge']);
+}
+
+function mapKnowledgeWriteError(error: unknown): never {
+  if (
+    error !== null
+    && typeof error === 'object'
+    && typeof (error as { code?: unknown }).code === 'string'
+    && typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    throw error;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (/Invalid Knowledge graph/i.test(message)) {
+    throw appError('INVALID_KNOWLEDGE_GRAPH', message);
+  }
+  throw appError('INVALID_KNOWLEDGE', message);
+}
+
 async function applyApprovedCapture(
   preview: CapturePreview,
   home: string,
@@ -310,26 +341,31 @@ async function applyApprovedCapture(
   const store = new KnowledgeStore(contextPath, { registeredRepositoryIds });
   const nowIso = new Date().toISOString();
 
-  for (const create of preview.creates) {
-    await store.put(create.entry);
-  }
-  for (const archive of preview.archives) {
-    const existing = await store.get(archive.id);
-    if (existing === undefined) {
-      throw appError('INVALID_KNOWLEDGE', 'Archive target is missing from Context knowledge', {
-        id: archive.id,
-      });
+  try {
+    for (const create of preview.creates) {
+      await store.put(create.entry);
     }
-    const archived: KnowledgeEntry = {
-      ...existing,
-      status: 'archived',
-      updated_at: nowIso,
-    };
-    await store.put(archived);
-  }
+    for (const archive of preview.archives) {
+      const existing = await store.get(archive.id);
+      if (existing === undefined) {
+        throw appError('INVALID_KNOWLEDGE', 'Archive target is missing from Context knowledge', {
+          id: archive.id,
+        });
+      }
+      const archived: KnowledgeEntry = {
+        ...existing,
+        status: 'archived',
+        updated_at: nowIso,
+      };
+      await store.put(archived);
+    }
 
-  // Final graph validation via list() after all mutations.
-  await store.list();
+    // Final graph validation via list() after all mutations.
+    await store.list();
+  } catch (error) {
+    await discardKnowledgeWorkingTree(contextPath);
+    mapKnowledgeWriteError(error);
+  }
 
   return commitAndPushKnowledge(
     contextPath,
