@@ -202,4 +202,23 @@ describe('apply preview and atomic apply', () => {
     expect(await fs.readFile(existingAgents, 'utf8')).toBe(beforeAgents);
     expect(await businessGitLog()).toEqual(beforeLog);
   });
+
+  it('rejects apply when a business repository HEAD changes after preview', async () => {
+    const preview = await previewApply({
+      workspaceId,
+      agents: ['claude-code', 'codex'],
+      home,
+    });
+    expect(preview.drift_candidates).toEqual([]);
+    await expect(fs.access(existingAgents)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.access(existingClaude)).rejects.toMatchObject({ code: 'ENOENT' });
+
+    await fixtureGit(repository, ['commit', '--allow-empty', '-m', 'business head moved']);
+
+    await expect(applyRendered(preview.preview_id, home)).rejects.toMatchObject({
+      code: 'STALE_PREVIEW',
+    });
+    await expect(fs.access(existingAgents)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.access(existingClaude)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });

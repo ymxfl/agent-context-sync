@@ -30472,6 +30472,7 @@ async function prepareCapture(input) {
   if (workspace.workspace_id !== input.workspaceId) {
     throw new Error("Workspace manifest does not match the requested workspace");
   }
+  await preflightContextRemote(contextPath);
   const contextHead = await localHead(contextPath);
   const repositoryReports = await inspect({
     workspaceId: input.workspaceId,

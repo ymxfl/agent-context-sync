@@ -94,6 +94,7 @@ function knowledge(overrides: Partial<KnowledgeEntry> = {}): KnowledgeEntry {
 describe('capture prepare and preview', () => {
   let root: string;
   let daemon: ChildProcess;
+  let remote: string;
   let home: string;
   let agentHome: string;
   let repository: string;
@@ -104,6 +105,7 @@ describe('capture prepare and preview', () => {
     root = await fs.mkdtemp(path.join(tmpdir(), 'acs-capture-preview-'));
     const started = await startGitDaemon(root);
     daemon = started.process;
+    remote = started.remote;
     home = path.join(root, 'acs-home');
     agentHome = path.join(root, 'agent-home');
     repository = path.join(root, 'business', 'api');
@@ -312,5 +314,33 @@ describe('capture prepare and preview', () => {
     const afterHead = await fixtureGit(contextPath, ['rev-parse', 'HEAD']);
     expect(await fixtureGit(contextPath, ['status', '--porcelain=v1'])).toBe('');
     expect(afterHead).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('fast-forwards a behind Context checkout before binding packet.context_head', async () => {
+    await fixtureGit(contextPath, ['push', 'origin', 'main']);
+    const behindHead = await fixtureGit(contextPath, ['rev-parse', 'HEAD']);
+
+    const rival = path.join(root, 'rival-context');
+    await fixtureGit(root, ['clone', remote, rival]);
+    await fixtureGit(rival, ['config', 'user.name', 'Rival']);
+    await fixtureGit(rival, ['config', 'user.email', 'rival@example.invalid']);
+    await fs.writeFile(path.join(rival, 'README.md'), 'remote advance for prepare\n');
+    await fixtureGit(rival, ['add', 'README.md']);
+    await fixtureGit(rival, ['commit', '-m', 'Remote Context advance']);
+    await fixtureGit(rival, ['push', 'origin', 'main']);
+    const remoteHead = await fixtureGit(rival, ['rev-parse', 'HEAD']);
+    expect(remoteHead).not.toBe(behindHead);
+    expect(await fixtureGit(contextPath, ['rev-parse', 'HEAD'])).toBe(behindHead);
+
+    const packet = await prepareCapture({
+      workspaceId,
+      agent: 'codex',
+      home,
+      homeDir: agentHome,
+    });
+
+    const localHeadAfter = await fixtureGit(contextPath, ['rev-parse', 'HEAD']);
+    expect(localHeadAfter).toBe(remoteHead);
+    expect(packet.context_head).toBe(remoteHead);
   });
 });

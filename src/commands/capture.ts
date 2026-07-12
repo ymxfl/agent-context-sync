@@ -223,6 +223,7 @@ export async function prepareCapture(input: CaptureInput): Promise<ExtractionPac
     throw new Error('Workspace manifest does not match the requested workspace');
   }
 
+  await preflightContextRemote(contextPath);
   const contextHead = await localHead(contextPath);
   const repositoryReports = await inspect({
     workspaceId: input.workspaceId,
