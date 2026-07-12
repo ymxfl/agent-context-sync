@@ -26370,9 +26370,6 @@ ${entry.statement}
 ${entry.reason}`).join("\n\n");
   return digestBytes(encodeLf(payload));
 }
-function looksAbsoluteLocator(locator) {
-  return locator.startsWith("/") || /^[A-Za-z]:[\\/]/.test(locator) || locator.startsWith("\\\\") || /^file:/i.test(locator);
-}
 function stableScopeId(paths) {
   const key = [...paths].sort(compareCodeUnits).join("\n");
   const digest = createHash4("sha256").update(key).digest("hex").slice(0, 16);
@@ -26380,6 +26377,9 @@ function stableScopeId(paths) {
 }
 function pathGroupKey(paths) {
   return [...paths].sort(compareCodeUnits).join("\n");
+}
+function looksAbsoluteLocator(locator) {
+  return locator.startsWith("/") || /^[A-Za-z]:[\\/]/.test(locator) || locator.startsWith("\\\\") || /^file:/i.test(locator);
 }
 function directoryForPathGlobs(paths) {
   const primary = [...paths].sort(compareCodeUnits)[0] ?? "";

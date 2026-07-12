@@ -35,6 +35,14 @@ export function pathGroupKey(paths: readonly string[]): string {
   return [...paths].sort(compareCodeUnits).join('\n');
 }
 
+/** Detect absolute / UNC / file-URL locators that must not become nested paths. */
+export function looksAbsoluteLocator(locator: string): boolean {
+  return locator.startsWith('/')
+    || /^[A-Za-z]:[\\/]/.test(locator)
+    || locator.startsWith('\\\\')
+    || /^file:/i.test(locator);
+}
+
 /**
  * Derive a nested directory from path globs (e.g. `src/auth/**` → `src/auth`).
  * Falls back to `.agents/<stable-scope-id>` when the pattern is not directory-like.
@@ -53,8 +61,7 @@ export function directoryForPathGlobs(paths: readonly string[]): string {
     || candidate.includes('*')
     || candidate.includes('?')
     || candidate.includes('[')
-    || candidate.startsWith('/')
-    || /^[A-Za-z]:[\\/]/.test(candidate)
+    || looksAbsoluteLocator(candidate)
   ) {
     return `.agents/${stableScopeId(paths)}`;
   }
