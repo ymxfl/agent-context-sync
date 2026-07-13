@@ -9,6 +9,7 @@ import { sanitizedAppErrorDetails } from './domain/errors.js';
 import { addRepository, applyAddRepository } from './commands/add-repo.js';
 import { applyRendered, previewApply } from './commands/apply.js';
 import { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
+import { prepareCheck, previewCheck, applyCheck } from './commands/check.js';
 import { doctor } from './commands/doctor.js';
 import { applyInit, initWorkspace } from './commands/init.js';
 import { inspect } from './commands/inspect.js';
@@ -18,6 +19,7 @@ import { syncPrepare } from './commands/sync.js';
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
 export { applyRendered, previewApply } from './commands/apply.js';
 export { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
+export { prepareCheck, previewCheck, applyCheck } from './commands/check.js';
 export { doctor } from './commands/doctor.js';
 export { applyInit, initWorkspace } from './commands/init.js';
 export { inspect } from './commands/inspect.js';
@@ -154,11 +156,46 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
   if (command === 'help') {
     if (argv.length > 0) throw new Error('help accepts no arguments');
     return {
-      commands: ['init', 'join', 'add-repo', 'inspect', 'doctor', 'capture', 'apply', 'sync'],
+      commands: ['init', 'join', 'add-repo', 'inspect', 'doctor', 'capture', 'check', 'apply', 'sync'],
     };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
+  if (command === 'check') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {
+      throw new Error('check requires exactly one phase: prepare, preview, or apply');
+    }
+    if (phase === 'apply') {
+      assertOptions(args, ['preview-id']);
+      return { result: await applyCheck(one(args, 'preview-id'), home) };
+    }
+    if (phase === 'prepare') {
+      assertOptions(args, ['workspace', 'repository', 'knowledge-id', 'scope']);
+      const repositories = many(args, 'repository');
+      const knowledgeIds = many(args, 'knowledge-id');
+      const scopeValue = args.options.has('scope') ? one(args, 'scope') : undefined;
+      if (
+        scopeValue !== undefined
+        && scopeValue !== 'workspace'
+        && !scopeValue.startsWith('repository:')
+      ) {
+        throw new Error('Option --scope must be workspace or repository:<repo_id>');
+      }
+      return { packets: await prepareCheck({
+        workspaceId: one(args, 'workspace'),
+        home,
+        ...(repositories.length === 0 ? {} : { repositories }),
+        ...(knowledgeIds.length === 0 ? {} : { knowledgeIds }),
+        ...(scopeValue === undefined ? {} : { scope: scopeValue as 'workspace' | `repository:${string}` }),
+      }) };
+    }
+    assertOptions(args, ['packet-id', 'proposal']);
+    const packetIds = many(args, 'packet-id');
+    if (packetIds.length === 0) throw new Error('Option --packet-id is required');
+    const proposal = await readProposalArgument(one(args, 'proposal'));
+    return { preview: await previewCheck(packetIds, proposal, { home }) };
+  }
   if (command === 'capture' || command === 'sync') {
     const phase = args.positionals[0];
     if (command === 'sync') {
