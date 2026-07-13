@@ -1,10 +1,9 @@
 /**
  * Full MVP acceptance scenario.
  *
- * Scale note: the original plan targeted 10 workspace repositories / 5 member-B
- * bindings. This suite uses 6 / 3 to keep CI under timeout while still covering
- * the hard gates: bidirectional Claude↔Codex sync, check stale mutation,
- * reconcile divergence, and businessCommitsCreatedByTool === 0.
+ * Targets the planned ten-repository Workspace with five member-B bindings,
+ * covering bidirectional Claude↔Codex sync, check stale mutation, reconcile
+ * divergence, and businessCommitsCreatedByTool === 0.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -18,10 +17,10 @@ import { expect, it, vi } from 'vitest';
 import { createBareRemote, fixtureGit, initFixtureRepository } from '../helpers/git.js';
 import { invoke } from '../helpers/invoke.js';
 
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
-const WORKSPACE_REPOS = 6;
-const MEMBER_B_REPOS = 3;
+const WORKSPACE_REPOS = 10;
+const MEMBER_B_REPOS = 5;
 
 const verificationFixture = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

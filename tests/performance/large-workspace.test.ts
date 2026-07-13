@@ -11,9 +11,9 @@ import { doctor } from '../../src/commands/doctor.js';
 import { applyInit, initWorkspace } from '../../src/commands/init.js';
 import { createBareRemote, fixtureGit, initFixtureRepository } from '../helpers/git.js';
 
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
-const REPO_COUNT = 6;
+const REPO_COUNT = 10;
 
 async function availablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
