@@ -7,9 +7,12 @@ import { promisify } from 'node:util';
 import { compareCodeUnits } from '../domain/compare.js';
 import { createId } from '../domain/ids.js';
 import type { KnowledgeEntry } from '../domain/model.js';
+import { ContentCache } from '../performance/cache.js';
 import { redactCandidate } from '../security/redact.js';
 import { parsePackageDependencies, type DependencyRecord } from './dependencies.js';
 import { collectGitEvidence, type GitCommitRecord } from './git-evidence.js';
+import { runGit } from '../git/run-git.js';
+import { serializeKnowledge } from '../knowledge/markdown.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -50,6 +53,8 @@ export interface EvidenceInput {
   readonly limits: EvidenceLimits;
   /** Optional absolute path to rg for tests or non-PATH installs. */
   readonly rgPath?: string;
+  /** Optional content cache for evidence packets keyed by knowledge hash + HEAD. */
+  readonly cache?: ContentCache;
 }
 
 export interface SearchHit {
@@ -353,6 +358,38 @@ async function readBoundedFile(
  * Timeouts and truncations are reported on the packet; they are not thrown as bare Errors.
  */
 export async function collectEvidence(input: EvidenceInput): Promise<VerificationPacket> {
+  let repositoryHead: string | undefined;
+  if (input.cache !== undefined) {
+    try {
+      const { stdout } = await runGit(input.repositoryPath, ['rev-parse', 'HEAD']);
+      repositoryHead = stdout.trim();
+      const knowledgeHash = digest(serializeKnowledge(input.entry));
+      const key = ContentCache.evidenceKey(knowledgeHash, repositoryHead);
+      await input.cache.invalidateByHead(input.repoId, repositoryHead);
+      const cached = await input.cache.get<VerificationPacket>(key);
+      if (cached !== undefined) return cached;
+    } catch {
+      // Cache misses and HEAD lookup failures fall through to live collection.
+      repositoryHead = undefined;
+    }
+  }
+
+  const packet = await collectEvidenceUncached(input);
+
+  if (input.cache !== undefined && repositoryHead !== undefined) {
+    const knowledgeHash = digest(serializeKnowledge(input.entry));
+    const key = ContentCache.evidenceKey(knowledgeHash, repositoryHead);
+    await input.cache.put(key, packet, {
+      repositoryId: input.repoId,
+      head: repositoryHead,
+      kind: 'evidence',
+    });
+  }
+
+  return packet;
+}
+
+async function collectEvidenceUncached(input: EvidenceInput): Promise<VerificationPacket> {
   const started = Date.now();
   const limits = input.limits;
   let timedOut = false;

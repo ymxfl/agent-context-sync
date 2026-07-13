@@ -115,17 +115,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path29) {
-      const ctrl = callVisitor(key, node, visitor, path29);
+    function visit_(key, node, visitor, path30) {
+      const ctrl = callVisitor(key, node, visitor, path30);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path29, ctrl);
-        return visit_(key, ctrl, visitor, path29);
+        replaceNode(key, path30, ctrl);
+        return visit_(key, ctrl, visitor, path30);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path29 = Object.freeze(path29.concat(node));
+          path30 = Object.freeze(path30.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path29);
+            const ci = visit_(i, node.items[i], visitor, path30);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -136,13 +136,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path29 = Object.freeze(path29.concat(node));
-          const ck = visit_("key", node.key, visitor, path29);
+          path30 = Object.freeze(path30.concat(node));
+          const ck = visit_("key", node.key, visitor, path30);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path29);
+          const cv = visit_("value", node.value, visitor, path30);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -163,17 +163,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path29) {
-      const ctrl = await callVisitor(key, node, visitor, path29);
+    async function visitAsync_(key, node, visitor, path30) {
+      const ctrl = await callVisitor(key, node, visitor, path30);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path29, ctrl);
-        return visitAsync_(key, ctrl, visitor, path29);
+        replaceNode(key, path30, ctrl);
+        return visitAsync_(key, ctrl, visitor, path30);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path29 = Object.freeze(path29.concat(node));
+          path30 = Object.freeze(path30.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path29);
+            const ci = await visitAsync_(i, node.items[i], visitor, path30);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -184,13 +184,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path29 = Object.freeze(path29.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path29);
+          path30 = Object.freeze(path30.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path30);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path29);
+          const cv = await visitAsync_("value", node.value, visitor, path30);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -217,23 +217,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path29) {
+    function callVisitor(key, node, visitor, path30) {
       if (typeof visitor === "function")
-        return visitor(key, node, path29);
+        return visitor(key, node, path30);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path29);
+        return visitor.Map?.(key, node, path30);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path29);
+        return visitor.Seq?.(key, node, path30);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path29);
+        return visitor.Pair?.(key, node, path30);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path29);
+        return visitor.Scalar?.(key, node, path30);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path29);
+        return visitor.Alias?.(key, node, path30);
       return void 0;
     }
-    function replaceNode(key, path29, node) {
-      const parent = path29[path29.length - 1];
+    function replaceNode(key, path30, node) {
+      const parent = path30[path30.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -843,10 +843,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path29, value) {
+    function collectionFromPath(schema, path30, value) {
       let v = value;
-      for (let i = path29.length - 1; i >= 0; --i) {
-        const k = path29[i];
+      for (let i = path30.length - 1; i >= 0; --i) {
+        const k = path30[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -865,7 +865,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path29) => path29 == null || typeof path29 === "object" && !!path29[Symbol.iterator]().next().done;
+    var isEmptyPath = (path30) => path30 == null || typeof path30 === "object" && !!path30[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -895,11 +895,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path29, value) {
-        if (isEmptyPath(path29))
+      addIn(path30, value) {
+        if (isEmptyPath(path30))
           this.add(value);
         else {
-          const [key, ...rest] = path29;
+          const [key, ...rest] = path30;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -913,8 +913,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path29) {
-        const [key, ...rest] = path29;
+      deleteIn(path30) {
+        const [key, ...rest] = path30;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -928,8 +928,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path29, keepScalar) {
-        const [key, ...rest] = path29;
+      getIn(path30, keepScalar) {
+        const [key, ...rest] = path30;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -947,8 +947,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path29) {
-        const [key, ...rest] = path29;
+      hasIn(path30) {
+        const [key, ...rest] = path30;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -958,8 +958,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path29, value) {
-        const [key, ...rest] = path29;
+      setIn(path30, value) {
+        const [key, ...rest] = path30;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3474,9 +3474,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path29, value) {
+      addIn(path30, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path29, value);
+          this.contents.addIn(path30, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3551,14 +3551,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path29) {
-        if (Collection.isEmptyPath(path29)) {
+      deleteIn(path30) {
+        if (Collection.isEmptyPath(path30)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path29) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path30) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3573,10 +3573,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path29, keepScalar) {
-        if (Collection.isEmptyPath(path29))
+      getIn(path30, keepScalar) {
+        if (Collection.isEmptyPath(path30))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path29, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path30, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3587,10 +3587,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path29) {
-        if (Collection.isEmptyPath(path29))
+      hasIn(path30) {
+        if (Collection.isEmptyPath(path30))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path29) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path30) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3607,13 +3607,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path29, value) {
-        if (Collection.isEmptyPath(path29)) {
+      setIn(path30, value) {
+        if (Collection.isEmptyPath(path30)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path29), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path30), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path29, value);
+          this.contents.setIn(path30, value);
         }
       }
       /**
@@ -5573,9 +5573,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path29) => {
+    visit.itemAtPath = (cst, path30) => {
       let item = cst;
-      for (const [field, index] of path29) {
+      for (const [field, index] of path30) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5584,23 +5584,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path29) => {
-      const parent = visit.itemAtPath(cst, path29.slice(0, -1));
-      const field = path29[path29.length - 1][0];
+    visit.parentCollection = (cst, path30) => {
+      const parent = visit.itemAtPath(cst, path30.slice(0, -1));
+      const field = path30[path30.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path29, item, visitor) {
-      let ctrl = visitor(item, path29);
+    function _visit(path30, item, visitor) {
+      let ctrl = visitor(item, path30);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path29.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path30.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5611,10 +5611,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path29);
+            ctrl = ctrl(item, path30);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path29) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path30) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6916,14 +6916,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs26 = this.flowScalar(this.type);
+              const fs27 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map2.items.push({ start, key: fs26, sep: [] });
+                map2.items.push({ start, key: fs27, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs26);
+                this.stack.push(fs27);
               } else {
-                Object.assign(it, { key: fs26, sep: [] });
+                Object.assign(it, { key: fs27, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7051,13 +7051,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs26 = this.flowScalar(this.type);
+              const fs27 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs26, sep: [] });
+                fc.items.push({ start: [], key: fs27, sep: [] });
               else if (it.sep)
-                this.stack.push(fs26);
+                this.stack.push(fs27);
               else
-                Object.assign(it, { key: fs26, sep: [] });
+                Object.assign(it, { key: fs27, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7373,9 +7373,9 @@ __export(macos_fs_usage_exports, {
 });
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import * as fs23 from "node:fs/promises";
+import * as fs24 from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import path26 from "node:path";
+import path27 from "node:path";
 function parseFsUsage(text) {
   const events = [];
   for (const rawLine of text.split(/\r?\n/)) {
@@ -7427,7 +7427,7 @@ var init_macos_fs_usage = __esm({
           return false;
         }
         try {
-          await fs23.access("/usr/bin/fs_usage");
+          await fs24.access("/usr/bin/fs_usage");
         } catch {
           this.reason = "fs_usage is unavailable: /usr/bin/fs_usage is not installed.";
           return false;
@@ -7442,7 +7442,7 @@ var init_macos_fs_usage = __esm({
         if (!await this.isAvailable()) {
           throw new Error(this.reason);
         }
-        this.outputPath = path26.join(
+        this.outputPath = path27.join(
           tmpdir2(),
           `acs-fs-usage-${process.pid}-${Date.now()}.log`
         );
@@ -7504,8 +7504,8 @@ var init_macos_fs_usage = __esm({
             resolve3();
           }, 1e3);
         });
-        const text = await fs23.readFile(this.outputPath, "utf8").catch(() => "");
-        await fs23.rm(this.outputPath, { force: true }).catch(() => void 0);
+        const text = await fs24.readFile(this.outputPath, "utf8").catch(() => "");
+        await fs24.rm(this.outputPath, { force: true }).catch(() => void 0);
         this.outputPath = void 0;
         return capTraceEvents(parseFsUsage(text));
       }
@@ -7520,9 +7520,9 @@ __export(linux_strace_exports, {
   parseStrace: () => parseStrace
 });
 import { spawn as spawn2 } from "node:child_process";
-import * as fs24 from "node:fs/promises";
+import * as fs25 from "node:fs/promises";
 import { tmpdir as tmpdir3 } from "node:os";
-import path27 from "node:path";
+import path28 from "node:path";
 function parseStrace(text) {
   const events = [];
   for (const rawLine of text.split(/\r?\n/)) {
@@ -7551,10 +7551,10 @@ function parseStrace(text) {
 }
 async function commandExists(binary) {
   const searchPath = process.env.PATH ?? "";
-  for (const dir of searchPath.split(path27.delimiter)) {
+  for (const dir of searchPath.split(path28.delimiter)) {
     if (dir.length === 0) continue;
     try {
-      await fs24.access(path27.join(dir, binary));
+      await fs25.access(path28.join(dir, binary));
       return true;
     } catch {
     }
@@ -7563,7 +7563,7 @@ async function commandExists(binary) {
 }
 async function ptraceAllowed() {
   try {
-    const scope = (await fs24.readFile("/proc/sys/kernel/yama/ptrace_scope", "utf8")).trim();
+    const scope = (await fs25.readFile("/proc/sys/kernel/yama/ptrace_scope", "utf8")).trim();
     if (scope === "0" || scope === "1") {
       return { ok: true, detail: `ptrace_scope=${scope}` };
     }
@@ -7616,7 +7616,7 @@ var init_linux_strace = __esm({
         if (!await this.isAvailable()) {
           throw new Error(this.reason);
         }
-        this.outputPath = path27.join(
+        this.outputPath = path28.join(
           tmpdir3(),
           `acs-strace-${process.pid}-${Date.now()}.log`
         );
@@ -7669,8 +7669,8 @@ var init_linux_strace = __esm({
             });
           });
         }
-        const text = await fs24.readFile(outputPath, "utf8").catch(() => "");
-        await fs24.rm(outputPath, { force: true }).catch(() => void 0);
+        const text = await fs25.readFile(outputPath, "utf8").catch(() => "");
+        await fs25.rm(outputPath, { force: true }).catch(() => void 0);
         return capTraceEvents(parseStrace(text));
       }
     };
@@ -7721,9 +7721,9 @@ var init_provider = __esm({
 
 // src/main.ts
 import { homedir as homedir2 } from "node:os";
-import path28 from "node:path";
+import path29 from "node:path";
 import { pathToFileURL } from "node:url";
-import * as fs25 from "node:fs/promises";
+import * as fs26 from "node:fs/promises";
 
 // src/domain/compare.ts
 function compareCodeUnits(left, right) {
@@ -8550,10 +8550,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path29) {
-  if (!path29)
+function getElementAtPath(obj, path30) {
+  if (!path30)
     return obj;
-  return path29.reduce((acc, key) => acc?.[key], obj);
+  return path30.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8962,11 +8962,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path29, issues) {
+function prefixIssues(path30, issues) {
   return issues.map((iss) => {
     var _a4;
     (_a4 = iss).path ?? (_a4.path = []);
-    iss.path.unshift(path29);
+    iss.path.unshift(path30);
     return iss;
   });
 }
@@ -9113,16 +9113,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path29 = []) => {
+  const processError = (error52, path30 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path29, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path30, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path30, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path30, ...issue2.path]);
       } else {
-        const fullpath = [...path29, ...issue2.path];
+        const fullpath = [...path30, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -9149,17 +9149,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path29 = []) => {
+  const processError = (error52, path30 = []) => {
     var _a4, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path29, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path30, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path30, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path30, ...issue2.path]);
       } else {
-        const fullpath = [...path29, ...issue2.path];
+        const fullpath = [...path30, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -9191,8 +9191,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path29 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path29) {
+  const path30 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path30) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -21884,13 +21884,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path29 = ref.slice(1).split("/").filter(Boolean);
-  if (path29.length === 0) {
+  const path30 = ref.slice(1).split("/").filter(Boolean);
+  if (path30.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path29[0] === defsKey) {
-    const key = path29[1];
+  if (path30[0] === defsKey) {
+    const key = path30[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -23250,18 +23250,18 @@ async function ownerAt(lock) {
   }
 }
 async function recoverIfStale(lock, staleMs) {
-  let stat2;
+  let stat4;
   try {
-    stat2 = await fs4.lstat(lock);
+    stat4 = await fs4.lstat(lock);
   } catch (error51) {
     if (error51.code === "ENOENT") return true;
     throw error51;
   }
-  if (!stat2.isDirectory() || stat2.isSymbolicLink() || (stat2.mode & 511) !== 448) {
+  if (!stat4.isDirectory() || stat4.isSymbolicLink() || (stat4.mode & 511) !== 448) {
     throw appError("INVALID_WORKSPACE_LOCK", "Workspace lock directory is invalid");
   }
   const owner = await ownerAt(lock);
-  const createdAt = typeof owner?.created_at === "number" ? owner.created_at : stat2.mtimeMs;
+  const createdAt = typeof owner?.created_at === "number" ? owner.created_at : stat4.mtimeMs;
   if (Date.now() - createdAt <= staleMs || processIsLive(owner?.pid ?? 0)) return false;
   const recovered = `${lock}.stale-${randomUUID2()}`;
   try {
@@ -23583,8 +23583,8 @@ ${entry.reason}`).join("\n\n");
 }
 function stableScopeId(paths) {
   const key = [...paths].sort(compareCodeUnits).join("\n");
-  const digest5 = createHash3("sha256").update(key).digest("hex").slice(0, 16);
-  return `scope-${digest5}`;
+  const digest6 = createHash3("sha256").update(key).digest("hex").slice(0, 16);
+  return `scope-${digest6}`;
 }
 function pathGroupKey(paths) {
   return [...paths].sort(compareCodeUnits).join("\n");
@@ -24245,16 +24245,16 @@ var Diff = class {
       }
     }
   }
-  addToPath(path29, added, removed, oldPosInc, options) {
-    const last = path29.lastComponent;
+  addToPath(path30, added, removed, oldPosInc, options) {
+    const last = path30.lastComponent;
     if (last && !options.oneChangePerToken && last.added === added && last.removed === removed) {
       return {
-        oldPos: path29.oldPos + oldPosInc,
+        oldPos: path30.oldPos + oldPosInc,
         lastComponent: { count: last.count + 1, added, removed, previousComponent: last.previousComponent }
       };
     } else {
       return {
-        oldPos: path29.oldPos + oldPosInc,
+        oldPos: path30.oldPos + oldPosInc,
         lastComponent: { count: 1, added, removed, previousComponent: last }
       };
     }
@@ -24663,7 +24663,7 @@ var ROOT = "CLAUDE.md";
 var DEFAULT_MAX_ROOT_LINES = 200;
 function renderRuleFile(paths, entries, header) {
   const scopeId = stableScopeId(paths);
-  const yamlPaths = [...paths].sort(compareCodeUnits).map((path29) => `  - ${path29}`).join("\n");
+  const yamlPaths = [...paths].sort(compareCodeUnits).map((path30) => `  - ${path30}`).join("\n");
   const body = [
     "---",
     "paths:",
@@ -24721,7 +24721,7 @@ function renderClaude(input) {
   if (rulePaths2.length > 0) {
     pathNote = [
       "Path-scoped rules are loaded from `.claude/rules/` (complete projection; do not import AGENTS.md).",
-      ...rulePaths2.sort(compareCodeUnits).map((path29) => `- ${path29}`)
+      ...rulePaths2.sort(compareCodeUnits).map((path30) => `- ${path30}`)
     ].join("\n");
   }
   let rootBody = [
@@ -24821,7 +24821,7 @@ function renderCodex(input) {
   const rootEntries = compiled.sections.filter((section) => section.id !== "path").flatMap((section) => section.entries);
   const pathNote = [
     "Path-scoped guidance lives in nested AGENTS.md files nearest those paths.",
-    ...nestedPaths.sort(compareCodeUnits).map((path29) => `- ${path29}`)
+    ...nestedPaths.sort(compareCodeUnits).map((path30) => `- ${path30}`)
   ].join("\n");
   let root = toRenderedFile(
     ROOT2,
@@ -28285,17 +28285,13 @@ async function previewApply(input) {
 }
 
 // src/commands/capture.ts
-import { createHash as createHash10 } from "node:crypto";
-import * as fs13 from "node:fs/promises";
-import path17 from "node:path";
+import { createHash as createHash11 } from "node:crypto";
+import * as fs14 from "node:fs/promises";
+import path18 from "node:path";
 
 // src/commands/inspect.ts
-import * as fs11 from "node:fs/promises";
-import path15 from "node:path";
-
-// src/adapters/adapter.ts
-var ADAPTER_CONTRACT_VERSION = 1;
-var COVERAGE_CONTRACT_VERSION = 1;
+import * as fs12 from "node:fs/promises";
+import path16 from "node:path";
 
 // src/adapters/claude/discover.ts
 import {
@@ -28307,11 +28303,17 @@ import {
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep as sep2 } from "node:path";
 var import_yaml4 = __toESM(require_dist(), 1);
+
+// src/adapters/adapter.ts
+var ADAPTER_CONTRACT_VERSION = 1;
+var COVERAGE_CONTRACT_VERSION = 1;
+
+// src/adapters/claude/discover.ts
 var defaultFileSystem = {
-  readFile: (path29) => nodeReadFile(path29, "utf8"),
-  readdir: (path29, options) => nodeReaddir(path29, options),
-  realpath: (path29) => nodeRealpath(path29),
-  stat: (path29) => nodeStat(path29)
+  readFile: (path30) => nodeReadFile(path30, "utf8"),
+  readdir: (path30, options) => nodeReaddir(path30, options),
+  realpath: (path30) => nodeRealpath(path30),
+  stat: (path30) => nodeStat(path30)
 };
 var AGENT = "claude-code";
 function isInside(parent, child) {
@@ -28324,23 +28326,23 @@ function uniqueSorted(values) {
 function coverage(id, status, detail, locator) {
   return { id, status, detail, ...locator === void 0 ? {} : { locator } };
 }
-async function readableFile(fs26, path29) {
+async function readableFile(fs27, path30) {
   try {
-    if (!(await fs26.stat(path29)).isFile()) return "missing";
-    await fs26.readFile(path29);
+    if (!(await fs27.stat(path30)).isFile()) return "missing";
+    await fs27.readFile(path30);
     return "file";
   } catch (error51) {
     return error51.code === "ENOENT" ? "missing" : "inaccessible";
   }
 }
-async function walkMarkdown(fs26, root) {
+async function walkMarkdown(fs27, root) {
   const files = [];
   const inaccessible = [];
   const escapes = [];
   const visited = /* @__PURE__ */ new Set();
   let canonicalRoot;
   try {
-    canonicalRoot = await fs26.realpath(root);
+    canonicalRoot = await fs27.realpath(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
     return { files, inaccessible, escapes };
@@ -28348,7 +28350,7 @@ async function walkMarkdown(fs26, root) {
   async function visit(directory) {
     let canonical;
     try {
-      canonical = await fs26.realpath(directory);
+      canonical = await fs27.realpath(directory);
     } catch {
       inaccessible.push(directory);
       return;
@@ -28361,7 +28363,7 @@ async function walkMarkdown(fs26, root) {
     visited.add(canonical);
     let entries;
     try {
-      entries = await fs26.readdir(directory, { withFileTypes: true });
+      entries = await fs27.readdir(directory, { withFileTypes: true });
     } catch {
       inaccessible.push(directory);
       return;
@@ -28369,32 +28371,32 @@ async function walkMarkdown(fs26, root) {
     entries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of entries) {
       if (entry.name === ".git" || entry.name === "node_modules") continue;
-      const path29 = join(directory, entry.name);
+      const path30 = join(directory, entry.name);
       if (entry.isDirectory() || entry.isSymbolicLink()) {
         let target;
         try {
-          target = await fs26.stat(path29);
+          target = await fs27.stat(path30);
         } catch {
-          inaccessible.push(path29);
+          inaccessible.push(path30);
           continue;
         }
-        if (target.isDirectory()) await visit(path29);
+        if (target.isDirectory()) await visit(path30);
         else if (target.isFile() && entry.name.endsWith(".md")) {
           try {
-            const canonicalFile = await fs26.realpath(path29);
-            if (isInside(canonicalRoot, canonicalFile)) files.push(path29);
-            else escapes.push(path29);
+            const canonicalFile = await fs27.realpath(path30);
+            if (isInside(canonicalRoot, canonicalFile)) files.push(path30);
+            else escapes.push(path30);
           } catch {
-            inaccessible.push(path29);
+            inaccessible.push(path30);
           }
         }
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        files.push(path29);
+        files.push(path30);
       }
     }
   }
   try {
-    if ((await fs26.stat(root)).isDirectory()) await visit(root);
+    if ((await fs27.stat(root)).isDirectory()) await visit(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
   }
@@ -28464,8 +28466,8 @@ function importedPaths(markdown) {
   }
   return imports;
 }
-function resolveTilde(path29, homeDir) {
-  return path29 === "~" ? homeDir : path29.startsWith(`~${sep2}`) || path29.startsWith("~/") ? join(homeDir, path29.slice(2)) : path29;
+function resolveTilde(path30, homeDir) {
+  return path30 === "~" ? homeDir : path30.startsWith(`~${sep2}`) || path30.startsWith("~/") ? join(homeDir, path30.slice(2)) : path30;
 }
 function rulePaths(markdown) {
   const match2 = markdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -28489,8 +28491,8 @@ var ClaudeAdapter = class {
     supported: true
   };
   fs;
-  constructor(fs26 = {}) {
-    this.fs = { ...defaultFileSystem, ...fs26 };
+  constructor(fs27 = {}) {
+    this.fs = { ...defaultFileSystem, ...fs27 };
   }
   render(input) {
     return renderClaude(input);
@@ -28529,10 +28531,10 @@ var ClaudeAdapter = class {
         repositoryRoot
       ));
     }
-    const safeShareability = async (path29, intended) => {
+    const safeShareability = async (path30, intended) => {
       if (intended !== "team") return intended;
       try {
-        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path29)) ? "team" : "personal";
+        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path30)) ? "team" : "personal";
       } catch {
         return "personal";
       }
@@ -28574,14 +28576,14 @@ var ClaudeAdapter = class {
     const excludes = uniqueSorted(parsedLayers.flatMap(
       ({ settings }) => Array.isArray(settings.claudeMdExcludes) ? settings.claudeMdExcludes.filter((item) => typeof item === "string") : []
     ));
-    const isExcluded = (path29) => excludes.some(
-      (pattern) => minimatch(path29, resolveTilde(pattern, homeDir), { dot: true })
+    const isExcluded = (path30) => excludes.some(
+      (pattern) => minimatch(path30, resolveTilde(pattern, homeDir), { dot: true })
     );
-    for (const path29 of uniqueSorted(input.managedInstructionPaths ?? [])) {
-      const status = await readableFile(this.fs, path29);
+    for (const path30 of uniqueSorted(input.managedInstructionPaths ?? [])) {
+      const status = await readableFile(this.fs, path30);
       if (status === "file") {
         foundInstructions.push({
-          locator: path29,
+          locator: path30,
           sourceType: "managed-instructions",
           shareability: "managed",
           loading: "reported-only"
@@ -28591,7 +28593,7 @@ var ClaudeAdapter = class {
           "claude-managed-inaccessible",
           status === "inaccessible" ? "inaccessible" : "unknown",
           status === "inaccessible" ? "Managed instructions are unreadable." : "Managed instructions do not exist.",
-          path29
+          path30
         ));
       }
     }
@@ -28656,33 +28658,33 @@ var ClaudeAdapter = class {
       }
     }
     const descendants = await walkMarkdown(this.fs, repositoryRoot);
-    for (const path29 of descendants.files) {
-      const name = path29.slice(path29.lastIndexOf(sep2) + 1);
+    for (const path30 of descendants.files) {
+      const name = path30.slice(path30.lastIndexOf(sep2) + 1);
       if (name !== "CLAUDE.md" && name !== "CLAUDE.local.md") continue;
-      if (path29.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path29) || path29 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
-      if (isExcluded(path29)) {
-        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path29));
+      if (path30.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path30) || path30 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
+      if (isExcluded(path30)) {
+        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path30));
         continue;
       }
-      const descendantStatus = await readableFile(this.fs, path29);
+      const descendantStatus = await readableFile(this.fs, path30);
       if (descendantStatus !== "file") {
-        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path29));
+        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path30));
         continue;
       }
       foundInstructions.push({
-        locator: path29,
+        locator: path30,
         sourceType: name === "CLAUDE.local.md" ? "local-instructions" : "project-instructions",
         shareability: name === "CLAUDE.local.md" ? "personal" : "team",
         loading: "on-demand"
       });
     }
-    for (const path29 of descendants.inaccessible) {
-      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path29));
+    for (const path30 of descendants.inaccessible) {
+      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path30));
     }
-    for (const path29 of descendants.escapes) {
-      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path29));
+    for (const path30 of descendants.escapes) {
+      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path30));
     }
-    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path29) => resolve(path29)));
+    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path30) => resolve(path30)));
     if (additionalDirectories.length > 0 && !input.includeAdditionalDirectoryInstructions) {
       coverageItems.push(coverage(
         "claude-additional-directories-disabled",
@@ -28728,46 +28730,46 @@ var ClaudeAdapter = class {
     ];
     for (const ruleRoot of ruleRoots) {
       const walked = await walkMarkdown(this.fs, ruleRoot.path);
-      for (const path29 of walked.files) {
-        if (isExcluded(path29)) {
-          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path29));
+      for (const path30 of walked.files) {
+        if (isExcluded(path30)) {
+          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path30));
           continue;
         }
         let paths;
         try {
-          paths = rulePaths(await this.fs.readFile(path29));
+          paths = rulePaths(await this.fs.readFile(path30));
         } catch {
-          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path29));
+          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path30));
           continue;
         }
         sources.push({
           agent: AGENT,
           sourceType: ruleRoot.sourceType,
-          locator: path29,
-          shareability: await safeShareability(path29, ruleRoot.shareability),
+          locator: path30,
+          shareability: await safeShareability(path30, ruleRoot.shareability),
           status: "available",
           ...paths === void 0 ? {} : { pathScope: paths }
         });
       }
-      for (const path29 of walked.inaccessible) {
-        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path29));
+      for (const path30 of walked.inaccessible) {
+        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path30));
       }
-      for (const path29 of walked.escapes) {
-        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path29));
+      for (const path30 of walked.escapes) {
+        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path30));
       }
     }
     const instructionSourcePaths = foundInstructions.filter((item) => item.loading !== "reported-only").map((item) => item.locator);
     const importSources = /* @__PURE__ */ new Map();
-    const visitImports = async (path29, depth, ancestors, inheritedShareability) => {
+    const visitImports = async (path30, depth, ancestors, inheritedShareability) => {
       let canonicalPath;
       try {
-        canonicalPath = await this.fs.realpath(path29);
+        canonicalPath = await this.fs.realpath(path30);
       } catch (error51) {
         coverageItems.push(coverage(
           "claude-import-inaccessible",
           error51.code === "ENOENT" ? "unknown" : "inaccessible",
           "Import source could not be canonicalized.",
-          path29
+          path30
         ));
         return;
       }
@@ -28779,7 +28781,7 @@ var ClaudeAdapter = class {
         return;
       }
       for (const imported of importedPaths(text)) {
-        const candidate = resolve(dirname(path29), resolveTilde(imported, homeDir));
+        const candidate = resolve(dirname(path30), resolveTilde(imported, homeDir));
         if (depth >= 4) {
           coverageItems.push(coverage("claude-import-depth", "partial", "Import exceeds the maximum depth of four hops.", candidate));
           continue;
@@ -29617,9 +29619,9 @@ var AGENT2 = "codex";
 var DEFAULT_MAX_BYTES2 = 32 * 1024;
 var DEFAULT_FALLBACK_FILENAMES = [];
 var defaultFileSystem2 = {
-  readFile: (path29) => nodeReadFile2(path29, "utf8"),
-  readdir: (path29, options) => nodeReaddir2(path29, options),
-  realpath: (path29) => nodeRealpath2(path29)
+  readFile: (path30) => nodeReadFile2(path30, "utf8"),
+  readdir: (path30, options) => nodeReaddir2(path30, options),
+  realpath: (path30) => nodeRealpath2(path30)
 };
 function isInside2(parent, child) {
   const pathFromParent = relative2(parent, child);
@@ -29671,8 +29673,8 @@ var CodexAdapter = class {
   fs;
   env;
   constructor(options = {}) {
-    const { env, ...fs26 } = options;
-    this.fs = { ...defaultFileSystem2, ...fs26 };
+    const { env, ...fs27 } = options;
+    this.fs = { ...defaultFileSystem2, ...fs27 };
     this.env = env ?? process.env;
   }
   render(input) {
@@ -30037,10 +30039,367 @@ function assessAdapterContracts(contracts) {
   };
 }
 
+// src/performance/cache.ts
+import { createHash as createHash7 } from "node:crypto";
+import * as fs11 from "node:fs/promises";
+import path15 from "node:path";
+var DEFAULT_MAX_ENTRIES = 256;
+var DEFAULT_MAX_BYTES3 = 32 * 1024 * 1024;
+function digest(contents) {
+  return createHash7("sha256").update(contents).digest("hex");
+}
+function checksumFor(record2) {
+  return `sha256:${digest(JSON.stringify({
+    schema_version: record2.schema_version,
+    key: record2.key,
+    repository_id: record2.repository_id,
+    head: record2.head,
+    kind: record2.kind,
+    created_at: record2.created_at,
+    value: record2.value
+  }))}`;
+}
+function isStoredRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const record2 = value;
+  return record2.schema_version === 1 && typeof record2.key === "string" && typeof record2.repository_id === "string" && typeof record2.head === "string" && (record2.kind === "discovery" || record2.kind === "evidence") && typeof record2.created_at === "string" && typeof record2.checksum === "string" && "value" in record2;
+}
+function cacheDirectory(home) {
+  return path15.resolve(home, "cache");
+}
+function entryPath(home, key) {
+  return path15.join(cacheDirectory(home), `${digest(key)}.json`);
+}
+var ContentCache = class {
+  home;
+  maxEntries;
+  maxBytes;
+  constructor(options) {
+    this.home = path15.resolve(options.home);
+    this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+    this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES3;
+  }
+  /** Build a discovery cache key from Adapter/config/HEAD/path/mtime fingerprint parts. */
+  static discoveryKey(parts) {
+    return [
+      "discovery",
+      parts.adapterVersion,
+      parts.configHash,
+      parts.repositoryId,
+      parts.head,
+      parts.targetPath,
+      parts.mtimeFingerprint
+    ].join("\0");
+  }
+  /** Build an evidence cache key from knowledge content hash and repository HEAD. */
+  static evidenceKey(knowledgeHash, head) {
+    return ["evidence", knowledgeHash, head].join("\0");
+  }
+  async get(key) {
+    const file2 = entryPath(this.home, key);
+    let raw;
+    try {
+      raw = await fs11.readFile(file2, "utf8");
+    } catch (error51) {
+      if (error51.code === "ENOENT") return void 0;
+      return void 0;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return void 0;
+    }
+    if (!isStoredRecord(parsed) || parsed.key !== key) return void 0;
+    if (parsed.checksum !== checksumFor(parsed)) return void 0;
+    return parsed.value;
+  }
+  async put(key, value, meta3) {
+    const directory = cacheDirectory(this.home);
+    await fs11.mkdir(this.home, { recursive: true, mode: 448 });
+    await fs11.mkdir(directory, { recursive: true, mode: 448 });
+    const created_at = (/* @__PURE__ */ new Date()).toISOString();
+    const withoutChecksum = {
+      schema_version: 1,
+      key,
+      repository_id: meta3.repositoryId,
+      head: meta3.head,
+      kind: meta3.kind,
+      created_at,
+      value
+    };
+    const record2 = {
+      ...withoutChecksum,
+      checksum: checksumFor(withoutChecksum)
+    };
+    await atomicWriteFile(entryPath(this.home, key), JSON.stringify(record2));
+    await this.enforceBounds();
+  }
+  /**
+   * Drop cache entries for a repository whose recorded HEAD differs from the supplied HEAD.
+   * Used when a repository advances so stale discovery/evidence cannot be reused.
+   */
+  async invalidateByHead(repositoryId, head) {
+    const directory = cacheDirectory(this.home);
+    let names;
+    try {
+      names = await fs11.readdir(directory);
+    } catch (error51) {
+      if (error51.code === "ENOENT") return;
+      throw error51;
+    }
+    await Promise.all(names.map(async (name) => {
+      if (!name.endsWith(".json")) return;
+      const file2 = path15.join(directory, name);
+      let raw;
+      try {
+        raw = await fs11.readFile(file2, "utf8");
+      } catch {
+        return;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (!isStoredRecord(parsed)) return;
+      if (parsed.repository_id === repositoryId && parsed.head !== head) {
+        try {
+          await fs11.unlink(file2);
+        } catch {
+        }
+      }
+    }));
+  }
+  async enforceBounds() {
+    const directory = cacheDirectory(this.home);
+    let names;
+    try {
+      names = await fs11.readdir(directory);
+    } catch (error51) {
+      if (error51.code === "ENOENT") return;
+      throw error51;
+    }
+    const files = (await Promise.all(names.map(async (name) => {
+      if (!name.endsWith(".json")) return void 0;
+      const file2 = path15.join(directory, name);
+      try {
+        const [stat4, raw] = await Promise.all([
+          fs11.stat(file2),
+          fs11.readFile(file2, "utf8")
+        ]);
+        let createdAt = stat4.mtimeMs;
+        try {
+          const parsed = JSON.parse(raw);
+          if (isStoredRecord(parsed)) {
+            const parsedTime = Date.parse(parsed.created_at);
+            if (Number.isFinite(parsedTime)) createdAt = parsedTime;
+          }
+        } catch {
+        }
+        return { file: file2, size: Buffer.byteLength(raw, "utf8"), createdAt };
+      } catch {
+        return void 0;
+      }
+    }))).filter((item) => item !== void 0);
+    files.sort((left, right) => left.createdAt - right.createdAt || compareCodeUnits(left.file, right.file));
+    let totalBytes = files.reduce((sum, item) => sum + item.size, 0);
+    while (files.length > this.maxEntries || files.length > 0 && totalBytes > this.maxBytes) {
+      const oldest = files.shift();
+      if (oldest === void 0) break;
+      totalBytes -= oldest.size;
+      try {
+        await fs11.unlink(oldest.file);
+      } catch {
+      }
+    }
+  }
+};
+async function assessCacheIntegrity(home) {
+  const directory = cacheDirectory(home);
+  let names;
+  try {
+    names = await fs11.readdir(directory);
+  } catch (error51) {
+    if (error51.code === "ENOENT") {
+      return {
+        status: "pass",
+        detail: "No local content cache directory is present.",
+        corruptPaths: []
+      };
+    }
+    return {
+      status: "warn",
+      detail: `The content cache directory could not be read. Remove ${directory} manually if corruption is suspected.`,
+      corruptPaths: []
+    };
+  }
+  const corruptPaths = [];
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const file2 = path15.join(directory, name);
+    let raw;
+    try {
+      raw = await fs11.readFile(file2, "utf8");
+    } catch {
+      corruptPaths.push(file2);
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      corruptPaths.push(file2);
+      continue;
+    }
+    if (!isStoredRecord(parsed) || parsed.checksum !== checksumFor(parsed)) {
+      corruptPaths.push(file2);
+    }
+  }
+  if (corruptPaths.length === 0) {
+    return {
+      status: "pass",
+      detail: "Local content cache entries are readable and checksum-valid.",
+      corruptPaths: []
+    };
+  }
+  return {
+    status: "warn",
+    detail: `Detected ${corruptPaths.length} corrupt content cache entr${corruptPaths.length === 1 ? "y" : "ies"}. Remove ${directory} manually after review; doctor does not delete cache files.`,
+    corruptPaths: corruptPaths.sort(compareCodeUnits)
+  };
+}
+async function mtimeFingerprint(paths) {
+  const lines = await Promise.all([...paths].sort(compareCodeUnits).map(async (filePath) => {
+    try {
+      const stat4 = await fs11.stat(filePath);
+      return `${filePath}:${stat4.mtimeMs}:${stat4.size}`;
+    } catch {
+      return `${filePath}:missing`;
+    }
+  }));
+  return digest(lines.join("\n"));
+}
+async function contentHashFingerprint(paths) {
+  const lines = await Promise.all([...paths].sort(compareCodeUnits).map(async (filePath) => {
+    try {
+      const contents = await fs11.readFile(filePath, "utf8");
+      return `${filePath}:${digest(contents)}`;
+    } catch {
+      return `${filePath}:missing`;
+    }
+  }));
+  return digest(lines.join("\n"));
+}
+
 // src/commands/inspect.ts
 function isInside3(parent, child) {
-  const relative3 = path15.relative(parent, child);
-  return relative3 === "" || !relative3.startsWith(`..${path15.sep}`) && relative3 !== ".." && !path15.isAbsolute(relative3);
+  const relative3 = path16.relative(parent, child);
+  return relative3 === "" || !relative3.startsWith(`..${path16.sep}`) && relative3 !== ".." && !path16.isAbsolute(relative3);
+}
+function directoryChain2(repositoryRoot, cwd) {
+  if (!isInside3(repositoryRoot, cwd)) return [repositoryRoot];
+  const suffix = path16.relative(repositoryRoot, cwd);
+  if (suffix === "") return [repositoryRoot];
+  const directories = [repositoryRoot];
+  let cursor = repositoryRoot;
+  for (const segment of suffix.split(path16.sep)) {
+    cursor = path16.join(cursor, segment);
+    directories.push(cursor);
+  }
+  return directories;
+}
+async function listMarkdownFiles(root) {
+  const found = [];
+  async function walk(directory) {
+    let entries;
+    try {
+      entries = await fs12.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path16.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === ".git" || entry.name === "node_modules") continue;
+        await walk(full);
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        found.push(full);
+      }
+    }
+  }
+  await walk(root);
+  return found;
+}
+async function discoveryCandidatePaths(agent, repositoryRoot, cwd, homeDir) {
+  const candidates = /* @__PURE__ */ new Set();
+  const chain = directoryChain2(repositoryRoot, cwd);
+  if (agent === "codex") {
+    const codexHome = process.env.CODEX_HOME === void 0 ? path16.join(homeDir, ".codex") : path16.resolve(process.env.CODEX_HOME);
+    candidates.add(path16.join(codexHome, "config.toml"));
+    candidates.add(path16.join(codexHome, "AGENTS.md"));
+    candidates.add(path16.join(codexHome, "AGENTS.override.md"));
+    for (const directory of chain) {
+      candidates.add(path16.join(directory, "AGENTS.md"));
+      candidates.add(path16.join(directory, "AGENTS.override.md"));
+      candidates.add(path16.join(directory, "TEAM.md"));
+      candidates.add(path16.join(directory, ".codex", "config.toml"));
+    }
+  } else {
+    candidates.add(path16.join(homeDir, ".claude", "CLAUDE.md"));
+    candidates.add(path16.join(homeDir, ".claude", "settings.json"));
+    candidates.add(path16.join(homeDir, ".claude", "settings.local.json"));
+    for (const directory of chain) {
+      candidates.add(path16.join(directory, "CLAUDE.md"));
+      candidates.add(path16.join(directory, "CLAUDE.local.md"));
+      candidates.add(path16.join(directory, ".claude", "CLAUDE.md"));
+      candidates.add(path16.join(directory, ".claude", "settings.json"));
+      candidates.add(path16.join(directory, ".claude", "settings.local.json"));
+      const rulesRoot = path16.join(directory, ".claude", "rules");
+      for (const file2 of await listMarkdownFiles(rulesRoot)) {
+        candidates.add(file2);
+      }
+    }
+  }
+  return [...candidates];
+}
+async function configHashForAgent(agent, homeDir) {
+  if (agent === "codex") {
+    const codexHome = process.env.CODEX_HOME === void 0 ? path16.join(homeDir, ".codex") : path16.resolve(process.env.CODEX_HOME);
+    return contentHashFingerprint([
+      path16.join(codexHome, "config.toml"),
+      path16.join(codexHome, "AGENTS.md"),
+      path16.join(codexHome, "AGENTS.override.md")
+    ]);
+  }
+  return contentHashFingerprint([
+    path16.join(homeDir, ".claude", "settings.json"),
+    path16.join(homeDir, ".claude", "settings.local.json"),
+    path16.join(homeDir, ".claude", "CLAUDE.md")
+  ]);
+}
+async function repositoryHead(repositoryRoot) {
+  const { stdout } = await runGit(repositoryRoot, ["rev-parse", "HEAD"]);
+  return stdout.trim();
+}
+function countingFileSystem(filesRead) {
+  return {
+    readFile: async (filePath) => {
+      filesRead.count += 1;
+      return fs12.readFile(filePath, "utf8");
+    },
+    readdir: (directory, options) => fs12.readdir(directory, options),
+    realpath: (filePath) => fs12.realpath(filePath),
+    stat: (filePath) => fs12.stat(filePath)
+  };
+}
+function createCountingAdapter(agent, filesRead, adapterRegistry) {
+  if (adapterRegistry !== void 0 && adapterRegistry !== defaultAdapterRegistry) {
+    return adapterRegistry.adapterFor(agent);
+  }
+  const fsLayer = countingFileSystem(filesRead);
+  return agent === "claude-code" ? new ClaudeAdapter(fsLayer) : new CodexAdapter({ ...fsLayer, env: process.env });
 }
 async function inspect(input) {
   const local = await readLocalWorkspace(input.home, input.workspaceId);
@@ -30070,33 +30429,67 @@ async function inspect(input) {
   if (input.cwd !== void 0 && repositories.length !== 1) {
     throw new Error("Option cwd requires exactly one requested local repository");
   }
-  const adapter = (input.adapterRegistry ?? defaultAdapterRegistry).adapterFor(input.agent);
-  return Promise.all(repositories.map(async (repository) => {
+  const cache = input.cache ?? new ContentCache({ home: input.home });
+  const homeDir = path16.resolve(input.homeDir);
+  const configHash = await configHashForAgent(input.agent, homeDir);
+  const filesRead = { count: 0 };
+  const adapter = createCountingAdapter(input.agent, filesRead, input.adapterRegistry);
+  const adapterVersion = [
+    adapter.metadata.agent,
+    adapter.metadata.contractVersion,
+    adapter.metadata.coverageVersion
+  ].join(":");
+  const reports = await Promise.all(repositories.map(async (repository) => {
     const recordedRoot = local.repository_paths[repository.repo_id];
-    const repositoryRoot = await fs11.realpath(recordedRoot).catch(() => void 0);
+    const repositoryRoot = await fs12.realpath(recordedRoot).catch(() => void 0);
     const [current] = repositoryRoot === void 0 ? [] : await scanRepositories(repositoryRoot, { maxDepth: 0 });
     if (repositoryRoot === void 0 || repositoryRoot !== recordedRoot || current?.realPath !== repositoryRoot || current.repositoryId !== repository.repo_id) {
       throw appError("REPOSITORY_ID_DRIFT", "Registered repository identity no longer matches the Workspace", {
         repo_id: repository.repo_id
       });
     }
-    const cwd = input.cwd === void 0 ? repositoryRoot : await fs11.realpath(path15.resolve(input.cwd));
+    const cwd = input.cwd === void 0 ? repositoryRoot : await fs12.realpath(path16.resolve(input.cwd));
     if (!isInside3(repositoryRoot, cwd)) {
       throw appError("INVALID_CWD", "Inspection cwd must be contained in the bound repository", {
         repo_id: repository.repo_id
       });
     }
+    const head = await repositoryHead(repositoryRoot);
+    await cache.invalidateByHead(repository.repo_id, head);
+    const candidates = await discoveryCandidatePaths(input.agent, repositoryRoot, cwd, homeDir);
+    const fingerprint2 = await mtimeFingerprint(candidates);
+    const key = ContentCache.discoveryKey({
+      adapterVersion,
+      configHash,
+      repositoryId: repository.repo_id,
+      head,
+      targetPath: cwd,
+      mtimeFingerprint: fingerprint2
+    });
+    const cached2 = await cache.get(key);
+    if (cached2 !== void 0) {
+      return { repo_id: repository.repo_id, report: cached2 };
+    }
     const report = await adapter.discover({
       repositoryRoot,
       cwd,
-      homeDir: path15.resolve(input.homeDir)
+      homeDir
+    });
+    await cache.put(key, report, {
+      repositoryId: repository.repo_id,
+      head,
+      kind: "discovery"
     });
     return { repo_id: repository.repo_id, report };
   }));
+  return {
+    reports,
+    stats: { files_read: filesRead.count }
+  };
 }
 
 // src/extraction/packet.ts
-import { createHash as createHash7 } from "node:crypto";
+import { createHash as createHash8 } from "node:crypto";
 
 // src/security/redact.ts
 var SECRET = "[REDACTED_SECRET]";
@@ -30271,13 +30664,13 @@ function createExtractionPacket(input) {
   };
   const packet = {
     ...body,
-    packet_hash: `sha256:${createHash7("sha256").update(canonicalJson2(body)).digest("hex")}`
+    packet_hash: `sha256:${createHash8("sha256").update(canonicalJson2(body)).digest("hex")}`
   };
   return deepFreeze(packet);
 }
 
 // src/extraction/proposal.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 
 // src/schema/extraction.ts
 var packetIdSchema = external_exports.string().regex(
@@ -30307,7 +30700,7 @@ function normalizeStatement(statement) {
   return statement.trim().replace(/\s+/g, " ");
 }
 function statementContentHash(statement) {
-  return `sha256:${createHash8("sha256").update(normalizeStatement(statement)).digest("hex")}`;
+  return `sha256:${createHash9("sha256").update(normalizeStatement(statement)).digest("hex")}`;
 }
 function knowledgeRelativePath(entry) {
   if (entry.scope === "workspace") return `knowledge/workspace/${entry.id}.md`;
@@ -30435,10 +30828,10 @@ function previewKnowledgeProposal(packet, proposalInput, options) {
 }
 
 // src/preview/store.ts
-import { createHash as createHash9, createHmac as createHmac3, randomBytes as randomBytes4, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+import { createHash as createHash10, createHmac as createHmac3, randomBytes as randomBytes4, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
 import { constants as fsConstants3 } from "node:fs";
-import * as fs12 from "node:fs/promises";
-import path16 from "node:path";
+import * as fs13 from "node:fs/promises";
+import path17 from "node:path";
 var DEFAULT_TTL_MS3 = 24 * 60 * 60 * 1e3;
 var PREVIEW_ID3 = /^preview_[0-9A-HJKMNP-TV-Z]{26}$/;
 var HASH3 = /^[a-f0-9]{64}$/;
@@ -30512,23 +30905,23 @@ function assertPreviewId3(previewId) {
   if (!PREVIEW_ID3.test(previewId)) throw appError("INVALID_PREVIEW", "Preview ID is invalid");
 }
 function previewsDirectory3(home) {
-  return path16.resolve(home, "capture-previews");
+  return path17.resolve(home, "capture-previews");
 }
 function capturePreviewRecordPath(home, previewId) {
   assertPreviewId3(previewId);
-  return path16.join(previewsDirectory3(home), `${previewId}.json`);
+  return path17.join(previewsDirectory3(home), `${previewId}.json`);
 }
 function usedCapturePreviewPath(home, previewId) {
   assertPreviewId3(previewId);
-  return path16.join(previewsDirectory3(home), `${previewId}.used`);
+  return path17.join(previewsDirectory3(home), `${previewId}.used`);
 }
 function keyPath3(home) {
-  return path16.resolve(home, "capture-preview-auth.key");
+  return path17.resolve(home, "capture-preview-auth.key");
 }
 function filesHash(preview) {
   const payload = preview.creates.map((item) => `${item.path}
 ${item.bytes}`).join("\n");
-  return createHash9("sha256").update(payload).digest("hex");
+  return createHash10("sha256").update(payload).digest("hex");
 }
 function authenticatedBytes3(expiresAt, packetHash, contextHead, filesDigest, preview) {
   return JSON.stringify({
@@ -30546,7 +30939,7 @@ function macFor3(key, expiresAt, packetHash, contextHead, filesDigest, preview) 
 async function readValidatedKey3(file2) {
   let handle;
   try {
-    handle = await fs12.open(file2, fsConstants3.O_RDONLY | fsConstants3.O_NOFOLLOW);
+    handle = await fs13.open(file2, fsConstants3.O_RDONLY | fsConstants3.O_NOFOLLOW);
   } catch (error51) {
     if (error51.code === "ENOENT") throw error51;
     throw appError("INVALID_PREVIEW", "Capture preview authentication key is invalid");
@@ -30576,10 +30969,10 @@ async function previewKey3(home) {
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
   }
-  await fs12.mkdir(path16.dirname(file2), { recursive: true, mode: 448 });
+  await fs13.mkdir(path17.dirname(file2), { recursive: true, mode: 448 });
   const candidate = randomBytes4(32).toString("base64");
   try {
-    const handle = await fs12.open(file2, "wx", 384);
+    const handle = await fs13.open(file2, "wx", 384);
     try {
       await handle.chmod(384);
       await handle.writeFile(candidate, "utf8");
@@ -30595,16 +30988,16 @@ async function previewKey3(home) {
 }
 async function ensurePreviewDirectory3(home) {
   const directory = previewsDirectory3(home);
-  await fs12.mkdir(home, { recursive: true, mode: 448 });
+  await fs13.mkdir(home, { recursive: true, mode: 448 });
   let created = false;
   try {
-    await fs12.mkdir(directory, { mode: 448 });
+    await fs13.mkdir(directory, { mode: 448 });
     created = true;
   } catch (error51) {
     if (error51.code !== "EEXIST") throw error51;
   }
-  if (created) await fs12.chmod(directory, 448);
-  const info = await fs12.lstat(directory).catch(() => void 0);
+  if (created) await fs13.chmod(directory, 448);
+  const info = await fs13.lstat(directory).catch(() => void 0);
   if (info === void 0 || !info.isDirectory() || info.isSymbolicLink() || (info.mode & 511) !== 448) {
     throw appError("INVALID_PREVIEW", "Capture preview directory is invalid");
   }
@@ -30615,22 +31008,22 @@ async function saveCapturePreview(home, preview, options = {}) {
   const now = options.now ?? Date.now();
   const expiresAt = now + (options.ttlMs ?? DEFAULT_TTL_MS3);
   const key = await previewKey3(home);
-  const digest5 = filesHash(preview);
+  const digest6 = filesHash(preview);
   const stored = {
     version: 1,
     expires_at: expiresAt,
     packet_hash: preview.packet_hash,
     context_head: preview.context_head,
-    files_hash: digest5,
+    files_hash: digest6,
     preview,
-    mac: macFor3(key, expiresAt, preview.packet_hash, preview.context_head, digest5, preview)
+    mac: macFor3(key, expiresAt, preview.packet_hash, preview.context_head, digest6, preview)
   };
   await atomicWriteFile(capturePreviewRecordPath(home, preview.preview_id), JSON.stringify(stored));
 }
 async function readAuthenticatedPreview3(home, file2, previewId, now = Date.now()) {
   let parsed;
   try {
-    parsed = JSON.parse(await fs12.readFile(file2, "utf8"));
+    parsed = JSON.parse(await fs13.readFile(file2, "utf8"));
   } catch {
     throw appError("INVALID_PREVIEW", "Stored capture preview is invalid");
   }
@@ -30653,8 +31046,8 @@ async function readAuthenticatedPreview3(home, file2, previewId, now = Date.now(
   if (actual.length !== expected.length || !timingSafeEqual3(actual, expected)) {
     throw appError("INVALID_PREVIEW", "Stored capture preview authentication failed");
   }
-  const digest5 = filesHash(stored.preview);
-  if (stored.files_hash !== digest5 || stored.packet_hash !== stored.preview.packet_hash || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
+  const digest6 = filesHash(stored.preview);
+  if (stored.files_hash !== digest6 || stored.packet_hash !== stored.preview.packet_hash || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
     throw appError("INVALID_PREVIEW", "Stored capture preview state hashes do not match");
   }
   if (now > stored.expires_at) {
@@ -30675,7 +31068,7 @@ async function peekCapturePreview(home, previewId, options = {}) {
   } catch (error51) {
     if (error51.code !== "INVALID_PREVIEW") throw error51;
     try {
-      await fs12.access(usedCapturePreviewPath(home, previewId));
+      await fs13.access(usedCapturePreviewPath(home, previewId));
       throw appError("PREVIEW_ALREADY_USED", "Capture preview has already been applied");
     } catch (usedError) {
       if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
@@ -30688,11 +31081,11 @@ async function claimCapturePreview(home, previewId, options = {}) {
   const pending = capturePreviewRecordPath(home, previewId);
   const used = usedCapturePreviewPath(home, previewId);
   try {
-    await fs12.rename(pending, used);
+    await fs13.rename(pending, used);
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
     try {
-      await fs12.access(used);
+      await fs13.access(used);
       throw appError("PREVIEW_ALREADY_USED", "Capture preview has already been applied");
     } catch (usedError) {
       if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
@@ -30706,16 +31099,16 @@ async function claimCapturePreview(home, previewId, options = {}) {
 var PACKET_ID2 = /^packet_[0-9A-HJKMNP-TV-Z]{26}$/;
 var MAX_EXCERPT_BYTES = 64 * 1024;
 function packetsDirectory(home) {
-  return path17.resolve(home, "packets");
+  return path18.resolve(home, "packets");
 }
 function packetRecordPath(home, packetId) {
   if (!PACKET_ID2.test(packetId)) {
     throw appError("INVALID_PACKET", "Extraction packet ID is invalid");
   }
-  return path17.join(packetsDirectory(home), `${packetId}.json`);
+  return path18.join(packetsDirectory(home), `${packetId}.json`);
 }
 function contentHash(bytes) {
-  return `sha256:${createHash10("sha256").update(bytes).digest("hex")}`;
+  return `sha256:${createHash11("sha256").update(bytes).digest("hex")}`;
 }
 function mergeCoverageReports(reports) {
   const byAgent = /* @__PURE__ */ new Map();
@@ -30758,7 +31151,7 @@ async function selectExcerpts(reports, includePersonal) {
       if (!allowShareability(source.shareability, includePersonal)) continue;
       let contents;
       try {
-        contents = await fs13.readFile(source.locator, "utf8");
+        contents = await fs14.readFile(source.locator, "utf8");
       } catch {
         continue;
       }
@@ -30781,8 +31174,8 @@ async function selectExcerpts(reports, includePersonal) {
 }
 async function persistExtractionPacket(home, packet, meta3) {
   const directory = packetsDirectory(home);
-  await fs13.mkdir(home, { recursive: true, mode: 448 });
-  await fs13.mkdir(directory, { recursive: true, mode: 448 });
+  await fs14.mkdir(home, { recursive: true, mode: 448 });
+  await fs14.mkdir(directory, { recursive: true, mode: 448 });
   const record2 = {
     packet,
     includePersonal: meta3.includePersonal,
@@ -30794,7 +31187,7 @@ async function persistExtractionPacket(home, packet, meta3) {
 async function loadPersistedPacket(home, packetId) {
   let raw;
   try {
-    raw = await fs13.readFile(packetRecordPath(home, packetId), "utf8");
+    raw = await fs14.readFile(packetRecordPath(home, packetId), "utf8");
   } catch (error51) {
     if (error51.code === "ENOENT") {
       throw appError("INVALID_PACKET", "Extraction packet does not exist");
@@ -30817,7 +31210,7 @@ async function loadPersistedPacket(home, packetId) {
   return record2;
 }
 async function prepareCapture(input) {
-  const home = path17.resolve(input.home);
+  const home = path18.resolve(input.home);
   const includePersonal = input.includePersonal === true;
   const local = await readLocalWorkspace(home, input.workspaceId);
   const contextPath = await assertLocalContextCheckout(
@@ -30831,7 +31224,7 @@ async function prepareCapture(input) {
   }
   await preflightContextRemote(contextPath);
   const contextHead = await localHead(contextPath);
-  const repositoryReports = await inspect({
+  const inspected = await inspect({
     workspaceId: input.workspaceId,
     agent: input.agent,
     home,
@@ -30839,7 +31232,7 @@ async function prepareCapture(input) {
     ...input.repositories === void 0 ? {} : { repositories: input.repositories },
     ...input.cwd === void 0 ? {} : { cwd: input.cwd }
   });
-  const coverageReports = mergeCoverageReports(repositoryReports.map((item) => item.report));
+  const coverageReports = mergeCoverageReports(inspected.reports.map((item) => item.report));
   const registeredRepositoryIds = workspace.repositories.map((item) => item.repo_id);
   const store = new KnowledgeStore(contextPath, {
     registeredRepositoryIds: new Set(registeredRepositoryIds)
@@ -30848,8 +31241,8 @@ async function prepareCapture(input) {
   const selectedExcerpts = await selectExcerpts(coverageReports, includePersonal);
   const localRoots = [
     .../* @__PURE__ */ new Set([
-      path17.resolve(input.homeDir),
-      ...Object.values(local.repository_paths).map((item) => path17.resolve(item))
+      path18.resolve(input.homeDir),
+      ...Object.values(local.repository_paths).map((item) => path18.resolve(item))
     ])
   ];
   const packet = createExtractionPacket({
@@ -30868,7 +31261,7 @@ async function prepareCapture(input) {
   return packet;
 }
 async function previewCapture(packetId, proposal, options) {
-  const home = path17.resolve(options.home);
+  const home = path18.resolve(options.home);
   const record2 = await loadPersistedPacket(home, packetId);
   const preview = previewKnowledgeProposal(record2.packet, proposal, {
     includePersonal: record2.includePersonal,
@@ -30950,7 +31343,7 @@ async function applyApprovedCapture(preview, home) {
   );
 }
 async function applyCapture(previewId, home) {
-  const resolvedHome = path17.resolve(home);
+  const resolvedHome = path18.resolve(home);
   const pending = await peekCapturePreview(resolvedHome, previewId);
   return withWorkspaceLock(resolvedHome, pending.workspace_id, async () => {
     const preview = await claimCapturePreview(resolvedHome, previewId);
@@ -30959,14 +31352,14 @@ async function applyCapture(previewId, home) {
 }
 
 // src/commands/check.ts
-import * as fs18 from "node:fs/promises";
-import path22 from "node:path";
+import * as fs19 from "node:fs/promises";
+import path23 from "node:path";
 
 // src/preview/check-store.ts
-import { createHash as createHash11, createHmac as createHmac4, randomBytes as randomBytes5, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
+import { createHash as createHash12, createHmac as createHmac4, randomBytes as randomBytes5, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
 import { constants as fsConstants4 } from "node:fs";
-import * as fs14 from "node:fs/promises";
-import path18 from "node:path";
+import * as fs15 from "node:fs/promises";
+import path19 from "node:path";
 var DEFAULT_TTL_MS4 = 24 * 60 * 60 * 1e3;
 var PREVIEW_ID4 = /^preview_[0-9A-HJKMNP-TV-Z]{26}$/;
 var HASH4 = /^[a-f0-9]{64}$/;
@@ -31043,18 +31436,18 @@ function assertPreviewId4(previewId) {
   if (!PREVIEW_ID4.test(previewId)) throw appError("INVALID_PREVIEW", "Preview ID is invalid");
 }
 function previewsDirectory4(home) {
-  return path18.resolve(home, "check-previews");
+  return path19.resolve(home, "check-previews");
 }
 function checkPreviewRecordPath(home, previewId) {
   assertPreviewId4(previewId);
-  return path18.join(previewsDirectory4(home), `${previewId}.json`);
+  return path19.join(previewsDirectory4(home), `${previewId}.json`);
 }
 function usedCheckPreviewPath(home, previewId) {
   assertPreviewId4(previewId);
-  return path18.join(previewsDirectory4(home), `${previewId}.used`);
+  return path19.join(previewsDirectory4(home), `${previewId}.used`);
 }
 function keyPath4(home) {
-  return path18.resolve(home, "check-preview-auth.key");
+  return path19.resolve(home, "check-preview-auth.key");
 }
 function filesHash2(preview) {
   const payload = [
@@ -31066,7 +31459,7 @@ ${item.bytes}`),
 ${item.bytes}`),
     ...preview.changes.archive.map((item) => `archive:${item.id}:${item.reason}`)
   ].join("\n");
-  return createHash11("sha256").update(payload).digest("hex");
+  return createHash12("sha256").update(payload).digest("hex");
 }
 function authenticatedBytes4(expiresAt, contextHead, filesDigest, preview) {
   return JSON.stringify({
@@ -31083,7 +31476,7 @@ function macFor4(key, expiresAt, contextHead, filesDigest, preview) {
 async function readValidatedKey4(file2) {
   let handle;
   try {
-    handle = await fs14.open(file2, fsConstants4.O_RDONLY | fsConstants4.O_NOFOLLOW);
+    handle = await fs15.open(file2, fsConstants4.O_RDONLY | fsConstants4.O_NOFOLLOW);
   } catch (error51) {
     if (error51.code === "ENOENT") throw error51;
     throw appError("INVALID_PREVIEW", "Check preview authentication key is invalid");
@@ -31113,10 +31506,10 @@ async function previewKey4(home) {
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
   }
-  await fs14.mkdir(path18.dirname(file2), { recursive: true, mode: 448 });
+  await fs15.mkdir(path19.dirname(file2), { recursive: true, mode: 448 });
   const candidate = randomBytes5(32).toString("base64");
   try {
-    const handle = await fs14.open(file2, "wx", 384);
+    const handle = await fs15.open(file2, "wx", 384);
     try {
       await handle.chmod(384);
       await handle.writeFile(candidate, "utf8");
@@ -31132,16 +31525,16 @@ async function previewKey4(home) {
 }
 async function ensurePreviewDirectory4(home) {
   const directory = previewsDirectory4(home);
-  await fs14.mkdir(home, { recursive: true, mode: 448 });
+  await fs15.mkdir(home, { recursive: true, mode: 448 });
   let created = false;
   try {
-    await fs14.mkdir(directory, { mode: 448 });
+    await fs15.mkdir(directory, { mode: 448 });
     created = true;
   } catch (error51) {
     if (error51.code !== "EEXIST") throw error51;
   }
-  if (created) await fs14.chmod(directory, 448);
-  const info = await fs14.lstat(directory).catch(() => void 0);
+  if (created) await fs15.chmod(directory, 448);
+  const info = await fs15.lstat(directory).catch(() => void 0);
   if (info === void 0 || !info.isDirectory() || info.isSymbolicLink() || (info.mode & 511) !== 448) {
     throw appError("INVALID_PREVIEW", "Check preview directory is invalid");
   }
@@ -31152,21 +31545,21 @@ async function saveCheckPreview(home, preview, options = {}) {
   const now = options.now ?? Date.now();
   const expiresAt = now + (options.ttlMs ?? DEFAULT_TTL_MS4);
   const key = await previewKey4(home);
-  const digest5 = filesHash2(preview);
+  const digest6 = filesHash2(preview);
   const stored = {
     version: 1,
     expires_at: expiresAt,
     context_head: preview.context_head,
-    files_hash: digest5,
+    files_hash: digest6,
     preview,
-    mac: macFor4(key, expiresAt, preview.context_head, digest5, preview)
+    mac: macFor4(key, expiresAt, preview.context_head, digest6, preview)
   };
   await atomicWriteFile(checkPreviewRecordPath(home, preview.preview_id), JSON.stringify(stored));
 }
 async function readAuthenticatedPreview4(home, file2, previewId, now = Date.now()) {
   let parsed;
   try {
-    parsed = JSON.parse(await fs14.readFile(file2, "utf8"));
+    parsed = JSON.parse(await fs15.readFile(file2, "utf8"));
   } catch {
     throw appError("INVALID_PREVIEW", "Stored check preview is invalid");
   }
@@ -31182,8 +31575,8 @@ async function readAuthenticatedPreview4(home, file2, previewId, now = Date.now(
   if (actual.length !== expected.length || !timingSafeEqual4(actual, expected)) {
     throw appError("INVALID_PREVIEW", "Stored check preview authentication failed");
   }
-  const digest5 = filesHash2(stored.preview);
-  if (stored.files_hash !== digest5 || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
+  const digest6 = filesHash2(stored.preview);
+  if (stored.files_hash !== digest6 || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
     throw appError("INVALID_PREVIEW", "Stored check preview state hashes do not match");
   }
   if (now > stored.expires_at) {
@@ -31199,7 +31592,7 @@ async function peekCheckPreview(home, previewId, options = {}) {
   } catch (error51) {
     if (error51.code !== "INVALID_PREVIEW") throw error51;
     try {
-      await fs14.access(usedCheckPreviewPath(home, previewId));
+      await fs15.access(usedCheckPreviewPath(home, previewId));
       throw appError("PREVIEW_ALREADY_USED", "Check preview has already been applied");
     } catch (usedError) {
       if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
@@ -31212,11 +31605,11 @@ async function claimCheckPreview(home, previewId, options = {}) {
   const pending = checkPreviewRecordPath(home, previewId);
   const used = usedCheckPreviewPath(home, previewId);
   try {
-    await fs14.rename(pending, used);
+    await fs15.rename(pending, used);
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
     try {
-      await fs14.access(used);
+      await fs15.access(used);
       throw appError("PREVIEW_ALREADY_USED", "Check preview has already been applied");
     } catch (usedError) {
       if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
@@ -31227,18 +31620,18 @@ async function claimCheckPreview(home, previewId, options = {}) {
 }
 
 // src/verification/collect.ts
-import { createHash as createHash13 } from "node:crypto";
+import { createHash as createHash14 } from "node:crypto";
 import { execFile as execFile3 } from "node:child_process";
-import { promises as fs16 } from "node:fs";
-import path20 from "node:path";
+import { promises as fs17 } from "node:fs";
+import path21 from "node:path";
 import { promisify as promisify2 } from "node:util";
 
 // src/verification/dependencies.ts
-import { createHash as createHash12 } from "node:crypto";
-import { promises as fs15 } from "node:fs";
-import path19 from "node:path";
-function digest(contents) {
-  return `sha256:${createHash12("sha256").update(contents).digest("hex")}`;
+import { createHash as createHash13 } from "node:crypto";
+import { promises as fs16 } from "node:fs";
+import path20 from "node:path";
+function digest2(contents) {
+  return `sha256:${createHash13("sha256").update(contents).digest("hex")}`;
 }
 function readDependencyMap(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return {};
@@ -31251,10 +31644,10 @@ function readDependencyMap(value) {
   return entries;
 }
 async function parsePackageDependencies(repositoryPath, manifestPath = "package.json") {
-  const absolute = path19.join(repositoryPath, manifestPath);
+  const absolute = path20.join(repositoryPath, manifestPath);
   let raw;
   try {
-    raw = await fs15.readFile(absolute, "utf8");
+    raw = await fs16.readFile(absolute, "utf8");
   } catch (error51) {
     if (error51.code === "ENOENT") return [];
     throw error51;
@@ -31267,7 +31660,7 @@ async function parsePackageDependencies(repositoryPath, manifestPath = "package.
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return [];
   const manifest = parsed;
-  const content_hash = digest(raw);
+  const content_hash = digest2(raw);
   const combined = {
     ...readDependencyMap(manifest.peerDependencies),
     ...readDependencyMap(manifest.optionalDependencies),
@@ -31441,8 +31834,8 @@ function canonicalJson3(value) {
   }
   return JSON.stringify(value);
 }
-function digest2(contents) {
-  return `sha256:${createHash13("sha256").update(contents).digest("hex")}`;
+function digest3(contents) {
+  return `sha256:${createHash14("sha256").update(contents).digest("hex")}`;
 }
 function isTimeoutError2(error51) {
   if (error51 === null || typeof error51 !== "object") return false;
@@ -31478,7 +31871,7 @@ function deriveSearchTerms(entry) {
   return [...terms].sort((left, right) => right.length - left.length || compareCodeUnits(left, right)).slice(0, 12);
 }
 function isConfigPath(relativePath) {
-  const base = path20.posix.basename(relativePath);
+  const base = path21.posix.basename(relativePath);
   if (CONFIG_BASENAMES.has(base)) return true;
   if (base.endsWith(".config.ts") || base.endsWith(".config.js") || base.endsWith(".config.mjs")) {
     return true;
@@ -31501,14 +31894,14 @@ async function ensureInsideRoot(rootReal, relativePosix) {
   if (relativePosix.length === 0 || relativePosix.startsWith("/") || relativePosix.split("/").some((segment) => segment === "." || segment === ".." || segment === "")) {
     return void 0;
   }
-  const candidate = path20.resolve(rootReal, ...relativePosix.split("/"));
+  const candidate = path21.resolve(rootReal, ...relativePosix.split("/"));
   let realFile;
   try {
-    realFile = await fs16.realpath(candidate);
+    realFile = await fs17.realpath(candidate);
   } catch {
     return void 0;
   }
-  const prefix = rootReal.endsWith(path20.sep) ? rootReal : `${rootReal}${path20.sep}`;
+  const prefix = rootReal.endsWith(path21.sep) ? rootReal : `${rootReal}${path21.sep}`;
   if (realFile !== rootReal && !realFile.startsWith(prefix)) return void 0;
   return realFile;
 }
@@ -31598,7 +31991,7 @@ async function readBoundedFile(rootReal, relativePosix, localRoots, remainingByt
   if (absolute === void 0) return void 0;
   let buffer;
   try {
-    buffer = await fs16.readFile(absolute);
+    buffer = await fs17.readFile(absolute);
   } catch {
     return void 0;
   }
@@ -31616,19 +32009,46 @@ async function readBoundedFile(rootReal, relativePosix, localRoots, remainingByt
       start_line: 1,
       end_line: Math.max(1, lines.length),
       content,
-      content_hash: digest2(content),
+      content_hash: digest3(content),
       bytes: Buffer.byteLength(content, "utf8")
     },
     clipped: buffer.length > maxRead || bytes > remainingBytes
   };
 }
 async function collectEvidence(input) {
+  let repositoryHead2;
+  if (input.cache !== void 0) {
+    try {
+      const { stdout } = await runGit(input.repositoryPath, ["rev-parse", "HEAD"]);
+      repositoryHead2 = stdout.trim();
+      const knowledgeHash = digest3(serializeKnowledge(input.entry));
+      const key = ContentCache.evidenceKey(knowledgeHash, repositoryHead2);
+      await input.cache.invalidateByHead(input.repoId, repositoryHead2);
+      const cached2 = await input.cache.get(key);
+      if (cached2 !== void 0) return cached2;
+    } catch {
+      repositoryHead2 = void 0;
+    }
+  }
+  const packet = await collectEvidenceUncached(input);
+  if (input.cache !== void 0 && repositoryHead2 !== void 0) {
+    const knowledgeHash = digest3(serializeKnowledge(input.entry));
+    const key = ContentCache.evidenceKey(knowledgeHash, repositoryHead2);
+    await input.cache.put(key, packet, {
+      repositoryId: input.repoId,
+      head: repositoryHead2,
+      kind: "evidence"
+    });
+  }
+  return packet;
+}
+async function collectEvidenceUncached(input) {
   const started = Date.now();
   const limits = input.limits;
   let timedOut = false;
   let truncated = false;
   let totalBytes = 0;
-  const rootReal = await fs16.realpath(input.repositoryPath);
+  const rootReal = await fs17.realpath(input.repositoryPath);
   const localRoots = [rootReal, input.repositoryPath];
   const remaining = () => Math.max(0, limits.timeoutMs - (Date.now() - started));
   const terms = deriveSearchTerms(input.entry);
@@ -31704,14 +32124,14 @@ async function collectEvidence(input) {
   };
   return {
     ...body,
-    packet_hash: digest2(canonicalJson3(body))
+    packet_hash: digest3(canonicalJson3(body))
   };
 }
 
 // src/verification/proposal.ts
-import { createHash as createHash14 } from "node:crypto";
-import { promises as fs17 } from "node:fs";
-import path21 from "node:path";
+import { createHash as createHash15 } from "node:crypto";
+import { promises as fs18 } from "node:fs";
+import path22 from "node:path";
 
 // src/schema/verification.ts
 var packetIdSchema2 = external_exports.string().regex(
@@ -31860,8 +32280,8 @@ function parseVerificationProposal(value) {
 }
 
 // src/verification/proposal.ts
-function digest3(contents) {
-  return `sha256:${createHash14("sha256").update(contents).digest("hex")}`;
+function digest4(contents) {
+  return `sha256:${createHash15("sha256").update(contents).digest("hex")}`;
 }
 function knowledgeRelativePath2(entry) {
   if (entry.scope === "workspace") return `knowledge/workspace/${entry.id}.md`;
@@ -31874,9 +32294,9 @@ function assertSafeRelative(relative3) {
 }
 async function ensureInsideRoot2(rootReal, relativePosix) {
   assertSafeRelative(relativePosix);
-  const candidate = path21.resolve(rootReal, ...relativePosix.split("/"));
-  const relative3 = path21.relative(rootReal, candidate);
-  if (relative3.startsWith("..") || path21.isAbsolute(relative3)) {
+  const candidate = path22.resolve(rootReal, ...relativePosix.split("/"));
+  const relative3 = path22.relative(rootReal, candidate);
+  if (relative3.startsWith("..") || path22.isAbsolute(relative3)) {
     throw appError("INVALID_EVIDENCE", "Evidence path escapes the repository root", {
       path: relativePosix
     });
@@ -31884,11 +32304,11 @@ async function ensureInsideRoot2(rootReal, relativePosix) {
   return candidate;
 }
 async function hashLineRange(repositoryPath, relativePosix, startLine, endLine) {
-  const rootReal = await fs17.realpath(repositoryPath);
+  const rootReal = await fs18.realpath(repositoryPath);
   const absolute = await ensureInsideRoot2(rootReal, relativePosix);
   let raw;
   try {
-    raw = await fs17.readFile(absolute, "utf8");
+    raw = await fs18.readFile(absolute, "utf8");
   } catch (error51) {
     if (error51.code === "ENOENT") {
       throw appError("INVALID_EVIDENCE", "Evidence file does not exist", {
@@ -31908,7 +32328,7 @@ async function hashLineRange(repositoryPath, relativePosix, startLine, endLine) 
     });
   }
   const excerpt = lines.slice(startLine - 1, endLine).join("\n");
-  return digest3(excerpt);
+  return digest4(excerpt);
 }
 async function resolveRepositoryPath(repoId, repositoryPaths) {
   const repositoryPath = repositoryPaths[repoId];
@@ -31917,7 +32337,7 @@ async function resolveRepositoryPath(repoId, repositoryPaths) {
       repo_id: repoId
     });
   }
-  return path21.resolve(repositoryPath);
+  return path22.resolve(repositoryPath);
 }
 async function validateEvidenceRef(evidence, repositoryPaths) {
   const repositoryPath = await resolveRepositoryPath(evidence.repo_id, repositoryPaths);
@@ -32113,25 +32533,25 @@ var DEFAULT_LIMITS = {
   timeoutMs: 5e3
 };
 function packetsDirectory2(home) {
-  return path22.resolve(home, "verification-packets");
+  return path23.resolve(home, "verification-packets");
 }
 function packetRecordPath2(home, packetId) {
   if (!PACKET_ID4.test(packetId)) {
     throw appError("INVALID_PACKET", "Verification packet ID is invalid");
   }
-  return path22.join(packetsDirectory2(home), `${packetId}.json`);
+  return path23.join(packetsDirectory2(home), `${packetId}.json`);
 }
 async function persistVerificationPacket(home, packet, meta3) {
   const directory = packetsDirectory2(home);
-  await fs18.mkdir(home, { recursive: true, mode: 448 });
-  await fs18.mkdir(directory, { recursive: true, mode: 448 });
+  await fs19.mkdir(home, { recursive: true, mode: 448 });
+  await fs19.mkdir(directory, { recursive: true, mode: 448 });
   const record2 = { packet, ...meta3 };
   await atomicWriteFile(packetRecordPath2(home, packet.packet_id), JSON.stringify(record2));
 }
 async function loadPersistedPacket2(home, packetId) {
   let raw;
   try {
-    raw = await fs18.readFile(packetRecordPath2(home, packetId), "utf8");
+    raw = await fs19.readFile(packetRecordPath2(home, packetId), "utf8");
   } catch (error51) {
     if (error51.code === "ENOENT") {
       throw appError("INVALID_PACKET", "Verification packet does not exist");
@@ -32186,7 +32606,7 @@ function repositoryTargetsForEntry(entry, localPaths, repositoryFilter) {
   return [{ repoId, repositoryPath }];
 }
 async function prepareCheck(input) {
-  const home = path22.resolve(input.home);
+  const home = path23.resolve(input.home);
   const local = await readLocalWorkspace(home, input.workspaceId);
   const contextPath = await assertLocalContextCheckout(
     home,
@@ -32205,6 +32625,7 @@ async function prepareCheck(input) {
   const repositoryFilter = input.repositories === void 0 ? void 0 : new Set(input.repositories);
   const limits = input.limits ?? DEFAULT_LIMITS;
   const packets = [];
+  const cache = new ContentCache({ home });
   for (const entry of active) {
     const targets = repositoryTargetsForEntry(entry, local.repository_paths, repositoryFilter);
     for (const target of targets) {
@@ -32212,7 +32633,8 @@ async function prepareCheck(input) {
         entry,
         repositoryPath: target.repositoryPath,
         repoId: target.repoId,
-        limits
+        limits,
+        cache
       });
       await persistVerificationPacket(home, packet, {
         workspaceId: input.workspaceId,
@@ -32225,7 +32647,7 @@ async function prepareCheck(input) {
   return packets;
 }
 async function previewCheck(packetIds, proposal, options) {
-  const home = path22.resolve(options.home);
+  const home = path23.resolve(options.home);
   if (packetIds.length === 0) {
     throw appError("INVALID_PACKET", "At least one verification packet ID is required");
   }
@@ -32359,7 +32781,7 @@ async function applyApprovedCheck(preview, home) {
   };
 }
 async function applyCheck(previewId, home) {
-  const resolvedHome = path22.resolve(home);
+  const resolvedHome = path23.resolve(home);
   const pending = await peekCheckPreview(resolvedHome, previewId);
   return withWorkspaceLock(resolvedHome, pending.workspace_id, async () => {
     const preview = await claimCheckPreview(resolvedHome, previewId);
@@ -32369,7 +32791,7 @@ async function applyCheck(previewId, home) {
 
 // src/commands/doctor.ts
 import { constants as fsConstants5 } from "node:fs";
-import * as fs19 from "node:fs/promises";
+import * as fs20 from "node:fs/promises";
 function check2(id, status, detail) {
   return { id, status, detail };
 }
@@ -32420,7 +32842,7 @@ async function doctor(input) {
       const shared = new Set(workspace.repositories.map((repository) => repository.repo_id));
       let drifted = false;
       for (const [repositoryId, repositoryPath] of Object.entries(local.repository_paths)) {
-        if (!shared.has(repositoryId) || await fs19.realpath(repositoryPath) !== repositoryPath) {
+        if (!shared.has(repositoryId) || await fs20.realpath(repositoryPath) !== repositoryPath) {
           drifted = true;
           break;
         }
@@ -32450,10 +32872,10 @@ async function doctor(input) {
   if (local !== void 0 && contextPath !== void 0) {
     try {
       await Promise.all([
-        fs19.access(registryPath(input.home, input.workspaceId), fsConstants5.R_OK),
-        fs19.access(contextPath, fsConstants5.R_OK),
+        fs20.access(registryPath(input.home, input.workspaceId), fsConstants5.R_OK),
+        fs20.access(contextPath, fsConstants5.R_OK),
         ...Object.values(local.repository_paths).map(
-          (repositoryPath) => fs19.access(repositoryPath, fsConstants5.R_OK)
+          (repositoryPath) => fs20.access(repositoryPath, fsConstants5.R_OK)
         )
       ]);
       checks.push(check2("permissions", "pass", "Required Workspace paths are readable."));
@@ -32463,16 +32885,26 @@ async function doctor(input) {
   } else {
     checks.push(check2("permissions", "fail", "One or more required Workspace paths are unreadable."));
   }
+  try {
+    const cacheReport = await assessCacheIntegrity(input.home);
+    checks.push(check2("cache-integrity", cacheReport.status, cacheReport.detail));
+  } catch {
+    checks.push(check2(
+      "cache-integrity",
+      "warn",
+      "Content cache integrity could not be assessed. Remove the local cache directory manually if corruption is suspected."
+    ));
+  }
   if (local !== void 0 && workspace !== void 0) {
     try {
       const reports = (await Promise.all(["claude-code", "codex"].map(
-        (agent) => inspect({
+        async (agent) => (await inspect({
           workspaceId: input.workspaceId,
           agent,
           home: input.home,
           homeDir: input.homeDir,
           adapterRegistry
-        })
+        })).reports
       ))).flat();
       const coverageReports = reports.map((item) => item.report);
       checks.push(coverageReports.length === 0 ? check2("adapter-coverage", "warn", "No local repositories were available for Adapter coverage discovery.") : coverageStatus(coverageReports) === "pass" ? check2("adapter-coverage", "pass", "Adapter discovery completed with covered diagnostics.") : check2("adapter-coverage", "warn", "Adapter discovery contains partial, unknown, or inaccessible coverage."));
@@ -32490,6 +32922,7 @@ async function doctor(input) {
     "repository-path-drift",
     "adapter-version-support",
     "permissions",
+    "cache-integrity",
     "adapter-coverage"
   ];
   checks.sort((left, right) => order.indexOf(left.id) - order.indexOf(right.id));
@@ -32497,8 +32930,8 @@ async function doctor(input) {
 }
 
 // src/commands/init.ts
-import * as fs20 from "node:fs/promises";
-import path23 from "node:path";
+import * as fs21 from "node:fs/promises";
+import path24 from "node:path";
 function validateInitInput(input, workspaceId) {
   parseWorkspaceManifest({
     schema_version: 1,
@@ -32515,9 +32948,9 @@ async function normalizeInput2(input) {
   return {
     name: input.name.trim(),
     context_remote: canonicalRemote(input.contextRemote),
-    scan_root: await fs20.realpath(path23.resolve(input.scanRoot)),
+    scan_root: await fs21.realpath(path24.resolve(input.scanRoot)),
     max_depth: input.maxDepth,
-    home: path23.resolve(input.home)
+    home: path24.resolve(input.home)
   };
 }
 async function initWorkspace(input) {
@@ -32549,7 +32982,7 @@ async function initWorkspace(input) {
   const repositories = [];
   for (const [repoId, candidates] of byIdentity) {
     const candidatePaths = candidates.map((candidate) => candidate.realPath).sort(compareCodeUnits);
-    const requested = requestedBindings[repoId] === void 0 ? void 0 : await fs20.realpath(path23.resolve(requestedBindings[repoId]));
+    const requested = requestedBindings[repoId] === void 0 ? void 0 : await fs21.realpath(path24.resolve(requestedBindings[repoId]));
     if (requested !== void 0 && !candidatePaths.includes(requested)) {
       throw appError("INVALID_BINDING", "Explicit binding is not one of the discovered candidates", { repo_id: repoId });
     }
@@ -32572,7 +33005,7 @@ async function initWorkspace(input) {
   const filesToWrite = [
     "workspace.yaml",
     ...repositories.map((repository) => repositoryManifestFile(repository.repo_id)),
-    path23.join(normalized.home, "workspaces", `${workspaceId}.yaml`)
+    path24.join(normalized.home, "workspaces", `${workspaceId}.yaml`)
   ];
   const approval = {
     workspace_id: workspaceId,
@@ -32631,7 +33064,7 @@ async function applyApprovedInit(preview) {
     );
     await installContextTransaction(transaction.context_path, contextPath);
   } finally {
-    await fs20.rm(transaction.root, { recursive: true, force: true });
+    await fs21.rm(transaction.root, { recursive: true, force: true });
   }
   const repositoryPaths = {};
   for (const repository of preview.repositories) {
@@ -32642,7 +33075,7 @@ async function applyApprovedInit(preview) {
   const local = {
     schema_version: 1,
     workspace_id: workspace.workspace_id,
-    context_path: await fs20.realpath(contextPath),
+    context_path: await fs21.realpath(contextPath),
     repository_paths: repositoryPaths
   };
   await writeLocalWorkspace(input.home, local);
@@ -32657,35 +33090,35 @@ async function applyInit(previewId, home) {
 }
 
 // src/commands/join.ts
-import * as fs21 from "node:fs/promises";
+import * as fs22 from "node:fs/promises";
 import { tmpdir } from "node:os";
-import path24 from "node:path";
+import path25 from "node:path";
 async function normalizeInput3(input) {
   if (!Number.isInteger(input.maxDepth) || input.maxDepth < 0) {
     throw new RangeError("maxDepth must be a non-negative integer");
   }
   const roots = await Promise.all(
-    input.scanRoots.map((root) => fs21.realpath(path24.resolve(root)))
+    input.scanRoots.map((root) => fs22.realpath(path25.resolve(root)))
   );
   return {
     context_remote: canonicalRemote(input.contextRemote),
     scan_roots: [...new Set(roots)].sort(compareCodeUnits),
     max_depth: input.maxDepth,
-    home: path24.resolve(input.home)
+    home: path25.resolve(input.home)
   };
 }
 async function joinWorkspace(input) {
   const normalized = await normalizeInput3(input);
   validateContextRemote(normalized.context_remote);
   const contextHead = await remoteHead(normalized.context_remote);
-  const temporaryRoot = await fs21.mkdtemp(path24.join(tmpdir(), "acs-join-preview-"));
+  const temporaryRoot = await fs22.mkdtemp(path25.join(tmpdir(), "acs-join-preview-"));
   let workspace;
   try {
-    const temporaryContext = path24.join(temporaryRoot, "context");
+    const temporaryContext = path25.join(temporaryRoot, "context");
     await cloneContext(normalized.context_remote, temporaryContext, contextHead);
     workspace = await readWorkspaceManifest(temporaryContext);
   } finally {
-    await fs21.rm(temporaryRoot, { recursive: true, force: true });
+    await fs22.rm(temporaryRoot, { recursive: true, force: true });
   }
   if (workspace.context_remote !== normalized.context_remote) {
     throw new Error("Context remote does not match workspace manifest");
@@ -32706,7 +33139,7 @@ async function joinWorkspace(input) {
     const candidates = localPaths.get(repository.repo_id) ?? [];
     const candidatePaths = candidates.map((candidate) => candidate.realPath).sort(compareCodeUnits);
     const requestedRaw = input.bindings?.[repository.repo_id];
-    const requested = requestedRaw === void 0 ? void 0 : await fs21.realpath(path24.resolve(requestedRaw));
+    const requested = requestedRaw === void 0 ? void 0 : await fs22.realpath(path25.resolve(requestedRaw));
     if (requested !== void 0 && !candidatePaths.includes(requested)) {
       throw appError(
         "INVALID_BINDING",
@@ -32727,7 +33160,7 @@ async function joinWorkspace(input) {
     });
   }
   const filesToWrite = [
-    path24.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
+    path25.join(normalized.home, "workspaces", `${workspace.workspace_id}.yaml`)
   ];
   const approval = {
     workspace_id: workspace.workspace_id,
@@ -32772,7 +33205,7 @@ async function applyApprovedJoin(preview) {
     await assertRemoteHead(input.context_remote, preview.context_head);
     await installContextTransaction(transaction.context_path, contextPath);
   } finally {
-    await fs21.rm(transaction.root, { recursive: true, force: true });
+    await fs22.rm(transaction.root, { recursive: true, force: true });
   }
   const repositoryPaths = {};
   for (const repository of preview.repositories) {
@@ -32783,7 +33216,7 @@ async function applyApprovedJoin(preview) {
   const local = {
     schema_version: 1,
     workspace_id: workspace.workspace_id,
-    context_path: await fs21.realpath(contextPath),
+    context_path: await fs22.realpath(contextPath),
     repository_paths: repositoryPaths
   };
   await writeLocalWorkspace(input.home, local);
@@ -32798,16 +33231,16 @@ async function applyJoin(previewId, home) {
 }
 
 // src/commands/reconcile.ts
-import { createHash as createHash16, createHmac as createHmac5, randomBytes as randomBytes6, timingSafeEqual as timingSafeEqual5 } from "node:crypto";
+import { createHash as createHash17, createHmac as createHmac5, randomBytes as randomBytes6, timingSafeEqual as timingSafeEqual5 } from "node:crypto";
 import { constants as fsConstants6 } from "node:fs";
-import * as fs22 from "node:fs/promises";
-import path25 from "node:path";
+import * as fs23 from "node:fs/promises";
+import path26 from "node:path";
 
 // src/merge/knowledge-merge.ts
-import { createHash as createHash15 } from "node:crypto";
+import { createHash as createHash16 } from "node:crypto";
 function fingerprint(entry) {
   if (entry === void 0) return "";
-  return createHash15("sha256").update(serializeKnowledge(entry)).digest("hex");
+  return createHash16("sha256").update(serializeKnowledge(entry)).digest("hex");
 }
 function byId(entries) {
   const map2 = /* @__PURE__ */ new Map();
@@ -32825,8 +33258,8 @@ function sameStringSet(left, right) {
   return left.every((value) => rightSet.has(value));
 }
 function conflictId(type, ids) {
-  const digest5 = createHash15("sha256").update(`${type}:${[...ids].sort(compareCodeUnits).join(",")}`).digest("hex").slice(0, 16);
-  return `conflict_${digest5}`;
+  const digest6 = createHash16("sha256").update(`${type}:${[...ids].sort(compareCodeUnits).join(",")}`).digest("hex").slice(0, 16);
+  return `conflict_${digest6}`;
 }
 function classifySameEntry(id, base, local, remote) {
   const conflicts = [];
@@ -33118,35 +33551,35 @@ var storedReconcilePreviewSchema = external_exports.strictObject({
   preview: reconcilePreviewSchema,
   mac: external_exports.string().regex(HASH5)
 });
-function digest4(contents) {
-  return `sha256:${createHash16("sha256").update(contents).digest("hex")}`;
+function digest5(contents) {
+  return `sha256:${createHash17("sha256").update(contents).digest("hex")}`;
 }
 function packetsDirectory3(home) {
-  return path25.resolve(home, "reconcile-packets");
+  return path26.resolve(home, "reconcile-packets");
 }
 function packetRecordPath3(home, packetId) {
   if (!PACKET_ID5.test(packetId)) {
     throw appError("INVALID_PACKET", "Reconcile packet ID is invalid");
   }
-  return path25.join(packetsDirectory3(home), `${packetId}.json`);
+  return path26.join(packetsDirectory3(home), `${packetId}.json`);
 }
 function previewsDirectory5(home) {
-  return path25.resolve(home, "reconcile-previews");
+  return path26.resolve(home, "reconcile-previews");
 }
 function previewRecordPath2(home, previewId) {
   if (!PREVIEW_ID5.test(previewId)) {
     throw appError("INVALID_PREVIEW", "Preview ID is invalid");
   }
-  return path25.join(previewsDirectory5(home), `${previewId}.json`);
+  return path26.join(previewsDirectory5(home), `${previewId}.json`);
 }
 function usedPreviewPath2(home, previewId) {
   if (!PREVIEW_ID5.test(previewId)) {
     throw appError("INVALID_PREVIEW", "Preview ID is invalid");
   }
-  return path25.join(previewsDirectory5(home), `${previewId}.used`);
+  return path26.join(previewsDirectory5(home), `${previewId}.used`);
 }
 function keyPath5(home) {
-  return path25.resolve(home, "reconcile-preview-auth.key");
+  return path26.resolve(home, "reconcile-preview-auth.key");
 }
 function knowledgeRelativePath3(entry) {
   if (entry.scope === "workspace") return `knowledge/workspace/${entry.id}.md`;
@@ -33208,8 +33641,8 @@ async function loadKnowledgeAtRevision(contextPath, revision, registeredReposito
   return entries;
 }
 async function persistPacket(home, packet) {
-  await fs22.mkdir(home, { recursive: true, mode: 448 });
-  await fs22.mkdir(packetsDirectory3(home), { recursive: true, mode: 448 });
+  await fs23.mkdir(home, { recursive: true, mode: 448 });
+  await fs23.mkdir(packetsDirectory3(home), { recursive: true, mode: 448 });
   const record2 = {
     packet,
     workspaceId: packet.workspace_id
@@ -33219,7 +33652,7 @@ async function persistPacket(home, packet) {
 async function loadPacket(home, packetId) {
   let raw;
   try {
-    raw = await fs22.readFile(packetRecordPath3(home, packetId), "utf8");
+    raw = await fs23.readFile(packetRecordPath3(home, packetId), "utf8");
   } catch (error51) {
     if (error51.code === "ENOENT") {
       throw appError("INVALID_PACKET", "Reconcile packet does not exist");
@@ -33238,7 +33671,7 @@ async function loadPacket(home, packetId) {
   }
 }
 function filesHash3(preview) {
-  return createHash16("sha256").update(preview.entries.map((item) => `${item.path}
+  return createHash17("sha256").update(preview.entries.map((item) => `${item.path}
 ${item.bytes}`).join("\n")).digest("hex");
 }
 function authenticatedBytes5(expiresAt, localHeadValue, remoteHeadValue, filesDigest, preview) {
@@ -33257,7 +33690,7 @@ function macFor5(key, expiresAt, localHeadValue, remoteHeadValue, filesDigest, p
 async function readValidatedKey5(file2) {
   let handle;
   try {
-    handle = await fs22.open(file2, fsConstants6.O_RDONLY | fsConstants6.O_NOFOLLOW);
+    handle = await fs23.open(file2, fsConstants6.O_RDONLY | fsConstants6.O_NOFOLLOW);
   } catch (error51) {
     if (error51.code === "ENOENT") throw error51;
     throw appError("INVALID_PREVIEW", "Reconcile preview authentication key is invalid");
@@ -33287,10 +33720,10 @@ async function previewKey5(home) {
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
   }
-  await fs22.mkdir(path25.dirname(file2), { recursive: true, mode: 448 });
+  await fs23.mkdir(path26.dirname(file2), { recursive: true, mode: 448 });
   const candidate = randomBytes6(32).toString("base64");
   try {
-    const handle = await fs22.open(file2, "wx", 384);
+    const handle = await fs23.open(file2, "wx", 384);
     try {
       await handle.chmod(384);
       await handle.writeFile(candidate, "utf8");
@@ -33306,16 +33739,16 @@ async function previewKey5(home) {
 }
 async function ensurePreviewDirectory5(home) {
   const directory = previewsDirectory5(home);
-  await fs22.mkdir(home, { recursive: true, mode: 448 });
+  await fs23.mkdir(home, { recursive: true, mode: 448 });
   let created = false;
   try {
-    await fs22.mkdir(directory, { mode: 448 });
+    await fs23.mkdir(directory, { mode: 448 });
     created = true;
   } catch (error51) {
     if (error51.code !== "EEXIST") throw error51;
   }
-  if (created) await fs22.chmod(directory, 448);
-  const info = await fs22.lstat(directory).catch(() => void 0);
+  if (created) await fs23.chmod(directory, 448);
+  const info = await fs23.lstat(directory).catch(() => void 0);
   if (info === void 0 || !info.isDirectory() || info.isSymbolicLink() || (info.mode & 511) !== 448) {
     throw appError("INVALID_PREVIEW", "Reconcile preview directory is invalid");
   }
@@ -33339,7 +33772,7 @@ async function saveReconcilePreview(home, preview) {
 async function readAuthenticatedPreview5(home, file2, previewId, now = Date.now()) {
   let parsed;
   try {
-    parsed = JSON.parse(await fs22.readFile(file2, "utf8"));
+    parsed = JSON.parse(await fs23.readFile(file2, "utf8"));
   } catch {
     throw appError("INVALID_PREVIEW", "Stored reconcile preview is invalid");
   }
@@ -33372,7 +33805,7 @@ async function peekReconcilePreview(home, previewId) {
   } catch (error51) {
     if (error51.code !== "INVALID_PREVIEW") throw error51;
     try {
-      await fs22.access(usedPreviewPath2(home, previewId));
+      await fs23.access(usedPreviewPath2(home, previewId));
       throw appError("PREVIEW_ALREADY_USED", "Reconcile preview has already been applied");
     } catch (usedError) {
       if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
@@ -33385,11 +33818,11 @@ async function claimReconcilePreview(home, previewId) {
   const pending = previewRecordPath2(home, previewId);
   const used = usedPreviewPath2(home, previewId);
   try {
-    await fs22.rename(pending, used);
+    await fs23.rename(pending, used);
   } catch (error51) {
     if (error51.code !== "ENOENT") throw error51;
     try {
-      await fs22.access(used);
+      await fs23.access(used);
       throw appError("PREVIEW_ALREADY_USED", "Reconcile preview has already been applied");
     } catch (usedError) {
       if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
@@ -33457,7 +33890,7 @@ function resolveConflictEntry(conflict, resolution, nowIso) {
   }];
 }
 async function prepareReconcile(input) {
-  const home = path25.resolve(input.home);
+  const home = path26.resolve(input.home);
   const local = await readLocalWorkspace(home, input.workspaceId);
   const contextPath = await assertLocalContextCheckout(
     home,
@@ -33509,13 +33942,13 @@ async function prepareReconcile(input) {
   };
   const packet = {
     ...withoutHash,
-    packet_hash: digest4(canonicalPacketBytes(withoutHash))
+    packet_hash: digest5(canonicalPacketBytes(withoutHash))
   };
   await persistPacket(home, packet);
   return packet;
 }
 async function previewReconcile(packetId, proposal, options) {
-  const home = path25.resolve(options.home);
+  const home = path26.resolve(options.home);
   const record2 = await loadPacket(home, packetId);
   const packet = record2.packet;
   const parsed = reconcileProposalSchema.safeParse(proposal);
@@ -33641,7 +34074,7 @@ async function configureCommitter2(contextPath) {
 }
 async function abortMergeIfPresent(contextPath) {
   try {
-    await fs22.access(path25.join(contextPath, ".git", "MERGE_HEAD"));
+    await fs23.access(path26.join(contextPath, ".git", "MERGE_HEAD"));
     await runGit(contextPath, ["merge", "--abort"]);
   } catch {
   }
@@ -33676,7 +34109,7 @@ async function applyApprovedReconcile(preview, home) {
   const store = new KnowledgeStore(contextPath, { registeredRepositoryIds });
   try {
     await discardKnowledgeWorkingTree3(contextPath);
-    await fs22.rm(path25.join(contextPath, "knowledge"), { recursive: true, force: true });
+    await fs23.rm(path26.join(contextPath, "knowledge"), { recursive: true, force: true });
     for (const item of preview.entries) {
       await store.put(item.entry);
     }
@@ -33686,11 +34119,11 @@ async function applyApprovedReconcile(preview, home) {
     await discardKnowledgeWorkingTree3(contextPath);
     mapKnowledgeWriteError3(error51);
   }
-  if (await pathExists2(path25.join(contextPath, "knowledge"))) {
+  if (await pathExists2(path26.join(contextPath, "knowledge"))) {
     await runGit(contextPath, ["add", "--", "knowledge"]);
   }
   for (const relative3 of ["workspace.yaml", "repositories", "sources", "schema"]) {
-    if (await pathExists2(path25.join(contextPath, relative3))) {
+    if (await pathExists2(path26.join(contextPath, relative3))) {
       await runGit(contextPath, ["add", "--", relative3]);
     }
   }
@@ -33724,14 +34157,14 @@ ${message}`;
 }
 async function pathExists2(file2) {
   try {
-    await fs22.access(file2);
+    await fs23.access(file2);
     return true;
   } catch {
     return false;
   }
 }
 async function applyReconcile(previewId, home) {
-  const resolvedHome = path25.resolve(home);
+  const resolvedHome = path26.resolve(home);
   const pending = await peekReconcilePreview(resolvedHome, previewId);
   return withWorkspaceLock(resolvedHome, pending.workspace_id, async () => {
     const preview = await claimReconcilePreview(resolvedHome, previewId);
@@ -33912,7 +34345,7 @@ async function traceRun(input) {
       candidates: []
     };
   }
-  const repositoryReports = await inspect({
+  const inspected = await inspect({
     workspaceId: input.workspaceId,
     agent: input.agent,
     home: input.home,
@@ -33921,7 +34354,7 @@ async function traceRun(input) {
     ...input.repositories === void 0 ? {} : { repositories: input.repositories },
     ...input.cwd === void 0 ? {} : { cwd: input.cwd }
   });
-  const stableReport = mergeCoverageReports2(repositoryReports.map((item) => item.report));
+  const stableReport = mergeCoverageReports2(inspected.reports.map((item) => item.report));
   await provider.start(input.command, input.commandArgs ?? []);
   let events;
   try {
@@ -34019,9 +34452,9 @@ function nonNegativeInteger(value, name) {
   return parsed;
 }
 function homePaths() {
-  const homeDir = path28.resolve(process.env.HOME ?? homedir2());
+  const homeDir = path29.resolve(process.env.HOME ?? homedir2());
   return {
-    home: path28.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path28.join(homeDir, ".agent-context-sync")),
+    home: path29.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path29.join(homeDir, ".agent-context-sync")),
     homeDir
   };
 }
@@ -34034,7 +34467,7 @@ function parseBooleanOption(args, name) {
 }
 async function readProposalArgument(value) {
   try {
-    const contents = await fs25.readFile(value, "utf8");
+    const contents = await fs26.readFile(value, "utf8");
     try {
       return JSON.parse(contents);
     } catch {
@@ -34296,14 +34729,15 @@ async function dispatch(command, argv) {
       throw new Error("Option --agent must be claude-code or codex");
     }
     const repositories = many(args, "repository");
-    return { reports: await inspect({
+    const inspected = await inspect({
       workspaceId: one(args, "workspace"),
       agent,
       home,
       homeDir,
       ...repositories.length === 0 ? {} : { repositories },
       ...args.options.has("cwd") ? { cwd: one(args, "cwd") } : {}
-    }) };
+    });
+    return { reports: inspected.reports, stats: inspected.stats };
   }
   if (command === "doctor") {
     assertOptions(args, ["workspace"]);

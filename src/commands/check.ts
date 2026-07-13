@@ -21,6 +21,7 @@ import {
   buildCheckPreview,
   type CheckPreview,
 } from '../verification/proposal.js';
+import { ContentCache } from '../performance/cache.js';
 import {
   assertLocalContextCheckout,
   localHead,
@@ -201,6 +202,7 @@ export async function prepareCheck(input: CheckInput): Promise<VerificationPacke
     : new Set(input.repositories);
   const limits = input.limits ?? DEFAULT_LIMITS;
   const packets: VerificationPacket[] = [];
+  const cache = new ContentCache({ home });
 
   for (const entry of active) {
     const targets = repositoryTargetsForEntry(entry, local.repository_paths, repositoryFilter);
@@ -210,6 +212,7 @@ export async function prepareCheck(input: CheckInput): Promise<VerificationPacke
         repositoryPath: target.repositoryPath,
         repoId: target.repoId,
         limits,
+        cache,
       });
       await persistVerificationPacket(home, packet, {
         workspaceId: input.workspaceId,

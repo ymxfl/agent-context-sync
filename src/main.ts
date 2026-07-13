@@ -426,14 +426,15 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
       throw new Error('Option --agent must be claude-code or codex');
     }
     const repositories = many(args, 'repository');
-    return { reports: await inspect({
+    const inspected = await inspect({
       workspaceId: one(args, 'workspace'),
       agent: agent as AgentName,
       home,
       homeDir,
       ...(repositories.length === 0 ? {} : { repositories }),
       ...(args.options.has('cwd') ? { cwd: one(args, 'cwd') } : {}),
-    }) };
+    });
+    return { reports: inspected.reports, stats: inspected.stats };
   }
   if (command === 'doctor') {
     assertOptions(args, ['workspace']);

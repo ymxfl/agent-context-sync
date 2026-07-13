@@ -92,7 +92,7 @@ export async function traceRun(input: TraceRunInput): Promise<TraceRunResult> {
     };
   }
 
-  const repositoryReports = await inspect({
+  const inspected = await inspect({
     workspaceId: input.workspaceId,
     agent: input.agent,
     home: input.home,
@@ -101,7 +101,7 @@ export async function traceRun(input: TraceRunInput): Promise<TraceRunResult> {
     ...(input.repositories === undefined ? {} : { repositories: input.repositories }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
   });
-  const stableReport = mergeCoverageReports(repositoryReports.map((item) => item.report));
+  const stableReport = mergeCoverageReports(inspected.reports.map((item) => item.report));
 
   await provider.start(input.command, input.commandArgs ?? []);
   let events: TraceEvent[];

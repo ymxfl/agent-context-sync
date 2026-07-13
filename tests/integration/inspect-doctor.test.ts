@@ -106,13 +106,15 @@ describe('inspect and doctor', () => {
     const first = await inspect({ workspaceId, agent: 'codex', home, homeDir: agentHome });
     const second = await inspect({ workspaceId, agent: 'codex', home, homeDir: agentHome });
 
-    expect(first).toEqual(second);
-    expect(first).toHaveLength(1);
-    expect(first[0]).toMatchObject({
+    expect(first.reports).toEqual(second.reports);
+    expect(first.reports).toHaveLength(1);
+    expect(first.reports[0]).toMatchObject({
       repo_id: 'github.com/acme/api',
       report: { agent: 'codex' },
     });
-    expect(first[0]?.report.sources.length).toBeGreaterThan(0);
+    expect(first.reports[0]?.report.sources.length).toBeGreaterThan(0);
+    expect(first.stats.files_read).toBeGreaterThan(0);
+    expect(second.stats.files_read).toBeLessThan(first.stats.files_read);
     expect(await fixtureGit(repository, ['status', '--porcelain=v1'])).toBe(before.status);
     expect(await fixtureGit(repository, ['rev-parse', 'HEAD'])).toBe(before.head);
     expect(await fs.readFile(path.join(repository, 'AGENTS.md'))).toEqual(before.agents);
@@ -124,7 +126,7 @@ describe('inspect and doctor', () => {
     await fs.mkdir(nested, { recursive: true });
     await fs.writeFile(path.join(nested, 'AGENTS.override.md'), '# Nested API\n');
 
-    const [result] = await inspect({
+    const { reports } = await inspect({
       workspaceId,
       agent: 'codex',
       home,
@@ -132,6 +134,7 @@ describe('inspect and doctor', () => {
       repositories: ['github.com/acme/api'],
       cwd: nested,
     });
+    const result = reports[0];
 
     expect(result?.repo_id).toBe('github.com/acme/api');
     expect(result?.report.loadPlan.map((item) => item.locator))
@@ -159,8 +162,9 @@ describe('inspect and doctor', () => {
       expect.objectContaining({ id: 'adapter-version-support', status: 'pass' }),
       expect.objectContaining({ id: 'permissions', status: 'pass' }),
       expect.objectContaining({ id: 'adapter-coverage' }),
+      expect.objectContaining({ id: 'cache-integrity' }),
     ]));
-    expect(report.checks.map((check) => check.id)).toHaveLength(8);
+    expect(report.checks.map((check) => check.id)).toHaveLength(9);
     expect(await fixtureGit(repository, ['rev-parse', 'HEAD'])).toBe(beforeHead);
   });
 
