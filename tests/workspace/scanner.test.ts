@@ -2,10 +2,13 @@ import { lstat, mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { scanRepositories } from '../../src/workspace/scanner.js';
 import { initFixtureRepository } from '../helpers/git.js';
+
+// Real Git repositories and filesystem scans can take over 20 seconds on slower CI hosts.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 const fixtureParent = path.resolve('tests', 'fixtures', 'workspace-scan');
 

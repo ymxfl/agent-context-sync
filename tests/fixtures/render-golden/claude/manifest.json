@@ -1,0 +1,19 @@
+[
+  {
+    "relativePath": "CLAUDE.md",
+    "sha256": "sha256:8467bfb1215436e7cdd12cf4cad36334aa7b214f35c37d82deb4bbd44669afeb",
+    "sourceKnowledgeIds": [
+      "kn_01J00000000000000000000040",
+      "kn_01J00000000000000000000041",
+      "kn_01J00000000000000000000043",
+      "kn_01J00000000000000000000044"
+    ]
+  },
+  {
+    "relativePath": ".claude/rules/scope-309fbaefedf68ced.md",
+    "sha256": "sha256:0443c6e9fca882ec9dabb7ea901c114011ef697bda721662b463429b9e455fd6",
+    "sourceKnowledgeIds": [
+      "kn_01J00000000000000000000042"
+    ]
+  }
+]

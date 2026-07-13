@@ -5,10 +5,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { createBareRemote, fixtureGit, initFixtureRepository } from '../helpers/git.js';
 import { invoke } from '../helpers/invoke.js';
+
+// Real Git daemons and repositories can take over 20 seconds on slower CI hosts.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 const execFileAsync = promisify(execFile);
 

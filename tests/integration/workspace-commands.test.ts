@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { parse, stringify } from 'yaml';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   cloneContext,
@@ -32,6 +32,9 @@ import {
   fixtureGit,
   initFixtureRepository,
 } from '../helpers/git.js';
+
+// Real Git daemons and repositories can take over 20 seconds on slower CI hosts.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 function previewHome(preview: WorkspacePreview): string {
   return preview.normalized_input.home;

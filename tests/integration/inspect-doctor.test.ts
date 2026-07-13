@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { adapterFor, type AdapterRegistry } from '../../src/adapters/registry.js';
 import { doctor } from '../../src/commands/doctor.js';
@@ -12,6 +12,9 @@ import { inspect } from '../../src/commands/inspect.js';
 import { applyInit, initWorkspace } from '../../src/commands/init.js';
 import { readLocalWorkspace, writeLocalWorkspace } from '../../src/workspace/local-registry.js';
 import { createBareRemote, fixtureGit, initFixtureRepository } from '../helpers/git.js';
+
+// Real Git daemons and repositories can take over 20 seconds on slower CI hosts.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 async function availablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
