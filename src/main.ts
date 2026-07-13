@@ -14,6 +14,7 @@ import { doctor } from './commands/doctor.js';
 import { applyInit, initWorkspace } from './commands/init.js';
 import { inspect } from './commands/inspect.js';
 import { applyJoin, joinWorkspace } from './commands/join.js';
+import { prepareReconcile, previewReconcile, applyReconcile } from './commands/reconcile.js';
 import { syncPrepare } from './commands/sync.js';
 
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
@@ -24,6 +25,7 @@ export { doctor } from './commands/doctor.js';
 export { applyInit, initWorkspace } from './commands/init.js';
 export { inspect } from './commands/inspect.js';
 export { applyJoin, joinWorkspace } from './commands/join.js';
+export { prepareReconcile, previewReconcile, applyReconcile } from './commands/reconcile.js';
 export { syncPrepare } from './commands/sync.js';
 
 export interface CommandIO {
@@ -156,11 +158,44 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
   if (command === 'help') {
     if (argv.length > 0) throw new Error('help accepts no arguments');
     return {
-      commands: ['init', 'join', 'add-repo', 'inspect', 'doctor', 'capture', 'check', 'apply', 'sync'],
+      commands: [
+        'init',
+        'join',
+        'add-repo',
+        'inspect',
+        'doctor',
+        'capture',
+        'check',
+        'reconcile',
+        'apply',
+        'sync',
+      ],
     };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
+  if (command === 'reconcile') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {
+      throw new Error('reconcile requires exactly one phase: prepare, preview, or apply');
+    }
+    if (phase === 'apply') {
+      assertOptions(args, ['preview-id']);
+      return { result: await applyReconcile(one(args, 'preview-id'), home) };
+    }
+    if (phase === 'prepare') {
+      assertOptions(args, ['workspace']);
+      return { packet: await prepareReconcile({
+        workspaceId: one(args, 'workspace'),
+        home,
+      }) };
+    }
+    assertOptions(args, ['packet-id', 'proposal']);
+    const proposal = await readProposalArgument(one(args, 'proposal'));
+    return {
+      preview: await previewReconcile(one(args, 'packet-id'), proposal, { home }),
+    };
+  }
   if (command === 'check') {
     const phase = args.positionals[0];
     if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {

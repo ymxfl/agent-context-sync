@@ -112,17 +112,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path26) {
-      const ctrl = callVisitor(key, node, visitor, path26);
+    function visit_(key, node, visitor, path27) {
+      const ctrl = callVisitor(key, node, visitor, path27);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path26, ctrl);
-        return visit_(key, ctrl, visitor, path26);
+        replaceNode(key, path27, ctrl);
+        return visit_(key, ctrl, visitor, path27);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path26 = Object.freeze(path26.concat(node));
+          path27 = Object.freeze(path27.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path26);
+            const ci = visit_(i, node.items[i], visitor, path27);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -133,13 +133,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path26 = Object.freeze(path26.concat(node));
-          const ck = visit_("key", node.key, visitor, path26);
+          path27 = Object.freeze(path27.concat(node));
+          const ck = visit_("key", node.key, visitor, path27);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path26);
+          const cv = visit_("value", node.value, visitor, path27);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -160,17 +160,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path26) {
-      const ctrl = await callVisitor(key, node, visitor, path26);
+    async function visitAsync_(key, node, visitor, path27) {
+      const ctrl = await callVisitor(key, node, visitor, path27);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path26, ctrl);
-        return visitAsync_(key, ctrl, visitor, path26);
+        replaceNode(key, path27, ctrl);
+        return visitAsync_(key, ctrl, visitor, path27);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path26 = Object.freeze(path26.concat(node));
+          path27 = Object.freeze(path27.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path26);
+            const ci = await visitAsync_(i, node.items[i], visitor, path27);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -181,13 +181,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path26 = Object.freeze(path26.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path26);
+          path27 = Object.freeze(path27.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path27);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path26);
+          const cv = await visitAsync_("value", node.value, visitor, path27);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -214,23 +214,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path26) {
+    function callVisitor(key, node, visitor, path27) {
       if (typeof visitor === "function")
-        return visitor(key, node, path26);
+        return visitor(key, node, path27);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path26);
+        return visitor.Map?.(key, node, path27);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path26);
+        return visitor.Seq?.(key, node, path27);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path26);
+        return visitor.Pair?.(key, node, path27);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path26);
+        return visitor.Scalar?.(key, node, path27);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path26);
+        return visitor.Alias?.(key, node, path27);
       return void 0;
     }
-    function replaceNode(key, path26, node) {
-      const parent = path26[path26.length - 1];
+    function replaceNode(key, path27, node) {
+      const parent = path27[path27.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -840,10 +840,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path26, value) {
+    function collectionFromPath(schema, path27, value) {
       let v = value;
-      for (let i = path26.length - 1; i >= 0; --i) {
-        const k = path26[i];
+      for (let i = path27.length - 1; i >= 0; --i) {
+        const k = path27[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -862,7 +862,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path26) => path26 == null || typeof path26 === "object" && !!path26[Symbol.iterator]().next().done;
+    var isEmptyPath = (path27) => path27 == null || typeof path27 === "object" && !!path27[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -892,11 +892,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path26, value) {
-        if (isEmptyPath(path26))
+      addIn(path27, value) {
+        if (isEmptyPath(path27))
           this.add(value);
         else {
-          const [key, ...rest] = path26;
+          const [key, ...rest] = path27;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -910,8 +910,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path26) {
-        const [key, ...rest] = path26;
+      deleteIn(path27) {
+        const [key, ...rest] = path27;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -925,8 +925,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path26, keepScalar) {
-        const [key, ...rest] = path26;
+      getIn(path27, keepScalar) {
+        const [key, ...rest] = path27;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -944,8 +944,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path26) {
-        const [key, ...rest] = path26;
+      hasIn(path27) {
+        const [key, ...rest] = path27;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -955,8 +955,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path26, value) {
-        const [key, ...rest] = path26;
+      setIn(path27, value) {
+        const [key, ...rest] = path27;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3471,9 +3471,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path26, value) {
+      addIn(path27, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path26, value);
+          this.contents.addIn(path27, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3548,14 +3548,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path26) {
-        if (Collection.isEmptyPath(path26)) {
+      deleteIn(path27) {
+        if (Collection.isEmptyPath(path27)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path26) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path27) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3570,10 +3570,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path26, keepScalar) {
-        if (Collection.isEmptyPath(path26))
+      getIn(path27, keepScalar) {
+        if (Collection.isEmptyPath(path27))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path26, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path27, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3584,10 +3584,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path26) {
-        if (Collection.isEmptyPath(path26))
+      hasIn(path27) {
+        if (Collection.isEmptyPath(path27))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path26) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path27) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3604,13 +3604,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path26, value) {
-        if (Collection.isEmptyPath(path26)) {
+      setIn(path27, value) {
+        if (Collection.isEmptyPath(path27)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path26), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path27), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path26, value);
+          this.contents.setIn(path27, value);
         }
       }
       /**
@@ -5570,9 +5570,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path26) => {
+    visit.itemAtPath = (cst, path27) => {
       let item = cst;
-      for (const [field, index] of path26) {
+      for (const [field, index] of path27) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5581,23 +5581,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path26) => {
-      const parent = visit.itemAtPath(cst, path26.slice(0, -1));
-      const field = path26[path26.length - 1][0];
+    visit.parentCollection = (cst, path27) => {
+      const parent = visit.itemAtPath(cst, path27.slice(0, -1));
+      const field = path27[path27.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path26, item, visitor) {
-      let ctrl = visitor(item, path26);
+    function _visit(path27, item, visitor) {
+      let ctrl = visitor(item, path27);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path26.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path27.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5608,10 +5608,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path26);
+            ctrl = ctrl(item, path27);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path26) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path27) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6913,14 +6913,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs23 = this.flowScalar(this.type);
+              const fs24 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map2.items.push({ start, key: fs23, sep: [] });
+                map2.items.push({ start, key: fs24, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs23);
+                this.stack.push(fs24);
               } else {
-                Object.assign(it, { key: fs23, sep: [] });
+                Object.assign(it, { key: fs24, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7048,13 +7048,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs23 = this.flowScalar(this.type);
+              const fs24 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs23, sep: [] });
+                fc.items.push({ start: [], key: fs24, sep: [] });
               else if (it.sep)
-                this.stack.push(fs23);
+                this.stack.push(fs24);
               else
-                Object.assign(it, { key: fs23, sep: [] });
+                Object.assign(it, { key: fs24, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7364,9 +7364,9 @@ var require_dist = __commonJS({
 
 // src/main.ts
 import { homedir as homedir2 } from "node:os";
-import path25 from "node:path";
+import path26 from "node:path";
 import { pathToFileURL } from "node:url";
-import * as fs22 from "node:fs/promises";
+import * as fs23 from "node:fs/promises";
 
 // src/domain/compare.ts
 function compareCodeUnits(left, right) {
@@ -8193,10 +8193,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path26) {
-  if (!path26)
+function getElementAtPath(obj, path27) {
+  if (!path27)
     return obj;
-  return path26.reduce((acc, key) => acc?.[key], obj);
+  return path27.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8605,11 +8605,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path26, issues) {
+function prefixIssues(path27, issues) {
   return issues.map((iss) => {
     var _a4;
     (_a4 = iss).path ?? (_a4.path = []);
-    iss.path.unshift(path26);
+    iss.path.unshift(path27);
     return iss;
   });
 }
@@ -8756,16 +8756,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path26 = []) => {
+  const processError = (error52, path27 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path26, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path27, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
       } else {
-        const fullpath = [...path26, ...issue2.path];
+        const fullpath = [...path27, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8792,17 +8792,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path26 = []) => {
+  const processError = (error52, path27 = []) => {
     var _a4, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path26, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path27, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path26, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
       } else {
-        const fullpath = [...path26, ...issue2.path];
+        const fullpath = [...path27, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8834,8 +8834,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path26 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path26) {
+  const path27 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path27) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -21527,13 +21527,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path26 = ref.slice(1).split("/").filter(Boolean);
-  if (path26.length === 0) {
+  const path27 = ref.slice(1).split("/").filter(Boolean);
+  if (path27.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path26[0] === defsKey) {
-    const key = path26[1];
+  if (path27[0] === defsKey) {
+    const key = path27[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -23226,8 +23226,8 @@ ${entry.reason}`).join("\n\n");
 }
 function stableScopeId(paths) {
   const key = [...paths].sort(compareCodeUnits).join("\n");
-  const digest4 = createHash3("sha256").update(key).digest("hex").slice(0, 16);
-  return `scope-${digest4}`;
+  const digest5 = createHash3("sha256").update(key).digest("hex").slice(0, 16);
+  return `scope-${digest5}`;
 }
 function pathGroupKey(paths) {
   return [...paths].sort(compareCodeUnits).join("\n");
@@ -23888,16 +23888,16 @@ var Diff = class {
       }
     }
   }
-  addToPath(path26, added, removed, oldPosInc, options) {
-    const last = path26.lastComponent;
+  addToPath(path27, added, removed, oldPosInc, options) {
+    const last = path27.lastComponent;
     if (last && !options.oneChangePerToken && last.added === added && last.removed === removed) {
       return {
-        oldPos: path26.oldPos + oldPosInc,
+        oldPos: path27.oldPos + oldPosInc,
         lastComponent: { count: last.count + 1, added, removed, previousComponent: last.previousComponent }
       };
     } else {
       return {
-        oldPos: path26.oldPos + oldPosInc,
+        oldPos: path27.oldPos + oldPosInc,
         lastComponent: { count: 1, added, removed, previousComponent: last }
       };
     }
@@ -24306,7 +24306,7 @@ var ROOT = "CLAUDE.md";
 var DEFAULT_MAX_ROOT_LINES = 200;
 function renderRuleFile(paths, entries, header) {
   const scopeId = stableScopeId(paths);
-  const yamlPaths = [...paths].sort(compareCodeUnits).map((path26) => `  - ${path26}`).join("\n");
+  const yamlPaths = [...paths].sort(compareCodeUnits).map((path27) => `  - ${path27}`).join("\n");
   const body = [
     "---",
     "paths:",
@@ -24364,7 +24364,7 @@ function renderClaude(input) {
   if (rulePaths2.length > 0) {
     pathNote = [
       "Path-scoped rules are loaded from `.claude/rules/` (complete projection; do not import AGENTS.md).",
-      ...rulePaths2.sort(compareCodeUnits).map((path26) => `- ${path26}`)
+      ...rulePaths2.sort(compareCodeUnits).map((path27) => `- ${path27}`)
     ].join("\n");
   }
   let rootBody = [
@@ -24464,7 +24464,7 @@ function renderCodex(input) {
   const rootEntries = compiled.sections.filter((section) => section.id !== "path").flatMap((section) => section.entries);
   const pathNote = [
     "Path-scoped guidance lives in nested AGENTS.md files nearest those paths.",
-    ...nestedPaths.sort(compareCodeUnits).map((path26) => `- ${path26}`)
+    ...nestedPaths.sort(compareCodeUnits).map((path27) => `- ${path27}`)
   ].join("\n");
   let root = toRenderedFile(
     ROOT2,
@@ -24509,16 +24509,16 @@ function isResolvedBySupersedes(left, right) {
   return left.supersedes.includes(right.id) || right.supersedes.includes(left.id);
 }
 function detectActiveConflicts(entries) {
-  const byId = /* @__PURE__ */ new Map();
+  const byId2 = /* @__PURE__ */ new Map();
   for (const entry of entries) {
-    if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    if (!byId2.has(entry.id)) byId2.set(entry.id, entry);
   }
   const conflicts = [];
   const seen = /* @__PURE__ */ new Set();
   for (const entry of entries) {
     if (entry.status !== "active") continue;
     for (const targetId of entry.conflicts_with) {
-      const target = byId.get(targetId);
+      const target = byId2.get(targetId);
       if (target === void 0) continue;
       const key = conflictKey(entry.id, targetId);
       if (seen.has(key)) continue;
@@ -26273,10 +26273,10 @@ var Minimatch = class {
       }
       return filtered.join("/");
     }).join("|");
-    const [open8, close] = set2.length > 1 ? ["(?:", ")"] : ["", ""];
-    re = "^" + open8 + re + close + "$";
+    const [open9, close] = set2.length > 1 ? ["(?:", ")"] : ["", ""];
+    re = "^" + open9 + re + close + "$";
     if (this.partial) {
-      re = "^(?:\\/|" + open8 + re.slice(1, -1) + close + ")$";
+      re = "^(?:\\/|" + open9 + re.slice(1, -1) + close + ")$";
     }
     if (this.negate)
       re = "^(?!" + re + ").+$";
@@ -26411,13 +26411,13 @@ function selectionFromTarget(target) {
   };
 }
 function conflictCheckEntries(allEntries2) {
-  const byId = /* @__PURE__ */ new Map();
+  const byId2 = /* @__PURE__ */ new Map();
   for (const entry of allEntries2) {
     if (entry.status === "active" || entry.status === "disputed") {
-      byId.set(entry.id, entry);
+      byId2.set(entry.id, entry);
     }
   }
-  return [...byId.values()];
+  return [...byId2.values()];
 }
 function groupIntoSections(selected, repoId) {
   const buckets = new Map(
@@ -26804,8 +26804,8 @@ function validateKnowledgeGraph(entries) {
       });
     }
   }
-  const byId = /* @__PURE__ */ new Map();
-  for (const entry of entries) if (!byId.has(entry.id)) byId.set(entry.id, entry);
+  const byId2 = /* @__PURE__ */ new Map();
+  for (const entry of entries) if (!byId2.has(entry.id)) byId2.set(entry.id, entry);
   const incomingSupersedes = /* @__PURE__ */ new Set();
   for (const entry of entries) {
     const supersedes = new Set(entry.supersedes);
@@ -26820,7 +26820,7 @@ function validateKnowledgeGraph(entries) {
             message: `${relation} must not reference the entry itself`
           });
         }
-        if (!byId.has(target)) {
+        if (!byId2.has(target)) {
           issues.push({
             code: "MISSING_RELATION_TARGET",
             entry_id: entry.id,
@@ -26829,7 +26829,7 @@ function validateKnowledgeGraph(entries) {
             message: `${relation} target ${target} is missing`
           });
         }
-        if (relation === "supersedes" && target !== entry.id && byId.has(target)) {
+        if (relation === "supersedes" && target !== entry.id && byId2.has(target)) {
           incomingSupersedes.add(target);
         }
       }
@@ -26867,13 +26867,13 @@ function validateKnowledgeGraph(entries) {
     }
     visiting.add(id);
     stack.push(id);
-    const targets = [...byId.get(id)?.supersedes ?? []].sort(compareCodeUnits);
-    for (const target of targets) if (target !== id && byId.has(target)) visit(target);
+    const targets = [...byId2.get(id)?.supersedes ?? []].sort(compareCodeUnits);
+    for (const target of targets) if (target !== id && byId2.has(target)) visit(target);
     stack.pop();
     visiting.delete(id);
     visited.add(id);
   }
-  for (const id of [...byId.keys()].sort(compareCodeUnits)) visit(id);
+  for (const id of [...byId2.keys()].sort(compareCodeUnits)) visit(id);
   for (const id of cycleMembers) {
     issues.push({
       code: "SUPERSEDES_CYCLE",
@@ -27756,27 +27756,27 @@ var KnowledgeStore = class {
     if (previous !== void 0 && previous.file !== target) {
       throw new Error("Knowledge scope cannot move an existing ID to a different path");
     }
-    const byId = new Map(stored.map((item) => [item.entry.id, item.entry]));
-    byId.set(validated.id, validated);
-    for (const conflictId of validated.conflicts_with) {
-      const conflict = byId.get(conflictId);
+    const byId2 = new Map(stored.map((item) => [item.entry.id, item.entry]));
+    byId2.set(validated.id, validated);
+    for (const conflictId2 of validated.conflicts_with) {
+      const conflict = byId2.get(conflictId2);
       if (conflict !== void 0 && !conflict.conflicts_with.includes(validated.id)) {
-        byId.set(conflictId, {
+        byId2.set(conflictId2, {
           ...conflict,
           conflicts_with: [...conflict.conflicts_with, validated.id]
         });
       }
     }
-    for (const [id, current] of byId) {
+    for (const [id, current] of byId2) {
       if (id === validated.id || validated.conflicts_with.includes(id)) continue;
       if (current.conflicts_with.includes(validated.id)) {
-        byId.set(id, {
+        byId2.set(id, {
           ...current,
           conflicts_with: current.conflicts_with.filter((targetId) => targetId !== validated.id)
         });
       }
     }
-    const entries = [...byId.values()];
+    const entries = [...byId2.values()];
     const error51 = graphError(entries);
     if (error51) throw error51;
     entries.sort((left, right) => compareCodeUnits(left.id, right.id));
@@ -27951,10 +27951,10 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep as sep2 } from "node:path";
 var import_yaml4 = __toESM(require_dist(), 1);
 var defaultFileSystem = {
-  readFile: (path26) => nodeReadFile(path26, "utf8"),
-  readdir: (path26, options) => nodeReaddir(path26, options),
-  realpath: (path26) => nodeRealpath(path26),
-  stat: (path26) => nodeStat(path26)
+  readFile: (path27) => nodeReadFile(path27, "utf8"),
+  readdir: (path27, options) => nodeReaddir(path27, options),
+  realpath: (path27) => nodeRealpath(path27),
+  stat: (path27) => nodeStat(path27)
 };
 var AGENT = "claude-code";
 function isInside(parent, child) {
@@ -27967,23 +27967,23 @@ function uniqueSorted(values) {
 function coverage(id, status, detail, locator) {
   return { id, status, detail, ...locator === void 0 ? {} : { locator } };
 }
-async function readableFile(fs23, path26) {
+async function readableFile(fs24, path27) {
   try {
-    if (!(await fs23.stat(path26)).isFile()) return "missing";
-    await fs23.readFile(path26);
+    if (!(await fs24.stat(path27)).isFile()) return "missing";
+    await fs24.readFile(path27);
     return "file";
   } catch (error51) {
     return error51.code === "ENOENT" ? "missing" : "inaccessible";
   }
 }
-async function walkMarkdown(fs23, root) {
+async function walkMarkdown(fs24, root) {
   const files = [];
   const inaccessible = [];
   const escapes = [];
   const visited = /* @__PURE__ */ new Set();
   let canonicalRoot;
   try {
-    canonicalRoot = await fs23.realpath(root);
+    canonicalRoot = await fs24.realpath(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
     return { files, inaccessible, escapes };
@@ -27991,7 +27991,7 @@ async function walkMarkdown(fs23, root) {
   async function visit(directory) {
     let canonical;
     try {
-      canonical = await fs23.realpath(directory);
+      canonical = await fs24.realpath(directory);
     } catch {
       inaccessible.push(directory);
       return;
@@ -28004,7 +28004,7 @@ async function walkMarkdown(fs23, root) {
     visited.add(canonical);
     let entries;
     try {
-      entries = await fs23.readdir(directory, { withFileTypes: true });
+      entries = await fs24.readdir(directory, { withFileTypes: true });
     } catch {
       inaccessible.push(directory);
       return;
@@ -28012,32 +28012,32 @@ async function walkMarkdown(fs23, root) {
     entries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of entries) {
       if (entry.name === ".git" || entry.name === "node_modules") continue;
-      const path26 = join(directory, entry.name);
+      const path27 = join(directory, entry.name);
       if (entry.isDirectory() || entry.isSymbolicLink()) {
         let target;
         try {
-          target = await fs23.stat(path26);
+          target = await fs24.stat(path27);
         } catch {
-          inaccessible.push(path26);
+          inaccessible.push(path27);
           continue;
         }
-        if (target.isDirectory()) await visit(path26);
+        if (target.isDirectory()) await visit(path27);
         else if (target.isFile() && entry.name.endsWith(".md")) {
           try {
-            const canonicalFile = await fs23.realpath(path26);
-            if (isInside(canonicalRoot, canonicalFile)) files.push(path26);
-            else escapes.push(path26);
+            const canonicalFile = await fs24.realpath(path27);
+            if (isInside(canonicalRoot, canonicalFile)) files.push(path27);
+            else escapes.push(path27);
           } catch {
-            inaccessible.push(path26);
+            inaccessible.push(path27);
           }
         }
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        files.push(path26);
+        files.push(path27);
       }
     }
   }
   try {
-    if ((await fs23.stat(root)).isDirectory()) await visit(root);
+    if ((await fs24.stat(root)).isDirectory()) await visit(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
   }
@@ -28107,8 +28107,8 @@ function importedPaths(markdown) {
   }
   return imports;
 }
-function resolveTilde(path26, homeDir) {
-  return path26 === "~" ? homeDir : path26.startsWith(`~${sep2}`) || path26.startsWith("~/") ? join(homeDir, path26.slice(2)) : path26;
+function resolveTilde(path27, homeDir) {
+  return path27 === "~" ? homeDir : path27.startsWith(`~${sep2}`) || path27.startsWith("~/") ? join(homeDir, path27.slice(2)) : path27;
 }
 function rulePaths(markdown) {
   const match2 = markdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -28132,8 +28132,8 @@ var ClaudeAdapter = class {
     supported: true
   };
   fs;
-  constructor(fs23 = {}) {
-    this.fs = { ...defaultFileSystem, ...fs23 };
+  constructor(fs24 = {}) {
+    this.fs = { ...defaultFileSystem, ...fs24 };
   }
   render(input) {
     return renderClaude(input);
@@ -28172,10 +28172,10 @@ var ClaudeAdapter = class {
         repositoryRoot
       ));
     }
-    const safeShareability = async (path26, intended) => {
+    const safeShareability = async (path27, intended) => {
       if (intended !== "team") return intended;
       try {
-        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path26)) ? "team" : "personal";
+        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path27)) ? "team" : "personal";
       } catch {
         return "personal";
       }
@@ -28217,14 +28217,14 @@ var ClaudeAdapter = class {
     const excludes = uniqueSorted(parsedLayers.flatMap(
       ({ settings }) => Array.isArray(settings.claudeMdExcludes) ? settings.claudeMdExcludes.filter((item) => typeof item === "string") : []
     ));
-    const isExcluded = (path26) => excludes.some(
-      (pattern) => minimatch(path26, resolveTilde(pattern, homeDir), { dot: true })
+    const isExcluded = (path27) => excludes.some(
+      (pattern) => minimatch(path27, resolveTilde(pattern, homeDir), { dot: true })
     );
-    for (const path26 of uniqueSorted(input.managedInstructionPaths ?? [])) {
-      const status = await readableFile(this.fs, path26);
+    for (const path27 of uniqueSorted(input.managedInstructionPaths ?? [])) {
+      const status = await readableFile(this.fs, path27);
       if (status === "file") {
         foundInstructions.push({
-          locator: path26,
+          locator: path27,
           sourceType: "managed-instructions",
           shareability: "managed",
           loading: "reported-only"
@@ -28234,7 +28234,7 @@ var ClaudeAdapter = class {
           "claude-managed-inaccessible",
           status === "inaccessible" ? "inaccessible" : "unknown",
           status === "inaccessible" ? "Managed instructions are unreadable." : "Managed instructions do not exist.",
-          path26
+          path27
         ));
       }
     }
@@ -28299,33 +28299,33 @@ var ClaudeAdapter = class {
       }
     }
     const descendants = await walkMarkdown(this.fs, repositoryRoot);
-    for (const path26 of descendants.files) {
-      const name = path26.slice(path26.lastIndexOf(sep2) + 1);
+    for (const path27 of descendants.files) {
+      const name = path27.slice(path27.lastIndexOf(sep2) + 1);
       if (name !== "CLAUDE.md" && name !== "CLAUDE.local.md") continue;
-      if (path26.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path26) || path26 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
-      if (isExcluded(path26)) {
-        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path26));
+      if (path27.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path27) || path27 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
+      if (isExcluded(path27)) {
+        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path27));
         continue;
       }
-      const descendantStatus = await readableFile(this.fs, path26);
+      const descendantStatus = await readableFile(this.fs, path27);
       if (descendantStatus !== "file") {
-        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path26));
+        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path27));
         continue;
       }
       foundInstructions.push({
-        locator: path26,
+        locator: path27,
         sourceType: name === "CLAUDE.local.md" ? "local-instructions" : "project-instructions",
         shareability: name === "CLAUDE.local.md" ? "personal" : "team",
         loading: "on-demand"
       });
     }
-    for (const path26 of descendants.inaccessible) {
-      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path26));
+    for (const path27 of descendants.inaccessible) {
+      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path27));
     }
-    for (const path26 of descendants.escapes) {
-      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path26));
+    for (const path27 of descendants.escapes) {
+      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path27));
     }
-    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path26) => resolve(path26)));
+    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path27) => resolve(path27)));
     if (additionalDirectories.length > 0 && !input.includeAdditionalDirectoryInstructions) {
       coverageItems.push(coverage(
         "claude-additional-directories-disabled",
@@ -28371,46 +28371,46 @@ var ClaudeAdapter = class {
     ];
     for (const ruleRoot of ruleRoots) {
       const walked = await walkMarkdown(this.fs, ruleRoot.path);
-      for (const path26 of walked.files) {
-        if (isExcluded(path26)) {
-          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path26));
+      for (const path27 of walked.files) {
+        if (isExcluded(path27)) {
+          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path27));
           continue;
         }
         let paths;
         try {
-          paths = rulePaths(await this.fs.readFile(path26));
+          paths = rulePaths(await this.fs.readFile(path27));
         } catch {
-          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path26));
+          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path27));
           continue;
         }
         sources.push({
           agent: AGENT,
           sourceType: ruleRoot.sourceType,
-          locator: path26,
-          shareability: await safeShareability(path26, ruleRoot.shareability),
+          locator: path27,
+          shareability: await safeShareability(path27, ruleRoot.shareability),
           status: "available",
           ...paths === void 0 ? {} : { pathScope: paths }
         });
       }
-      for (const path26 of walked.inaccessible) {
-        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path26));
+      for (const path27 of walked.inaccessible) {
+        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path27));
       }
-      for (const path26 of walked.escapes) {
-        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path26));
+      for (const path27 of walked.escapes) {
+        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path27));
       }
     }
     const instructionSourcePaths = foundInstructions.filter((item) => item.loading !== "reported-only").map((item) => item.locator);
     const importSources = /* @__PURE__ */ new Map();
-    const visitImports = async (path26, depth, ancestors, inheritedShareability) => {
+    const visitImports = async (path27, depth, ancestors, inheritedShareability) => {
       let canonicalPath;
       try {
-        canonicalPath = await this.fs.realpath(path26);
+        canonicalPath = await this.fs.realpath(path27);
       } catch (error51) {
         coverageItems.push(coverage(
           "claude-import-inaccessible",
           error51.code === "ENOENT" ? "unknown" : "inaccessible",
           "Import source could not be canonicalized.",
-          path26
+          path27
         ));
         return;
       }
@@ -28422,7 +28422,7 @@ var ClaudeAdapter = class {
         return;
       }
       for (const imported of importedPaths(text)) {
-        const candidate = resolve(dirname(path26), resolveTilde(imported, homeDir));
+        const candidate = resolve(dirname(path27), resolveTilde(imported, homeDir));
         if (depth >= 4) {
           coverageItems.push(coverage("claude-import-depth", "partial", "Import exceeds the maximum depth of four hops.", candidate));
           continue;
@@ -29260,9 +29260,9 @@ var AGENT2 = "codex";
 var DEFAULT_MAX_BYTES2 = 32 * 1024;
 var DEFAULT_FALLBACK_FILENAMES = [];
 var defaultFileSystem2 = {
-  readFile: (path26) => nodeReadFile2(path26, "utf8"),
-  readdir: (path26, options) => nodeReaddir2(path26, options),
-  realpath: (path26) => nodeRealpath2(path26)
+  readFile: (path27) => nodeReadFile2(path27, "utf8"),
+  readdir: (path27, options) => nodeReaddir2(path27, options),
+  realpath: (path27) => nodeRealpath2(path27)
 };
 function isInside2(parent, child) {
   const pathFromParent = relative2(parent, child);
@@ -29314,8 +29314,8 @@ var CodexAdapter = class {
   fs;
   env;
   constructor(options = {}) {
-    const { env, ...fs23 } = options;
-    this.fs = { ...defaultFileSystem2, ...fs23 };
+    const { env, ...fs24 } = options;
+    this.fs = { ...defaultFileSystem2, ...fs24 };
     this.env = env ?? process.env;
   }
   render(input) {
@@ -30258,15 +30258,15 @@ async function saveCapturePreview(home, preview, options = {}) {
   const now = options.now ?? Date.now();
   const expiresAt = now + (options.ttlMs ?? DEFAULT_TTL_MS3);
   const key = await previewKey3(home);
-  const digest4 = filesHash(preview);
+  const digest5 = filesHash(preview);
   const stored = {
     version: 1,
     expires_at: expiresAt,
     packet_hash: preview.packet_hash,
     context_head: preview.context_head,
-    files_hash: digest4,
+    files_hash: digest5,
     preview,
-    mac: macFor3(key, expiresAt, preview.packet_hash, preview.context_head, digest4, preview)
+    mac: macFor3(key, expiresAt, preview.packet_hash, preview.context_head, digest5, preview)
   };
   await atomicWriteFile(capturePreviewRecordPath(home, preview.preview_id), JSON.stringify(stored));
 }
@@ -30296,8 +30296,8 @@ async function readAuthenticatedPreview3(home, file2, previewId, now = Date.now(
   if (actual.length !== expected.length || !timingSafeEqual3(actual, expected)) {
     throw appError("INVALID_PREVIEW", "Stored capture preview authentication failed");
   }
-  const digest4 = filesHash(stored.preview);
-  if (stored.files_hash !== digest4 || stored.packet_hash !== stored.preview.packet_hash || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
+  const digest5 = filesHash(stored.preview);
+  if (stored.files_hash !== digest5 || stored.packet_hash !== stored.preview.packet_hash || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
     throw appError("INVALID_PREVIEW", "Stored capture preview state hashes do not match");
   }
   if (now > stored.expires_at) {
@@ -30795,14 +30795,14 @@ async function saveCheckPreview(home, preview, options = {}) {
   const now = options.now ?? Date.now();
   const expiresAt = now + (options.ttlMs ?? DEFAULT_TTL_MS4);
   const key = await previewKey4(home);
-  const digest4 = filesHash2(preview);
+  const digest5 = filesHash2(preview);
   const stored = {
     version: 1,
     expires_at: expiresAt,
     context_head: preview.context_head,
-    files_hash: digest4,
+    files_hash: digest5,
     preview,
-    mac: macFor4(key, expiresAt, preview.context_head, digest4, preview)
+    mac: macFor4(key, expiresAt, preview.context_head, digest5, preview)
   };
   await atomicWriteFile(checkPreviewRecordPath(home, preview.preview_id), JSON.stringify(stored));
 }
@@ -30825,8 +30825,8 @@ async function readAuthenticatedPreview4(home, file2, previewId, now = Date.now(
   if (actual.length !== expected.length || !timingSafeEqual4(actual, expected)) {
     throw appError("INVALID_PREVIEW", "Stored check preview authentication failed");
   }
-  const digest4 = filesHash2(stored.preview);
-  if (stored.files_hash !== digest4 || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
+  const digest5 = filesHash2(stored.preview);
+  if (stored.files_hash !== digest5 || stored.context_head !== stored.preview.context_head || stored.preview.preview_id !== previewId) {
     throw appError("INVALID_PREVIEW", "Stored check preview state hashes do not match");
   }
   if (now > stored.expires_at) {
@@ -32440,6 +32440,948 @@ async function applyJoin(previewId, home) {
   });
 }
 
+// src/commands/reconcile.ts
+import { createHash as createHash16, createHmac as createHmac5, randomBytes as randomBytes6, timingSafeEqual as timingSafeEqual5 } from "node:crypto";
+import { constants as fsConstants6 } from "node:fs";
+import * as fs22 from "node:fs/promises";
+import path25 from "node:path";
+
+// src/merge/knowledge-merge.ts
+import { createHash as createHash15 } from "node:crypto";
+function fingerprint(entry) {
+  if (entry === void 0) return "";
+  return createHash15("sha256").update(serializeKnowledge(entry)).digest("hex");
+}
+function byId(entries) {
+  const map2 = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    if (!map2.has(entry.id)) map2.set(entry.id, entry);
+  }
+  return map2;
+}
+function sortedUnique(values) {
+  return [...new Set(values)].sort(compareCodeUnits);
+}
+function sameStringSet(left, right) {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
+}
+function conflictId(type, ids) {
+  const digest5 = createHash15("sha256").update(`${type}:${[...ids].sort(compareCodeUnits).join(",")}`).digest("hex").slice(0, 16);
+  return `conflict_${digest5}`;
+}
+function classifySameEntry(id, base, local, remote) {
+  const conflicts = [];
+  const localFp = fingerprint(local);
+  const remoteFp = fingerprint(remote);
+  const baseFp = fingerprint(base);
+  if (local === void 0 && remote === void 0) {
+    return { conflicts };
+  }
+  if (local !== void 0 && remote === void 0) {
+    if (base === void 0) return { automatic: local, conflicts };
+    if (localFp === baseFp) {
+      return { conflicts };
+    }
+    conflicts.push({
+      conflict_id: conflictId("SAME_ENTRY_EDIT", [id]),
+      type: "SAME_ENTRY_EDIT",
+      knowledge_id: id,
+      related_ids: [id],
+      ...base === void 0 ? {} : { base },
+      local,
+      reason: "Local edited an entry that remote deleted"
+    });
+    return { conflicts };
+  }
+  if (local === void 0 && remote !== void 0) {
+    if (base === void 0) return { automatic: remote, conflicts };
+    if (remoteFp === baseFp) return { conflicts };
+    conflicts.push({
+      conflict_id: conflictId("SAME_ENTRY_EDIT", [id]),
+      type: "SAME_ENTRY_EDIT",
+      knowledge_id: id,
+      related_ids: [id],
+      ...base === void 0 ? {} : { base },
+      remote,
+      reason: "Remote edited an entry that local deleted"
+    });
+    return { conflicts };
+  }
+  const localEntry = local;
+  const remoteEntry = remote;
+  if (localFp === remoteFp) {
+    return { automatic: localEntry, conflicts };
+  }
+  if (base !== void 0 && localFp === baseFp) {
+    return { automatic: remoteEntry, conflicts };
+  }
+  if (base !== void 0 && remoteFp === baseFp) {
+    return { automatic: localEntry, conflicts };
+  }
+  const statusDiverged = localEntry.status !== remoteEntry.status && (base === void 0 || localEntry.status !== base.status || remoteEntry.status !== base.status);
+  const supersedesDiverged = !sameStringSet(localEntry.supersedes, remoteEntry.supersedes) && (base === void 0 || !sameStringSet(localEntry.supersedes, base.supersedes) || !sameStringSet(remoteEntry.supersedes, base.supersedes));
+  const conflictsWithDiverged = !sameStringSet(localEntry.conflicts_with, remoteEntry.conflicts_with) && (base === void 0 || !sameStringSet(localEntry.conflicts_with, base.conflicts_with) || !sameStringSet(remoteEntry.conflicts_with, base.conflicts_with));
+  if (statusDiverged) {
+    conflicts.push({
+      conflict_id: conflictId("STATUS_CHANGE", [id]),
+      type: "STATUS_CHANGE",
+      knowledge_id: id,
+      related_ids: [id],
+      ...base === void 0 ? {} : { base },
+      local: localEntry,
+      remote: remoteEntry,
+      reason: "Local and remote changed status differently"
+    });
+  }
+  if (supersedesDiverged) {
+    conflicts.push({
+      conflict_id: conflictId("SUPERSEDES_CONFLICT", [id]),
+      type: "SUPERSEDES_CONFLICT",
+      knowledge_id: id,
+      related_ids: sortedUnique([id, ...localEntry.supersedes, ...remoteEntry.supersedes]),
+      ...base === void 0 ? {} : { base },
+      local: localEntry,
+      remote: remoteEntry,
+      reason: "Local and remote declare competing supersedes relations"
+    });
+  }
+  if (conflictsWithDiverged) {
+    conflicts.push({
+      conflict_id: conflictId("CONFLICTS_WITH", [id]),
+      type: "CONFLICTS_WITH",
+      knowledge_id: id,
+      related_ids: sortedUnique([
+        id,
+        ...localEntry.conflicts_with,
+        ...remoteEntry.conflicts_with
+      ]),
+      ...base === void 0 ? {} : { base },
+      local: localEntry,
+      remote: remoteEntry,
+      reason: "Local and remote declare divergent conflicts_with relations"
+    });
+  }
+  const payloadDiverged = localEntry.statement !== remoteEntry.statement || localEntry.reason !== remoteEntry.reason || localEntry.kind !== remoteEntry.kind || localEntry.scope !== remoteEntry.scope || localEntry.confidence !== remoteEntry.confidence || !sameStringSet(localEntry.applies_to.paths, remoteEntry.applies_to.paths) || !sameStringSet(localEntry.applies_to.agents, remoteEntry.applies_to.agents) || JSON.stringify(localEntry.source) !== JSON.stringify(remoteEntry.source);
+  if (payloadDiverged || conflicts.length === 0) {
+    conflicts.push({
+      conflict_id: conflictId("SAME_ENTRY_EDIT", [id]),
+      type: "SAME_ENTRY_EDIT",
+      knowledge_id: id,
+      related_ids: [id],
+      ...base === void 0 ? {} : { base },
+      local: localEntry,
+      remote: remoteEntry,
+      reason: "Local and remote edited the same knowledge entry differently"
+    });
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const unique = conflicts.filter((item) => {
+    if (seen.has(item.conflict_id)) return false;
+    seen.add(item.conflict_id);
+    return true;
+  });
+  return { conflicts: unique };
+}
+function isSemanticPair(left, right) {
+  if (left.id === right.id) return false;
+  if (left.conflicts_with.includes(right.id) || right.conflicts_with.includes(left.id)) {
+    return true;
+  }
+  return left.supersedes.some((target) => right.supersedes.includes(target));
+}
+function threeWayKnowledgeMerge(base, local, remote) {
+  const baseMap = byId(base);
+  const localMap = byId(local);
+  const remoteMap = byId(remote);
+  const ids = sortedUnique([
+    ...baseMap.keys(),
+    ...localMap.keys(),
+    ...remoteMap.keys()
+  ]);
+  const automatic = [];
+  const merged = [];
+  const conflicts = [];
+  const conflictedIds = /* @__PURE__ */ new Set();
+  for (const id of ids) {
+    const classified = classifySameEntry(
+      id,
+      baseMap.get(id),
+      localMap.get(id),
+      remoteMap.get(id)
+    );
+    if (classified.conflicts.length > 0) {
+      conflicts.push(...classified.conflicts);
+      for (const item of classified.conflicts) {
+        conflictedIds.add(item.knowledge_id);
+        for (const related of item.related_ids) conflictedIds.add(related);
+      }
+      continue;
+    }
+    if (classified.automatic !== void 0) {
+      automatic.push(id);
+      merged.push(classified.automatic);
+    }
+  }
+  const candidateEntries = merged.filter((entry) => !conflictedIds.has(entry.id));
+  const localOnlyAdds = [...localMap.values()].filter(
+    (entry) => !baseMap.has(entry.id) && !remoteMap.has(entry.id)
+  );
+  const remoteOnlyAdds = [...remoteMap.values()].filter(
+    (entry) => !baseMap.has(entry.id) && !localMap.has(entry.id)
+  );
+  const semanticSeen = /* @__PURE__ */ new Set();
+  for (const left of localOnlyAdds) {
+    for (const right of remoteOnlyAdds) {
+      if (!isSemanticPair(left, right)) continue;
+      const key = [left.id, right.id].sort(compareCodeUnits).join(":");
+      if (semanticSeen.has(key)) continue;
+      semanticSeen.add(key);
+      conflictedIds.add(left.id);
+      conflictedIds.add(right.id);
+      conflicts.push({
+        conflict_id: conflictId("SEMANTIC_CONTRADICTION", [left.id, right.id]),
+        type: "SEMANTIC_CONTRADICTION",
+        knowledge_id: compareCodeUnits(left.id, right.id) <= 0 ? left.id : right.id,
+        related_ids: sortedUnique([left.id, right.id]),
+        local: left,
+        remote: right,
+        reason: "Local and remote added potentially contradictory knowledge under overlapping scope"
+      });
+    }
+  }
+  for (let i = 0; i < candidateEntries.length; i += 1) {
+    for (let j = i + 1; j < candidateEntries.length; j += 1) {
+      const left = candidateEntries[i];
+      const right = candidateEntries[j];
+      const leftIsNew = !baseMap.has(left.id);
+      const rightIsNew = !baseMap.has(right.id);
+      if (!leftIsNew && !rightIsNew) continue;
+      const leftFromLocal = localMap.has(left.id) && !remoteMap.has(left.id);
+      const leftFromRemote = remoteMap.has(left.id) && !localMap.has(left.id);
+      const rightFromLocal = localMap.has(right.id) && !remoteMap.has(right.id);
+      const rightFromRemote = remoteMap.has(right.id) && !localMap.has(right.id);
+      const crossSide = leftFromLocal && rightFromRemote || leftFromRemote && rightFromLocal;
+      if (!crossSide) continue;
+      if (!isSemanticPair(left, right)) continue;
+      const key = [left.id, right.id].sort(compareCodeUnits).join(":");
+      if (semanticSeen.has(key)) continue;
+      semanticSeen.add(key);
+      conflictedIds.add(left.id);
+      conflictedIds.add(right.id);
+      conflicts.push({
+        conflict_id: conflictId("SEMANTIC_CONTRADICTION", [left.id, right.id]),
+        type: "SEMANTIC_CONTRADICTION",
+        knowledge_id: compareCodeUnits(left.id, right.id) <= 0 ? left.id : right.id,
+        related_ids: sortedUnique([left.id, right.id]),
+        local: leftFromLocal ? left : rightFromLocal ? right : left,
+        remote: leftFromRemote ? left : rightFromRemote ? right : right,
+        reason: "Local and remote added potentially contradictory knowledge under overlapping scope"
+      });
+    }
+  }
+  const filteredMerged = merged.filter((entry) => !conflictedIds.has(entry.id));
+  const filteredAutomatic = automatic.filter((id) => !conflictedIds.has(id));
+  conflicts.sort((left, right) => compareCodeUnits(left.type, right.type) || compareCodeUnits(left.knowledge_id, right.knowledge_id) || compareCodeUnits(left.conflict_id, right.conflict_id));
+  return {
+    automatic: filteredAutomatic.sort(compareCodeUnits),
+    merged: filteredMerged.sort((left, right) => compareCodeUnits(left.id, right.id)),
+    conflicts
+  };
+}
+
+// src/commands/reconcile.ts
+var PACKET_ID5 = /^packet_[0-9A-HJKMNP-TV-Z]{26}$/;
+var PREVIEW_ID5 = /^preview_[0-9A-HJKMNP-TV-Z]{26}$/;
+var HASH5 = /^[a-f0-9]{64}$/;
+var PACKET_HASH3 = /^sha256:[0-9a-f]{64}$/;
+var WORKSPACE_ID4 = /^ws_[0-9A-HJKMNP-TV-Z]{26}$/;
+var KNOWLEDGE_ID2 = /^kn_[0-9A-HJKMNP-TV-Z]{26}$/;
+var DEFAULT_TTL_MS5 = 24 * 60 * 60 * 1e3;
+var sourceReferenceSchema4 = external_exports.strictObject({
+  agent: external_exports.string().min(1),
+  source_type: external_exports.string().min(1),
+  locator: external_exports.string().min(1),
+  content_hash: external_exports.string().regex(PACKET_HASH3),
+  observed_at: external_exports.string().min(1)
+});
+var knowledgeEntrySchema4 = external_exports.object({
+  schema_version: external_exports.literal(1),
+  id: external_exports.string().regex(KNOWLEDGE_ID2),
+  kind: external_exports.string().min(1),
+  scope: external_exports.string().min(1),
+  status: external_exports.enum(["active", "superseded", "archived", "disputed"]),
+  applies_to: external_exports.strictObject({
+    paths: external_exports.array(external_exports.string()),
+    agents: external_exports.array(external_exports.string())
+  }),
+  source: sourceReferenceSchema4,
+  confidence: external_exports.number(),
+  supersedes: external_exports.array(external_exports.string()),
+  conflicts_with: external_exports.array(external_exports.string()),
+  created_at: external_exports.string().min(1),
+  updated_at: external_exports.string().min(1),
+  last_verified_at: external_exports.string().nullable(),
+  statement: external_exports.string(),
+  reason: external_exports.string()
+});
+var reconcileProposalSchema = external_exports.strictObject({
+  schema_version: external_exports.literal(1),
+  packet_id: external_exports.string().regex(PACKET_ID5),
+  packet_hash: external_exports.string().regex(PACKET_HASH3),
+  resolutions: external_exports.array(external_exports.strictObject({
+    conflict_id: external_exports.string().min(1),
+    choice: external_exports.enum(["local", "remote", "combine", "disputed"]),
+    entry: knowledgeEntrySchema4.optional(),
+    reason: external_exports.string().min(1).optional()
+  }))
+});
+var reconcilePreviewSchema = external_exports.strictObject({
+  preview_id: external_exports.string().regex(PREVIEW_ID5),
+  packet_id: external_exports.string().regex(PACKET_ID5),
+  packet_hash: external_exports.string().regex(PACKET_HASH3),
+  workspace_id: external_exports.string().regex(WORKSPACE_ID4),
+  local_head: external_exports.string().min(1),
+  remote_head: external_exports.string().min(1),
+  merge_base: external_exports.string().min(1),
+  entries: external_exports.array(external_exports.strictObject({
+    entry: knowledgeEntrySchema4,
+    path: external_exports.string().min(1),
+    bytes: external_exports.string()
+  })),
+  warnings: external_exports.array(external_exports.string())
+});
+var storedReconcilePreviewSchema = external_exports.strictObject({
+  version: external_exports.literal(1),
+  expires_at: external_exports.number().finite(),
+  local_head: external_exports.string().min(1),
+  remote_head: external_exports.string().min(1),
+  files_hash: external_exports.string().regex(HASH5),
+  preview: reconcilePreviewSchema,
+  mac: external_exports.string().regex(HASH5)
+});
+function digest4(contents) {
+  return `sha256:${createHash16("sha256").update(contents).digest("hex")}`;
+}
+function packetsDirectory3(home) {
+  return path25.resolve(home, "reconcile-packets");
+}
+function packetRecordPath3(home, packetId) {
+  if (!PACKET_ID5.test(packetId)) {
+    throw appError("INVALID_PACKET", "Reconcile packet ID is invalid");
+  }
+  return path25.join(packetsDirectory3(home), `${packetId}.json`);
+}
+function previewsDirectory5(home) {
+  return path25.resolve(home, "reconcile-previews");
+}
+function previewRecordPath2(home, previewId) {
+  if (!PREVIEW_ID5.test(previewId)) {
+    throw appError("INVALID_PREVIEW", "Preview ID is invalid");
+  }
+  return path25.join(previewsDirectory5(home), `${previewId}.json`);
+}
+function usedPreviewPath2(home, previewId) {
+  if (!PREVIEW_ID5.test(previewId)) {
+    throw appError("INVALID_PREVIEW", "Preview ID is invalid");
+  }
+  return path25.join(previewsDirectory5(home), `${previewId}.used`);
+}
+function keyPath5(home) {
+  return path25.resolve(home, "reconcile-preview-auth.key");
+}
+function knowledgeRelativePath3(entry) {
+  if (entry.scope === "workspace") return `knowledge/workspace/${entry.id}.md`;
+  return `knowledge/repositories/${entry.scope.slice("repository:".length)}/${entry.id}.md`;
+}
+function canonicalPacketBytes(packet) {
+  return JSON.stringify({
+    schema_version: packet.schema_version,
+    packet_id: packet.packet_id,
+    workspace_id: packet.workspace_id,
+    local_head: packet.local_head,
+    remote_head: packet.remote_head,
+    merge_base: packet.merge_base,
+    automatic: packet.automatic,
+    merged: packet.merged,
+    conflicts: packet.conflicts
+  });
+}
+async function upstreamRef2(contextPath) {
+  try {
+    const { stdout } = await runGit(contextPath, [
+      "rev-parse",
+      "--abbrev-ref",
+      "--symbolic-full-name",
+      "@{upstream}"
+    ]);
+    const ref = stdout.trim();
+    if (ref.length > 0) return ref;
+  } catch {
+  }
+  return "refs/remotes/origin/main";
+}
+async function revParse2(contextPath, rev) {
+  const { stdout } = await runGit(contextPath, ["rev-parse", rev]);
+  return stdout.trim();
+}
+async function loadKnowledgeAtRevision(contextPath, revision, registeredRepositoryIds) {
+  let listing;
+  try {
+    const { stdout } = await runGit(contextPath, [
+      "ls-tree",
+      "-r",
+      "--name-only",
+      revision,
+      "--",
+      "knowledge"
+    ]);
+    listing = stdout;
+  } catch {
+    return [];
+  }
+  const files = listing.split("\n").map((line) => line.trim()).filter((line) => line.endsWith(".md"));
+  const entries = [];
+  const context = { registeredRepositoryIds };
+  for (const file2 of files) {
+    const { stdout } = await runGit(contextPath, ["show", `${revision}:${file2}`]);
+    entries.push(parseKnowledgeMarkdown(stdout, context));
+  }
+  return entries;
+}
+async function persistPacket(home, packet) {
+  await fs22.mkdir(home, { recursive: true, mode: 448 });
+  await fs22.mkdir(packetsDirectory3(home), { recursive: true, mode: 448 });
+  const record2 = {
+    packet,
+    workspaceId: packet.workspace_id
+  };
+  await atomicWriteFile(packetRecordPath3(home, packet.packet_id), JSON.stringify(record2));
+}
+async function loadPacket(home, packetId) {
+  let raw;
+  try {
+    raw = await fs22.readFile(packetRecordPath3(home, packetId), "utf8");
+  } catch (error51) {
+    if (error51.code === "ENOENT") {
+      throw appError("INVALID_PACKET", "Reconcile packet does not exist");
+    }
+    throw error51;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed.packet?.packet_id !== packetId) {
+      throw appError("INVALID_PACKET", "Reconcile packet is invalid");
+    }
+    return parsed;
+  } catch (error51) {
+    if (error51.code === "INVALID_PACKET") throw error51;
+    throw appError("INVALID_PACKET", "Reconcile packet is invalid");
+  }
+}
+function filesHash3(preview) {
+  return createHash16("sha256").update(preview.entries.map((item) => `${item.path}
+${item.bytes}`).join("\n")).digest("hex");
+}
+function authenticatedBytes5(expiresAt, localHeadValue, remoteHeadValue, filesDigest, preview) {
+  return JSON.stringify({
+    version: 1,
+    expires_at: expiresAt,
+    local_head: localHeadValue,
+    remote_head: remoteHeadValue,
+    files_hash: filesDigest,
+    preview
+  });
+}
+function macFor5(key, expiresAt, localHeadValue, remoteHeadValue, filesDigest, preview) {
+  return createHmac5("sha256", key).update(authenticatedBytes5(expiresAt, localHeadValue, remoteHeadValue, filesDigest, preview)).digest("hex");
+}
+async function readValidatedKey5(file2) {
+  let handle;
+  try {
+    handle = await fs22.open(file2, fsConstants6.O_RDONLY | fsConstants6.O_NOFOLLOW);
+  } catch (error51) {
+    if (error51.code === "ENOENT") throw error51;
+    throw appError("INVALID_PREVIEW", "Reconcile preview authentication key is invalid");
+  }
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || (info.mode & 511) !== 384) {
+      throw appError("INVALID_PREVIEW", "Reconcile preview authentication key is invalid");
+    }
+    const encoded = await handle.readFile("utf8");
+    const key = Buffer.from(encoded, "base64");
+    if (!/^[A-Za-z0-9+/]{43}=$/.test(encoded) || key.length !== 32 || key.toString("base64") !== encoded) {
+      throw appError("INVALID_PREVIEW", "Reconcile preview authentication key is invalid");
+    }
+    return key;
+  } catch (error51) {
+    if (error51.code === "INVALID_PREVIEW") throw error51;
+    throw appError("INVALID_PREVIEW", "Reconcile preview authentication key is invalid");
+  } finally {
+    await handle.close();
+  }
+}
+async function previewKey5(home) {
+  const file2 = keyPath5(home);
+  try {
+    return await readValidatedKey5(file2);
+  } catch (error51) {
+    if (error51.code !== "ENOENT") throw error51;
+  }
+  await fs22.mkdir(path25.dirname(file2), { recursive: true, mode: 448 });
+  const candidate = randomBytes6(32).toString("base64");
+  try {
+    const handle = await fs22.open(file2, "wx", 384);
+    try {
+      await handle.chmod(384);
+      await handle.writeFile(candidate, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    return readValidatedKey5(file2);
+  } catch (error51) {
+    if (error51.code !== "EEXIST") throw error51;
+    return readValidatedKey5(file2);
+  }
+}
+async function ensurePreviewDirectory5(home) {
+  const directory = previewsDirectory5(home);
+  await fs22.mkdir(home, { recursive: true, mode: 448 });
+  let created = false;
+  try {
+    await fs22.mkdir(directory, { mode: 448 });
+    created = true;
+  } catch (error51) {
+    if (error51.code !== "EEXIST") throw error51;
+  }
+  if (created) await fs22.chmod(directory, 448);
+  const info = await fs22.lstat(directory).catch(() => void 0);
+  if (info === void 0 || !info.isDirectory() || info.isSymbolicLink() || (info.mode & 511) !== 448) {
+    throw appError("INVALID_PREVIEW", "Reconcile preview directory is invalid");
+  }
+}
+async function saveReconcilePreview(home, preview) {
+  await ensurePreviewDirectory5(home);
+  const expiresAt = Date.now() + DEFAULT_TTL_MS5;
+  const key = await previewKey5(home);
+  const digestValue = filesHash3(preview);
+  const stored = {
+    version: 1,
+    expires_at: expiresAt,
+    local_head: preview.local_head,
+    remote_head: preview.remote_head,
+    files_hash: digestValue,
+    preview,
+    mac: macFor5(key, expiresAt, preview.local_head, preview.remote_head, digestValue, preview)
+  };
+  await atomicWriteFile(previewRecordPath2(home, preview.preview_id), JSON.stringify(stored));
+}
+async function readAuthenticatedPreview5(home, file2, previewId, now = Date.now()) {
+  let parsed;
+  try {
+    parsed = JSON.parse(await fs22.readFile(file2, "utf8"));
+  } catch {
+    throw appError("INVALID_PREVIEW", "Stored reconcile preview is invalid");
+  }
+  const validated = storedReconcilePreviewSchema.safeParse(parsed);
+  if (!validated.success) throw appError("INVALID_PREVIEW", "Stored reconcile preview is invalid");
+  const stored = parsed;
+  const key = await previewKey5(home);
+  const expected = Buffer.from(
+    macFor5(key, stored.expires_at, stored.local_head, stored.remote_head, stored.files_hash, stored.preview),
+    "hex"
+  );
+  const actual = typeof stored.mac === "string" ? Buffer.from(stored.mac, "hex") : Buffer.alloc(0);
+  if (actual.length !== expected.length || !timingSafeEqual5(actual, expected)) {
+    throw appError("INVALID_PREVIEW", "Stored reconcile preview authentication failed");
+  }
+  const digestValue = filesHash3(stored.preview);
+  if (stored.files_hash !== digestValue || stored.local_head !== stored.preview.local_head || stored.remote_head !== stored.preview.remote_head || stored.preview.preview_id !== previewId) {
+    throw appError("INVALID_PREVIEW", "Stored reconcile preview state hashes do not match");
+  }
+  if (now > stored.expires_at) {
+    throw appError("PREVIEW_EXPIRED", "Reconcile preview approval has expired");
+  }
+  return stored.preview;
+}
+async function peekReconcilePreview(home, previewId) {
+  await ensurePreviewDirectory5(home);
+  const pending = previewRecordPath2(home, previewId);
+  try {
+    return await readAuthenticatedPreview5(home, pending, previewId);
+  } catch (error51) {
+    if (error51.code !== "INVALID_PREVIEW") throw error51;
+    try {
+      await fs22.access(usedPreviewPath2(home, previewId));
+      throw appError("PREVIEW_ALREADY_USED", "Reconcile preview has already been applied");
+    } catch (usedError) {
+      if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
+      throw error51;
+    }
+  }
+}
+async function claimReconcilePreview(home, previewId) {
+  await ensurePreviewDirectory5(home);
+  const pending = previewRecordPath2(home, previewId);
+  const used = usedPreviewPath2(home, previewId);
+  try {
+    await fs22.rename(pending, used);
+  } catch (error51) {
+    if (error51.code !== "ENOENT") throw error51;
+    try {
+      await fs22.access(used);
+      throw appError("PREVIEW_ALREADY_USED", "Reconcile preview has already been applied");
+    } catch (usedError) {
+      if (usedError.code === "PREVIEW_ALREADY_USED") throw usedError;
+      throw appError("INVALID_PREVIEW", "Reconcile preview does not exist");
+    }
+  }
+  return readAuthenticatedPreview5(home, used, previewId);
+}
+function resolveConflictEntry(conflict, resolution, nowIso) {
+  if (resolution.choice === "local") {
+    if (conflict.local === void 0) {
+      throw appError("INVALID_PROPOSAL", "Conflict has no local entry to choose", {
+        conflict_id: conflict.conflict_id
+      });
+    }
+    return [conflict.local];
+  }
+  if (resolution.choice === "remote") {
+    if (conflict.remote === void 0) {
+      throw appError("INVALID_PROPOSAL", "Conflict has no remote entry to choose", {
+        conflict_id: conflict.conflict_id
+      });
+    }
+    return [conflict.remote];
+  }
+  if (resolution.choice === "combine") {
+    if (resolution.entry === void 0) {
+      throw appError("INVALID_PROPOSAL", "combine requires an entry", {
+        conflict_id: conflict.conflict_id
+      });
+    }
+    return [resolution.entry];
+  }
+  const outputs = [];
+  if (conflict.type === "SEMANTIC_CONTRADICTION") {
+    if (conflict.local !== void 0) {
+      outputs.push({
+        ...conflict.local,
+        status: "disputed",
+        updated_at: nowIso,
+        reason: resolution.reason ?? conflict.local.reason
+      });
+    }
+    if (conflict.remote !== void 0) {
+      outputs.push({
+        ...conflict.remote,
+        status: "disputed",
+        updated_at: nowIso,
+        reason: resolution.reason ?? conflict.remote.reason
+      });
+    }
+    return outputs;
+  }
+  const base = conflict.local ?? conflict.remote;
+  if (base === void 0) {
+    throw appError("INVALID_PROPOSAL", "Conflict has no entry to mark disputed", {
+      conflict_id: conflict.conflict_id
+    });
+  }
+  return [{
+    ...base,
+    status: "disputed",
+    updated_at: nowIso,
+    reason: resolution.reason ?? base.reason
+  }];
+}
+async function prepareReconcile(input) {
+  const home = path25.resolve(input.home);
+  const local = await readLocalWorkspace(home, input.workspaceId);
+  const contextPath = await assertLocalContextCheckout(
+    home,
+    input.workspaceId,
+    local.context_path
+  );
+  const workspace = await readWorkspaceManifest(contextPath);
+  if (workspace.workspace_id !== input.workspaceId) {
+    throw new Error("Workspace manifest does not match the requested workspace");
+  }
+  const state = await inspectContextRemoteState(contextPath);
+  if (!state.diverged) {
+    throw appError(
+      "CONTEXT_NOT_DIVERGED",
+      "Context Git history is not diverged; reconcile is only for divergent histories",
+      {
+        head: state.head,
+        upstream: state.upstream,
+        ahead: state.ahead,
+        behind: state.behind
+      }
+    );
+  }
+  const upstream = await upstreamRef2(contextPath);
+  const localHeadValue = await revParse2(contextPath, "HEAD");
+  const remoteHeadValue = await revParse2(contextPath, upstream);
+  const { stdout: mergeBaseStdout } = await runGit(contextPath, [
+    "merge-base",
+    localHeadValue,
+    remoteHeadValue
+  ]);
+  const mergeBase = mergeBaseStdout.trim();
+  const registeredRepositoryIds = new Set(workspace.repositories.map((item) => item.repo_id));
+  const baseEntries = await loadKnowledgeAtRevision(contextPath, mergeBase, registeredRepositoryIds);
+  const localEntries = await loadKnowledgeAtRevision(contextPath, localHeadValue, registeredRepositoryIds);
+  const remoteEntries = await loadKnowledgeAtRevision(contextPath, remoteHeadValue, registeredRepositoryIds);
+  const merge2 = threeWayKnowledgeMerge(baseEntries, localEntries, remoteEntries);
+  const packetId = createId("packet");
+  const withoutHash = {
+    schema_version: 1,
+    packet_id: packetId,
+    workspace_id: input.workspaceId,
+    local_head: localHeadValue,
+    remote_head: remoteHeadValue,
+    merge_base: mergeBase,
+    automatic: merge2.automatic,
+    merged: merge2.merged,
+    conflicts: merge2.conflicts
+  };
+  const packet = {
+    ...withoutHash,
+    packet_hash: digest4(canonicalPacketBytes(withoutHash))
+  };
+  await persistPacket(home, packet);
+  return packet;
+}
+async function previewReconcile(packetId, proposal, options) {
+  const home = path25.resolve(options.home);
+  const record2 = await loadPacket(home, packetId);
+  const packet = record2.packet;
+  const parsed = reconcileProposalSchema.safeParse(proposal);
+  if (!parsed.success) {
+    throw appError("INVALID_PROPOSAL", "Reconcile proposal failed schema validation", {
+      issues: parsed.error.issues.map((issue2) => issue2.message)
+    });
+  }
+  const validated = parsed.data;
+  if (validated.packet_id !== packet.packet_id || validated.packet_hash !== packet.packet_hash) {
+    throw appError("STALE_PREVIEW", "Reconcile proposal does not match the prepared packet", {
+      packet_id: packet.packet_id
+    });
+  }
+  const local = await readLocalWorkspace(home, packet.workspace_id);
+  const contextPath = await assertLocalContextCheckout(
+    home,
+    packet.workspace_id,
+    local.context_path
+  );
+  const state = await inspectContextRemoteState(contextPath);
+  const head = await localHead(contextPath);
+  const upstream = await upstreamRef2(contextPath);
+  const remoteHeadValue = await revParse2(contextPath, upstream);
+  if (head !== packet.local_head || remoteHeadValue !== packet.remote_head || !state.diverged) {
+    throw appError("STALE_PREVIEW", "Context divergence changed after packet preparation", {
+      expected_local_head: packet.local_head,
+      actual_local_head: head,
+      expected_remote_head: packet.remote_head,
+      actual_remote_head: remoteHeadValue
+    });
+  }
+  const byConflictId = new Map(packet.conflicts.map((item) => [item.conflict_id, item]));
+  const resolvedIds = /* @__PURE__ */ new Set();
+  const resolvedEntries = /* @__PURE__ */ new Map();
+  const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+  const warnings = [];
+  for (const entry of packet.merged) {
+    resolvedEntries.set(entry.id, entry);
+  }
+  const seenResolutions = /* @__PURE__ */ new Set();
+  for (const resolution of validated.resolutions) {
+    if (seenResolutions.has(resolution.conflict_id)) {
+      throw appError("INVALID_PROPOSAL", "Duplicate conflict resolution", {
+        conflict_id: resolution.conflict_id
+      });
+    }
+    seenResolutions.add(resolution.conflict_id);
+    const conflict = byConflictId.get(resolution.conflict_id);
+    if (conflict === void 0) {
+      throw appError("INVALID_PROPOSAL", "Unknown conflict_id in reconcile proposal", {
+        conflict_id: resolution.conflict_id
+      });
+    }
+    const typedResolution = {
+      conflict_id: resolution.conflict_id,
+      choice: resolution.choice,
+      ...resolution.entry === void 0 ? {} : { entry: resolution.entry },
+      ...resolution.reason === void 0 ? {} : { reason: resolution.reason }
+    };
+    for (const entry of resolveConflictEntry(conflict, typedResolution, nowIso)) {
+      resolvedEntries.set(entry.id, entry);
+      resolvedIds.add(entry.id);
+    }
+  }
+  for (const conflict of packet.conflicts) {
+    if (!seenResolutions.has(conflict.conflict_id)) {
+      throw appError("INVALID_PROPOSAL", "Missing resolution for reconcile conflict", {
+        conflict_id: conflict.conflict_id
+      });
+    }
+  }
+  const entries = [...resolvedEntries.values()].sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0).map((entry) => ({
+    entry,
+    path: knowledgeRelativePath3(entry),
+    bytes: serializeKnowledge(entry)
+  }));
+  if (resolvedIds.size > 0) {
+    warnings.push(`Resolved ${seenResolutions.size} knowledge conflict(s)`);
+  }
+  const preview = {
+    preview_id: createId("preview"),
+    packet_id: packet.packet_id,
+    packet_hash: packet.packet_hash,
+    workspace_id: packet.workspace_id,
+    local_head: packet.local_head,
+    remote_head: packet.remote_head,
+    merge_base: packet.merge_base,
+    entries,
+    warnings
+  };
+  await saveReconcilePreview(home, preview);
+  return preview;
+}
+async function discardKnowledgeWorkingTree3(contextPath) {
+  try {
+    await runGit(contextPath, ["reset", "HEAD", "--", "knowledge"]);
+  } catch {
+  }
+  try {
+    await runGit(contextPath, ["checkout", "HEAD", "--", "knowledge"]);
+  } catch {
+  }
+  await runGit(contextPath, ["clean", "-fd", "--", "knowledge"]);
+}
+function mapKnowledgeWriteError3(error51) {
+  if (error51 !== null && typeof error51 === "object" && typeof error51.code === "string" && typeof error51.message === "string") {
+    throw error51;
+  }
+  const message = error51 instanceof Error ? error51.message : String(error51);
+  if (/Invalid Knowledge graph/i.test(message)) {
+    throw appError("INVALID_KNOWLEDGE_GRAPH", message);
+  }
+  throw appError("INVALID_KNOWLEDGE", message);
+}
+async function configureCommitter2(contextPath) {
+  await runGit(contextPath, ["config", "user.name", "Agent Context Sync"]);
+  await runGit(contextPath, [
+    "config",
+    "user.email",
+    "agent-context-sync@localhost.invalid"
+  ]);
+}
+async function abortMergeIfPresent(contextPath) {
+  try {
+    await fs22.access(path25.join(contextPath, ".git", "MERGE_HEAD"));
+    await runGit(contextPath, ["merge", "--abort"]);
+  } catch {
+  }
+}
+async function applyApprovedReconcile(preview, home) {
+  const local = await readLocalWorkspace(home, preview.workspace_id);
+  const contextPath = await assertLocalContextCheckout(
+    home,
+    preview.workspace_id,
+    local.context_path
+  );
+  const workspace = await readWorkspaceManifest(contextPath);
+  if (workspace.workspace_id !== preview.workspace_id) {
+    throw appError("STALE_PREVIEW", "Workspace identity changed after preview generation");
+  }
+  const state = await inspectContextRemoteState(contextPath);
+  const head = await localHead(contextPath);
+  const upstream = await upstreamRef2(contextPath);
+  const remoteHeadValue = await revParse2(contextPath, upstream);
+  if (head !== preview.local_head || remoteHeadValue !== preview.remote_head || !state.diverged) {
+    throw appError("STALE_PREVIEW", "Context divergence changed after preview generation", {
+      expected_local_head: preview.local_head,
+      actual_local_head: head,
+      expected_remote_head: preview.remote_head,
+      actual_remote_head: remoteHeadValue
+    });
+  }
+  await configureCommitter2(contextPath);
+  await abortMergeIfPresent(contextPath);
+  await runGit(contextPath, ["merge", "-s", "ours", "--no-commit", "--no-ff", upstream]);
+  const registeredRepositoryIds = new Set(workspace.repositories.map((item) => item.repo_id));
+  const store = new KnowledgeStore(contextPath, { registeredRepositoryIds });
+  try {
+    await discardKnowledgeWorkingTree3(contextPath);
+    await fs22.rm(path25.join(contextPath, "knowledge"), { recursive: true, force: true });
+    for (const item of preview.entries) {
+      await store.put(item.entry);
+    }
+    await store.list();
+  } catch (error51) {
+    await abortMergeIfPresent(contextPath);
+    await discardKnowledgeWorkingTree3(contextPath);
+    mapKnowledgeWriteError3(error51);
+  }
+  if (await pathExists2(path25.join(contextPath, "knowledge"))) {
+    await runGit(contextPath, ["add", "--", "knowledge"]);
+  }
+  for (const relative3 of ["workspace.yaml", "repositories", "sources", "schema"]) {
+    if (await pathExists2(path25.join(contextPath, relative3))) {
+      await runGit(contextPath, ["add", "--", relative3]);
+    }
+  }
+  await runGit(contextPath, [
+    "commit",
+    "-m",
+    `Reconcile divergent Context knowledge (${preview.preview_id})`
+  ]);
+  const commit = await revParse2(contextPath, "HEAD");
+  try {
+    await runGit(contextPath, ["push", "origin", "HEAD:refs/heads/main"]);
+  } catch (error51) {
+    const stderr = typeof error51.stderr === "string" ? error51.stderr : "";
+    const message = error51 instanceof Error ? error51.message : String(error51);
+    const text = `${stderr}
+${message}`;
+    if (/non-fast-forward/i.test(text) || /\[rejected\].*\(non-fast-forward\)/i.test(text) || /fetch first/i.test(text) || /updates were rejected because the (?:remote|tip of your current branch)/i.test(text)) {
+      throw appError(
+        "REMOTE_CHANGED",
+        "Context remote advanced during push; local merge commit was preserved",
+        {
+          commit,
+          recovery: "Fetch origin, re-prepare reconcile against the new HEAD, then retry without force push."
+        }
+      );
+    }
+    throw error51;
+  }
+  const remote_state = await inspectContextRemoteState(contextPath);
+  return { commit, remote_state };
+}
+async function pathExists2(file2) {
+  try {
+    await fs22.access(file2);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function applyReconcile(previewId, home) {
+  const resolvedHome = path25.resolve(home);
+  const pending = await peekReconcilePreview(resolvedHome, previewId);
+  return withWorkspaceLock(resolvedHome, pending.workspace_id, async () => {
+    const preview = await claimReconcilePreview(resolvedHome, previewId);
+    return applyApprovedReconcile(preview, resolvedHome);
+  });
+}
+
 // src/commands/sync.ts
 async function syncPrepare(input) {
   return prepareCapture(input);
@@ -32510,9 +33452,9 @@ function nonNegativeInteger(value, name) {
   return parsed;
 }
 function homePaths() {
-  const homeDir = path25.resolve(process.env.HOME ?? homedir2());
+  const homeDir = path26.resolve(process.env.HOME ?? homedir2());
   return {
-    home: path25.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path25.join(homeDir, ".agent-context-sync")),
+    home: path26.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path26.join(homeDir, ".agent-context-sync")),
     homeDir
   };
 }
@@ -32525,7 +33467,7 @@ function parseBooleanOption(args, name) {
 }
 async function readProposalArgument(value) {
   try {
-    const contents = await fs22.readFile(value, "utf8");
+    const contents = await fs23.readFile(value, "utf8");
     try {
       return JSON.parse(contents);
     } catch {
@@ -32544,11 +33486,44 @@ async function dispatch(command, argv) {
   if (command === "help") {
     if (argv.length > 0) throw new Error("help accepts no arguments");
     return {
-      commands: ["init", "join", "add-repo", "inspect", "doctor", "capture", "check", "apply", "sync"]
+      commands: [
+        "init",
+        "join",
+        "add-repo",
+        "inspect",
+        "doctor",
+        "capture",
+        "check",
+        "reconcile",
+        "apply",
+        "sync"
+      ]
     };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
+  if (command === "reconcile") {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || phase !== "prepare" && phase !== "preview" && phase !== "apply") {
+      throw new Error("reconcile requires exactly one phase: prepare, preview, or apply");
+    }
+    if (phase === "apply") {
+      assertOptions(args, ["preview-id"]);
+      return { result: await applyReconcile(one(args, "preview-id"), home) };
+    }
+    if (phase === "prepare") {
+      assertOptions(args, ["workspace"]);
+      return { packet: await prepareReconcile({
+        workspaceId: one(args, "workspace"),
+        home
+      }) };
+    }
+    assertOptions(args, ["packet-id", "proposal"]);
+    const proposal = await readProposalArgument(one(args, "proposal"));
+    return {
+      preview: await previewReconcile(one(args, "packet-id"), proposal, { home })
+    };
+  }
   if (command === "check") {
     const phase = args.positionals[0];
     if (args.positionals.length !== 1 || phase !== "prepare" && phase !== "preview" && phase !== "apply") {
@@ -32756,6 +33731,7 @@ export {
   applyCheck,
   applyInit,
   applyJoin,
+  applyReconcile,
   applyRendered,
   doctor,
   initWorkspace,
@@ -32764,9 +33740,11 @@ export {
   parseRepositoryBindings,
   prepareCapture,
   prepareCheck,
+  prepareReconcile,
   previewApply,
   previewCapture,
   previewCheck,
+  previewReconcile,
   run,
   syncPrepare
 };
