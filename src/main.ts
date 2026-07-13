@@ -9,20 +9,26 @@ import { sanitizedAppErrorDetails } from './domain/errors.js';
 import { addRepository, applyAddRepository } from './commands/add-repo.js';
 import { applyRendered, previewApply } from './commands/apply.js';
 import { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
+import { prepareCheck, previewCheck, applyCheck } from './commands/check.js';
 import { doctor } from './commands/doctor.js';
 import { applyInit, initWorkspace } from './commands/init.js';
 import { inspect } from './commands/inspect.js';
 import { applyJoin, joinWorkspace } from './commands/join.js';
+import { prepareReconcile, previewReconcile, applyReconcile } from './commands/reconcile.js';
 import { syncPrepare } from './commands/sync.js';
+import { traceRun } from './commands/trace.js';
 
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
 export { applyRendered, previewApply } from './commands/apply.js';
 export { prepareCapture, previewCapture, applyCapture } from './commands/capture.js';
+export { prepareCheck, previewCheck, applyCheck } from './commands/check.js';
 export { doctor } from './commands/doctor.js';
 export { applyInit, initWorkspace } from './commands/init.js';
 export { inspect } from './commands/inspect.js';
 export { applyJoin, joinWorkspace } from './commands/join.js';
+export { prepareReconcile, previewReconcile, applyReconcile } from './commands/reconcile.js';
 export { syncPrepare } from './commands/sync.js';
+export { traceRun } from './commands/trace.js';
 
 export interface CommandIO {
   stdout(line: string): void;
@@ -47,6 +53,13 @@ interface ParsedArguments {
   options: Map<string, string[]>;
 }
 
+/** Options that may appear as bare flags (`--experimental`) or with an explicit boolean value. */
+const BOOLEAN_FLAGS = new Set([
+  'experimental',
+  'consent-path-metadata',
+  'include-personal',
+]);
+
 function parseArguments(argv: readonly string[]): ParsedArguments {
   const positionals: string[] = [];
   const options = new Map<string, string[]>();
@@ -59,10 +72,15 @@ function parseArguments(argv: readonly string[]): ParsedArguments {
     const name = token.slice(2);
     if (name.length === 0) throw new Error('Invalid empty option');
     const value = argv[index + 1];
+    const existing = options.get(name) ?? [];
+    if (BOOLEAN_FLAGS.has(name) && (value === undefined || value.startsWith('--'))) {
+      existing.push('true');
+      options.set(name, existing);
+      continue;
+    }
     if (value === undefined || value.startsWith('--')) {
       throw new Error(`Option --${name} requires a value`);
     }
-    const existing = options.get(name) ?? [];
     existing.push(value);
     options.set(name, existing);
     index += 1;
@@ -154,11 +172,131 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
   if (command === 'help') {
     if (argv.length > 0) throw new Error('help accepts no arguments');
     return {
-      commands: ['init', 'join', 'add-repo', 'inspect', 'doctor', 'capture', 'apply', 'sync'],
+      commands: [
+        'init',
+        'join',
+        'add-repo',
+        'inspect',
+        'doctor',
+        'capture',
+        'check',
+        'reconcile',
+        'apply',
+        'sync',
+        'trace',
+      ],
     };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
+  if (command === 'trace') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || phase !== 'run') {
+      throw new Error('trace requires exactly one phase: run');
+    }
+    assertOptions(args, [
+      'workspace',
+      'agent',
+      'command',
+      'arg',
+      'experimental',
+      'consent-path-metadata',
+      'repository',
+      'cwd',
+    ]);
+    const agent = one(args, 'agent');
+    if (agent !== 'claude-code' && agent !== 'codex') {
+      throw new Error('Option --agent must be claude-code or codex');
+    }
+    if (!args.options.has('experimental') || !parseBooleanOption(args, 'experimental')) {
+      throw Object.assign(
+        new Error('Experimental tracing requires --experimental and --consent-path-metadata'),
+        { code: 'TRACE_CONSENT_REQUIRED' },
+      );
+    }
+    if (
+      !args.options.has('consent-path-metadata')
+      || !parseBooleanOption(args, 'consent-path-metadata')
+    ) {
+      throw Object.assign(
+        new Error('Experimental tracing requires --experimental and --consent-path-metadata'),
+        { code: 'TRACE_CONSENT_REQUIRED' },
+      );
+    }
+    const repositories = many(args, 'repository');
+    const commandArgs = many(args, 'arg');
+    return {
+      result: await traceRun({
+        workspaceId: one(args, 'workspace'),
+        agent: agent as AgentName,
+        home,
+        homeDir,
+        command: one(args, 'command'),
+        experimental: true,
+        consentPathMetadata: true,
+        ...(commandArgs.length === 0 ? {} : { commandArgs }),
+        ...(repositories.length === 0 ? {} : { repositories }),
+        ...(args.options.has('cwd') ? { cwd: one(args, 'cwd') } : {}),
+      }),
+    };
+  }
+  if (command === 'reconcile') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {
+      throw new Error('reconcile requires exactly one phase: prepare, preview, or apply');
+    }
+    if (phase === 'apply') {
+      assertOptions(args, ['preview-id']);
+      return { result: await applyReconcile(one(args, 'preview-id'), home) };
+    }
+    if (phase === 'prepare') {
+      assertOptions(args, ['workspace']);
+      return { packet: await prepareReconcile({
+        workspaceId: one(args, 'workspace'),
+        home,
+      }) };
+    }
+    assertOptions(args, ['packet-id', 'proposal']);
+    const proposal = await readProposalArgument(one(args, 'proposal'));
+    return {
+      preview: await previewReconcile(one(args, 'packet-id'), proposal, { home }),
+    };
+  }
+  if (command === 'check') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {
+      throw new Error('check requires exactly one phase: prepare, preview, or apply');
+    }
+    if (phase === 'apply') {
+      assertOptions(args, ['preview-id']);
+      return { result: await applyCheck(one(args, 'preview-id'), home) };
+    }
+    if (phase === 'prepare') {
+      assertOptions(args, ['workspace', 'repository', 'knowledge-id', 'scope']);
+      const repositories = many(args, 'repository');
+      const knowledgeIds = many(args, 'knowledge-id');
+      const scopeValue = args.options.has('scope') ? one(args, 'scope') : undefined;
+      if (
+        scopeValue !== undefined
+        && scopeValue !== 'workspace'
+        && !scopeValue.startsWith('repository:')
+      ) {
+        throw new Error('Option --scope must be workspace or repository:<repo_id>');
+      }
+      return { packets: await prepareCheck({
+        workspaceId: one(args, 'workspace'),
+        home,
+        ...(repositories.length === 0 ? {} : { repositories }),
+        ...(knowledgeIds.length === 0 ? {} : { knowledgeIds }),
+        ...(scopeValue === undefined ? {} : { scope: scopeValue as 'workspace' | `repository:${string}` }),
+      }) };
+    }
+    assertOptions(args, ['packet-id', 'proposal']);
+    const packetIds = many(args, 'packet-id');
+    if (packetIds.length === 0) throw new Error('Option --packet-id is required');
+    const proposal = await readProposalArgument(one(args, 'proposal'));
+    return { preview: await previewCheck(packetIds, proposal, { home }) };
+  }
   if (command === 'capture' || command === 'sync') {
     const phase = args.positionals[0];
     if (command === 'sync') {
@@ -288,14 +426,15 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
       throw new Error('Option --agent must be claude-code or codex');
     }
     const repositories = many(args, 'repository');
-    return { reports: await inspect({
+    const inspected = await inspect({
       workspaceId: one(args, 'workspace'),
       agent: agent as AgentName,
       home,
       homeDir,
       ...(repositories.length === 0 ? {} : { repositories }),
       ...(args.options.has('cwd') ? { cwd: one(args, 'cwd') } : {}),
-    }) };
+    });
+    return { reports: inspected.reports, stats: inspected.stats };
   }
   if (command === 'doctor') {
     assertOptions(args, ['workspace']);

@@ -75,6 +75,18 @@ node "$ACS" apply preview --workspace "$WORKSPACE_ID" --agent codex
 node "$ACS" apply apply --preview-id "$PREVIEW_ID"
 
 node "$ACS" sync prepare --workspace "$WORKSPACE_ID" --agent claude-code
+
+node "$ACS" check prepare --workspace "$WORKSPACE_ID" --repository github.com/acme/api
+node "$ACS" check preview --packet-id "$PACKET_ID" --proposal /tmp/verification-proposal.json
+node "$ACS" check apply --preview-id "$PREVIEW_ID"
+
+node "$ACS" reconcile prepare --workspace "$WORKSPACE_ID"
+node "$ACS" reconcile preview --packet-id "$PACKET_ID" --proposal /tmp/reconcile-proposal.json
+node "$ACS" reconcile apply --preview-id "$PREVIEW_ID"
+
+node "$ACS" trace run --workspace "$WORKSPACE_ID" --agent codex \
+  --experimental --consent-path-metadata \
+  --command /bin/true
 ```
 
 Repeat `--scan-root` for multiple join roots and `--repository` to restrict an
@@ -96,15 +108,29 @@ private local registry; an already-identical binding is a deterministic no-op.
 Skill-driven: prepare capture → agent proposal → capture preview/apply → apply
 preview/apply.
 
+Daily workflow summary:
+
+1. **init** or **join** a Workspace against the Context remote.
+2. **inspect** / **doctor** to understand Adapter coverage and local health.
+3. **capture** (or **sync prepare**) to extract and publish shared knowledge.
+4. **apply** to render native Agent guidance into business repositories.
+5. **check** when knowledge may be stale against code evidence.
+6. **reconcile** when Context Git histories diverge.
+7. **trace** only with explicit experimental consent when hunting unknown sources.
+
 ## Safety boundaries
 
 - `inspect` and `doctor` are read-only. `doctor` reports fixed diagnostics and
-  does not repair anything.
+  does not repair anything, including corrupt cache entries (see
+  [docs/operations.md](docs/operations.md)).
 - Preview phases do not persist Workspace or business-repository changes; they
   persist only private, expiring authorization records. Apply rejects altered,
   expired, reused, stale, or concurrently claimed preview IDs.
-- Context commits and pushes occur only in approved capture apply phases.
+- Context commits and pushes occur only in approved capture, check, and
+  reconcile apply phases.
 - Generated Agent files are written only in approved apply apply phases, with
   drift detection; drifted targets are never silently overwritten.
 - No command commits, pushes, resets, cleans, or force-updates a business
   repository.
+- Discovery and verification evidence may be cached under the ACS home; cache
+  hits reduce repeated file reads. `inspect` JSON may include `data.stats.files_read`.

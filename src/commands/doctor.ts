@@ -8,6 +8,7 @@ import {
   type AdapterRegistry,
 } from '../adapters/registry.js';
 import { runGit } from '../git/run-git.js';
+import { assessCacheIntegrity } from '../performance/cache.js';
 import { assertLocalContextCheckout, readWorkspaceManifest, remoteHead } from '../workspace/context-repository.js';
 import { readLocalWorkspace, registryPath } from '../workspace/local-registry.js';
 import { scanRepositories } from '../workspace/scanner.js';
@@ -18,7 +19,7 @@ export type DoctorStatus = 'pass' | 'warn' | 'fail';
 export interface DoctorCheck {
   id: 'node-version' | 'git-availability' | 'context-git' | 'registry-validity'
     | 'repository-path-drift' | 'adapter-version-support' | 'permissions'
-    | 'adapter-coverage';
+    | 'adapter-coverage' | 'cache-integrity';
   status: DoctorStatus;
   detail: string;
 }
@@ -141,16 +142,27 @@ export async function doctor(input: DoctorInput): Promise<DoctorReport> {
     checks.push(check('permissions', 'fail', 'One or more required Workspace paths are unreadable.'));
   }
 
+  try {
+    const cacheReport = await assessCacheIntegrity(input.home);
+    checks.push(check('cache-integrity', cacheReport.status, cacheReport.detail));
+  } catch {
+    checks.push(check(
+      'cache-integrity',
+      'warn',
+      'Content cache integrity could not be assessed. Remove the local cache directory manually if corruption is suspected.',
+    ));
+  }
+
   if (local !== undefined && workspace !== undefined) {
     try {
-      const reports = (await Promise.all((['claude-code', 'codex'] as const).map((agent) =>
-        inspect({
+      const reports = (await Promise.all((['claude-code', 'codex'] as const).map(async (agent) =>
+        (await inspect({
           workspaceId: input.workspaceId,
           agent,
           home: input.home,
           homeDir: input.homeDir,
           adapterRegistry,
-        }),
+        })).reports,
       ))).flat();
       const coverageReports = reports.map((item) => item.report);
       checks.push(coverageReports.length === 0
@@ -173,6 +185,7 @@ export async function doctor(input: DoctorInput): Promise<DoctorReport> {
     'repository-path-drift',
     'adapter-version-support',
     'permissions',
+    'cache-integrity',
     'adapter-coverage',
   ];
   checks.sort((left, right) => order.indexOf(left.id) - order.indexOf(right.id));

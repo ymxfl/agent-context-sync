@@ -20,9 +20,9 @@ Codex also honors `CODEX_HOME`.
 `inspect` and `doctor` are strictly read-only. They may read files and query Git,
 but must not repair, stage, commit, push, or change a business repository.
 
-`init`, `join`, `add-repo`, `capture`, and `apply` are two-phase (or three-phase)
-operations. Always run the prepare/preview phase first, show the user the exact
-impact, and preserve the opaque `preview_id`. Ask exactly one approval question at a time.
+`init`, `join`, `add-repo`, `capture`, `check`, and `apply` are two-phase (or
+three-phase) operations. Always run the prepare/preview phase first, show the
+user the exact impact, and preserve the opaque `preview_id`. Ask exactly one approval question at a time.
 Run the matching apply command only after explicit approval of that exact preview.
 Preview IDs expire and are one-time. Never reuse or invent them.
 If a preview reports ambiguous clone candidates, do not ask for apply approval.
@@ -99,6 +99,24 @@ node "$SKILL_DIR/scripts/acs.mjs" capture preview --packet-id "$PACKET_ID" --pro
 node "$SKILL_DIR/scripts/acs.mjs" capture apply --preview-id "$PREVIEW_ID"
 ```
 
+### Check active knowledge against code evidence
+
+1. Prepare bounded verification packets for active knowledge in scope.
+2. Ask the active Agent for schema-constrained verification findings.
+3. Preview creates/updates/supersede/archive impact and obtain approval.
+4. Apply publishes Context Git knowledge only (`required_apply: true`); then run
+   a separate `apply` preview/apply if Agent files must refresh.
+
+Do not infer `stale` from age alone. Use `unverifiable` when evidence is
+insufficient, and cite `attempted_checks`. Cite concrete file, dependency,
+config, or git-commit evidence for `valid`, `stale`, and `contradicted`.
+
+```sh
+node "$SKILL_DIR/scripts/acs.mjs" check prepare --workspace ws_01J00000000000000000000000 --repository github.com/acme/api
+node "$SKILL_DIR/scripts/acs.mjs" check preview --packet-id "$PACKET_ID" --proposal /tmp/check-proposal.json
+node "$SKILL_DIR/scripts/acs.mjs" check apply --preview-id "$PREVIEW_ID"
+```
+
 ### Apply generated Agent files
 
 Compile Context knowledge into native `AGENTS.md` / `CLAUDE.md` files. Preview
@@ -127,6 +145,21 @@ one or both explicitly.
 ```sh
 node "$SKILL_DIR/scripts/acs.mjs" sync prepare --workspace ws_01J00000000000000000000000 --agent claude-code
 ```
+
+### Experimental runtime tracing (opt-in)
+
+Discover unknown context file paths by tracing Agent process file access.
+Requires both `--experimental` and `--consent-path-metadata`. Records path
+metadata only (open/stat/readlink-style events); never reads file contents.
+Unavailable providers are reported without failing stable discovery. Windows is
+unavailable in v0.3.
+
+```sh
+node "$SKILL_DIR/scripts/acs.mjs" trace run --experimental --consent-path-metadata --workspace ws_01J00000000000000000000000 --agent claude-code --command /usr/bin/true
+```
+
+Repeat `--arg` for command arguments. Candidates are hints for a later stable
+`inspect` / `capture` — tracing never mutates Adapter coverage.
 
 Report failed JSON envelopes without inventing a repair. If a repair would
 write, return to the relevant preview/approval/apply workflow.

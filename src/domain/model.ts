@@ -73,3 +73,58 @@ export interface ExtractionProposal {
   accepted: ProposedKnowledge[];
   rejected: RejectedCandidate[];
 }
+
+export type VerificationStatus = 'valid' | 'stale' | 'contradicted' | 'unverifiable';
+
+export type EvidenceRef =
+  | {
+    type: 'file';
+    repo_id: string;
+    path: string;
+    start_line: number;
+    end_line: number;
+    content_hash: string;
+  }
+  | {
+    type: 'dependency';
+    repo_id: string;
+    manifest_path: string;
+    name: string;
+    version: string;
+    content_hash: string;
+  }
+  | {
+    type: 'config';
+    repo_id: string;
+    path: string;
+    start_line: number;
+    end_line: number;
+    content_hash: string;
+  }
+  | {
+    type: 'git-commit';
+    repo_id: string;
+    commit: string;
+  };
+
+export type ProposedVerificationAction =
+  | { type: 'none' }
+  | { type: 'update'; statement: string; reason: string }
+  | { type: 'supersede'; statement: string; reason: string }
+  | { type: 'archive'; reason: string };
+
+export interface VerificationFinding {
+  knowledge_id: string;
+  status: VerificationStatus;
+  explanation: string;
+  evidence: EvidenceRef[];
+  proposed_action: ProposedVerificationAction;
+  attempted_checks?: string[];
+}
+
+export interface VerificationProposal {
+  schema_version: 1;
+  packet_id: string;
+  packet_hash: string;
+  findings: VerificationFinding[];
+}

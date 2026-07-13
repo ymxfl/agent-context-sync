@@ -1,0 +1,8 @@
+12345 10:00:00.123456 openat(AT_FDCWD, "/tmp/repo/AGENTS.md", O_RDONLY|O_CLOEXEC) = 3
+12345 10:00:00.123500 stat("/tmp/repo/package.json", {st_mode=S_IFREG|0644, st_size=100}) = 0
+12345 10:00:00.123550 newfstatat(AT_FDCWD, "/tmp/repo/src/main.ts", {st_mode=S_IFREG|0644, st_size=200}, 0) = 0
+12345 10:00:00.123600 readlink("/tmp/repo/custom.rules", "custom", 4096) = 6
+12346 10:00:00.123650 openat(AT_FDCWD, "/tmp/repo/CLAUDE.md", O_RDONLY) = 4
+12345 10:00:00.123700 write(1, "hello", 5) = 5
+12345 10:00:00.123750 close(3) = 0
+12345 10:00:00.123800 openat(AT_FDCWD, "/usr/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 5

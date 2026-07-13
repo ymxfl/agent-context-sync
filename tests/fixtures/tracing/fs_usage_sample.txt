@@ -1,0 +1,7 @@
+16:20:51.693058  open              F=30 (_WCA__)  /tmp/repo/CLAUDE.md                                                     0.000135   node.2315137
+16:20:51.693100  stat64                           /tmp/repo/package.json                                                   0.000010   node.2315137
+16:20:51.693150  lstat64                          /tmp/repo/src/main.ts                                                    0.000008   node.2315137
+16:20:51.693200  readlink                         /tmp/repo/custom.rules                                                   0.000005   node.2315137
+16:20:51.693250  open              F=31 (_R____)  /tmp/repo/AGENTS.md                                                      0.000020   node.2315138
+16:20:51.693300  write             F=1   B=0x10                                                                            0.000001   node.2315137
+16:20:51.693350  close             F=30                                                                                    0.000001   node.2315137

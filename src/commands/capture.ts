@@ -225,7 +225,7 @@ export async function prepareCapture(input: CaptureInput): Promise<ExtractionPac
 
   await preflightContextRemote(contextPath);
   const contextHead = await localHead(contextPath);
-  const repositoryReports = await inspect({
+  const inspected = await inspect({
     workspaceId: input.workspaceId,
     agent: input.agent,
     home,
@@ -233,7 +233,7 @@ export async function prepareCapture(input: CaptureInput): Promise<ExtractionPac
     ...(input.repositories === undefined ? {} : { repositories: input.repositories }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
   });
-  const coverageReports = mergeCoverageReports(repositoryReports.map((item) => item.report));
+  const coverageReports = mergeCoverageReports(inspected.reports.map((item) => item.report));
   const registeredRepositoryIds = workspace.repositories.map((item) => item.repo_id);
   const store = new KnowledgeStore(contextPath, {
     registeredRepositoryIds: new Set(registeredRepositoryIds),
