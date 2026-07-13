@@ -177,7 +177,7 @@ last_verified_at: null
 
 认证模块使用服务端 Session，不使用 JWT。
 
-## Reason
+## 原因
 
 需要支持服务端主动撤销登录状态。
 ```

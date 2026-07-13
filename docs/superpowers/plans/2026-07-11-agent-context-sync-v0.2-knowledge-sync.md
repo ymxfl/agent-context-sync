@@ -1,58 +1,58 @@
-# Agent Context Sync v0.2 Knowledge Sync and Compilation Implementation Plan
+# Agent Context Sync v0.2 知识同步与编译实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
+> **面向智能体执行者：** 必须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务逐步实现本计划。步骤使用 checkbox（- [ ]）跟踪。
 
-**Goal:** Convert reviewed Agent proposals into structured Git-backed knowledge and deterministically compile applicable knowledge into tracked AGENTS.md and CLAUDE.md files.
+**目标：** 将已审阅的 Agent 提案转换为结构化的、由 Git 支持的知识，并以确定性方式将适用知识编译到受跟踪的 AGENTS.md 和 CLAUDE.md 文件中。
 
-**Architecture:** Discovery output becomes an immutable extraction packet. The active Agent writes a schema-constrained proposal; deterministic code validates, previews, stores, publishes, compiles, and atomically applies it. Preview IDs bind every approval to exact Context and business repository states so stale approval cannot write.
+**架构：** 发现输出会成为不可变的提取包。当前活动的 Agent 写入受 schema 约束的提案；确定性代码负责验证、预览、存储、发布、编译，并以原子方式应用该提案。预览 ID 会将每次批准绑定到精确的 Context 和业务仓库状态，从而避免过期批准执行写入。
 
-**Tech Stack:** The v0.1 Node.js 20+/TypeScript/Vitest stack plus JSON Schema exports from Zod, SHA-256 source hashing, the diff package for unified diffs, and the existing safe Git wrapper.
+**技术栈：** v0.1 的 Node.js 20+/TypeScript/Vitest 技术栈，加上来自 Zod 的 JSON Schema 导出、SHA-256 源哈希、用于 unified diff 的 diff package，以及现有的安全 Git wrapper。
 
-## Global Constraints
+## 全局约束
 
-- Complete v0.1 and keep all v0.1 acceptance tests passing.
-- Context Git is the only source of truth; generated Agent files are derived, tracked business-repository files.
-- Knowledge kind is open kebab-case; behavior must not depend on a closed kind enum.
-- Shared sources contain no absolute local paths or unselected private-memory copies.
-- Every Context or business-repository write requires a non-stale preview and explicit user approval.
-- Context Git may commit and push after approval; business repositories must never be committed or pushed by the tool.
-- Known active conflicts fail compilation instead of being resolved by timestamp.
-- Same inputs and Context commit must produce byte-identical output.
+- 完成 v0.1，并保持所有 v0.1 验收测试通过。
+- Context Git 是唯一事实来源；生成的 Agent 文件是派生的、受跟踪的业务仓库文件。
+- 知识 kind 是开放的 kebab-case；行为不得依赖封闭的 kind enum。
+- 共享来源不得包含绝对本地路径或未选中的 private-memory 副本。
+- 每次 Context 或业务仓库写入都需要未过期的预览和明确的用户批准。
+- Context Git 可在批准后 commit 和 push；业务仓库绝不能由工具 commit 或 push。
+- 已知活动冲突会导致编译失败，而不是按时间戳解决。
+- 相同输入和 Context commit 必须产生字节完全一致的输出。
 
 ---
 
-## File Map
+## 文件映射
 
-- src/schema/knowledge.ts: canonical KnowledgeEntry and relation validation.
-- src/schema/extraction.ts: Agent proposal and rejection schemas.
-- src/knowledge/store.ts: one-entry-per-Markdown persistence.
-- src/knowledge/graph.ts: supersedes/conflicts graph and active-set validation.
-- src/security/redact.ts: secrets and local-path detection.
-- src/extraction/packet.ts: immutable discovery packet creation.
-- src/extraction/proposal.ts: proposal validation, dedupe, and preview.
-- src/git/context-publisher.ts: fast-forward preflight, commit, and push.
-- src/compiler/select.ts: scope/path/agent selection.
-- src/compiler/compile.ts: deterministic section model.
-- src/adapters/claude/render.ts and src/adapters/codex/render.ts: native renderers.
-- src/apply/preview.ts and src/apply/atomic-apply.ts: diff, drift checks, and atomic replacement.
-- src/commands/capture.ts, apply.ts, sync.ts: workflows exposed to the Skill.
+- src/schema/knowledge.ts：规范 KnowledgeEntry 和关系验证。
+- src/schema/extraction.ts：Agent 提案和拒绝 schema。
+- src/knowledge/store.ts：每个 Markdown 一个条目的持久化。
+- src/knowledge/graph.ts：supersedes/conflicts 图和活动集合验证。
+- src/security/redact.ts：secret 和本地路径检测。
+- src/extraction/packet.ts：不可变发现包创建。
+- src/extraction/proposal.ts：提案验证、去重和预览。
+- src/git/context-publisher.ts：fast-forward 预检、commit 和 push。
+- src/compiler/select.ts：scope/path/agent 选择。
+- src/compiler/compile.ts：确定性 section 模型。
+- src/adapters/claude/render.ts 和 src/adapters/codex/render.ts：原生渲染器。
+- src/apply/preview.ts 和 src/apply/atomic-apply.ts：diff、drift 检查和原子替换。
+- src/commands/capture.ts、apply.ts、sync.ts：暴露给 Skill 的工作流。
 
-### Task 1: Define Canonical Knowledge and Extraction Schemas
+### 任务 1：定义规范知识和提取 schema
 
-**Files:**
-- Create: src/schema/knowledge.ts
-- Create: src/schema/extraction.ts
-- Create: tests/schema/knowledge.test.ts
-- Create: tests/schema/extraction.test.ts
-- Modify: src/domain/model.ts
+**文件：**
+- 新建：src/schema/knowledge.ts
+- 新建：src/schema/extraction.ts
+- 新建：tests/schema/knowledge.test.ts
+- 新建：tests/schema/extraction.test.ts
+- 修改：src/domain/model.ts
 
-**Interfaces:**
-- Produces: KnowledgeEntry, KnowledgeStatus, KnowledgeScope, SourceReference
-- Produces: ExtractionProposal, ProposedKnowledge, RejectedCandidate
-- Produces: parseKnowledgeEntry(value: unknown): KnowledgeEntry
-- Produces: parseExtractionProposal(value: unknown): ExtractionProposal
+**接口：**
+- 产出：KnowledgeEntry, KnowledgeStatus, KnowledgeScope, SourceReference
+- 产出：ExtractionProposal, ProposedKnowledge, RejectedCandidate
+- 产出：parseKnowledgeEntry(value: unknown): KnowledgeEntry
+- 产出：parseExtractionProposal(value: unknown): ExtractionProposal
 
-- [ ] **Step 1: Write failing open-kind and relation tests**
+- [ ] **步骤 1：编写失败的开放 kind 和关系测试**
 
 ~~~ts
 expect(parseKnowledgeEntry({
@@ -77,46 +77,46 @@ expect(() => parseKnowledgeEntry({ ...valid, kind: 'Bad Kind' })).toThrow();
 expect(() => parseExtractionProposal({ ...proposal, accepted: [], rejected: [] })).not.toThrow();
 ~~~
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/schema/knowledge.test.ts tests/schema/extraction.test.ts
+运行：npm test -- --run tests/schema/knowledge.test.ts tests/schema/extraction.test.ts
 
-Expected: FAIL because the schemas do not exist.
+预期：FAIL，因为 schema 尚不存在。
 
-- [ ] **Step 3: Implement strict schemas**
+- [ ] **步骤 3：实现严格 schema**
 
-Use literal schema_version 1. Knowledge status is active, superseded, archived, or disputed. Scope is workspace or repository:<repo-id>. kind matches /^[a-z0-9]+(?:-[a-z0-9]+)*$/. Agent names are open strings but MVP renderers recognize claude-code and codex. Store statement and reason as schema fields so validation does not parse Markdown headings.
+使用字面量 schema_version 1。Knowledge status 为 active、superseded、archived 或 disputed。Scope 为 workspace 或 repository:<repo-id>。kind 匹配 /^[a-z0-9]+(?:-[a-z0-9]+)*$/。Agent 名称是开放字符串，但 MVP 渲染器识别 claude-code 和 codex。将 statement 和 reason 存储为 schema 字段，使验证无需解析 Markdown 标题。
 
-- [ ] **Step 4: Run focused and regression tests**
+- [ ] **步骤 4：运行聚焦测试和回归测试**
 
-Run: npm test -- --run tests/schema && npm run verify
+运行：npm test -- --run tests/schema && npm run verify
 
-Expected: all v0.1 and new schema tests pass.
+预期：所有 v0.1 和新的 schema 测试通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/schema src/domain/model.ts tests/schema
 git commit -m "feat: define structured knowledge proposals"
 ~~~
 
-### Task 2: Store Knowledge as Canonical Markdown
+### 任务 2：将知识存储为规范 Markdown
 
-**Files:**
-- Create: src/knowledge/markdown.ts
-- Create: src/knowledge/store.ts
-- Create: src/knowledge/graph.ts
-- Test: tests/knowledge/store.test.ts
-- Test: tests/knowledge/graph.test.ts
+**文件：**
+- 新建：src/knowledge/markdown.ts
+- 新建：src/knowledge/store.ts
+- 新建：src/knowledge/graph.ts
+- 测试：tests/knowledge/store.test.ts
+- 测试：tests/knowledge/graph.test.ts
 
-**Interfaces:**
-- Consumes: KnowledgeEntry
-- Produces: serializeKnowledge(entry: KnowledgeEntry): string
-- Produces: parseKnowledgeMarkdown(text: string): KnowledgeEntry
-- Produces: KnowledgeStore.list(), get(id), put(entry)
-- Produces: validateKnowledgeGraph(entries: KnowledgeEntry[]): GraphIssue[]
+**接口：**
+- 消费：KnowledgeEntry
+- 产出：serializeKnowledge(entry: KnowledgeEntry): string
+- 产出：parseKnowledgeMarkdown(text: string): KnowledgeEntry
+- 产出：KnowledgeStore.list(), get(id), put(entry)
+- 产出：validateKnowledgeGraph(entries: KnowledgeEntry[]): GraphIssue[]
 
-- [ ] **Step 1: Write failing round-trip and graph tests**
+- [ ] **步骤 1：编写失败的往返和图测试**
 
 ~~~ts
 const text = serializeKnowledge(entry);
@@ -129,46 +129,46 @@ expect(validateKnowledgeGraph([
 ])).toContainEqual(expect.objectContaining({ code: 'SUPERSEDES_CYCLE' }));
 ~~~
 
-Also assert IDs determine paths, archived entries are not moved, and a conflicts_with relation is symmetric after normalization.
+同时断言 ID 决定路径、archived 条目不会被移动，并且 conflicts_with 关系在规范化后是对称的。
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/knowledge
+运行：npm test -- --run tests/knowledge
 
-Expected: FAIL because storage modules do not exist.
+预期：FAIL，因为存储模块尚不存在。
 
-- [ ] **Step 3: Implement deterministic serialization and graph checks**
+- [ ] **步骤 3：实现确定性序列化和图检查**
 
-Sort frontmatter keys and arrays, use LF endings and one final newline. Map workspace entries to knowledge/workspace/<id>.md and repository entries to knowledge/repositories/<repo-id>/<id>.md. Reject duplicate IDs, missing relation targets, self-relations, supersedes cycles, and active entries superseded by missing knowledge.
+排序 frontmatter key 和数组，使用 LF 行尾并保留一个最终换行。将 workspace 条目映射到 knowledge/workspace/<id>.md，将 repository 条目映射到 knowledge/repositories/<repo-id>/<id>.md。拒绝重复 ID、缺失的关系目标、自引用关系、supersedes 循环，以及被缺失知识 supersede 的 active 条目。
 
-- [ ] **Step 4: Verify focused and full tests**
+- [ ] **步骤 4：验证聚焦测试和完整测试**
 
-Run: npm test -- --run tests/knowledge && npm run verify
+运行：npm test -- --run tests/knowledge && npm run verify
 
-Expected: all pass and repeated serialization is byte-identical.
+预期：全部通过，且重复序列化得到字节完全一致的结果。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/knowledge tests/knowledge
 git commit -m "feat: persist canonical knowledge markdown"
 ~~~
 
-### Task 3: Build Safe Extraction Packets and Redaction
+### 任务 3：构建安全的提取包和脱敏
 
-**Files:**
-- Create: src/security/redact.ts
-- Create: src/extraction/packet.ts
-- Create: tests/security/redact.test.ts
-- Create: tests/extraction/packet.test.ts
+**文件：**
+- 新建：src/security/redact.ts
+- 新建：src/extraction/packet.ts
+- 新建：tests/security/redact.test.ts
+- 新建：tests/extraction/packet.test.ts
 
-**Interfaces:**
-- Consumes: CoverageReport[] and existing KnowledgeEntry[]
-- Produces: redactCandidate(value: string, localRoots: string[]): RedactionResult
-- Produces: createExtractionPacket(input: PacketInput): ExtractionPacket
-- ExtractionPacket includes packet_id, context_head, source hashes, selected excerpts, existing summaries, and JSON output contract
+**接口：**
+- 消费：CoverageReport[] 和现有 KnowledgeEntry[]
+- 产出：redactCandidate(value: string, localRoots: string[]): RedactionResult
+- 产出：createExtractionPacket(input: PacketInput): ExtractionPacket
+- ExtractionPacket 包含 packet_id、context_head、source hashes、selected excerpts、existing summaries 和 JSON output contract
 
-- [ ] **Step 1: Write failing secret and immutability tests**
+- [ ] **步骤 1：编写失败的 secret 和不可变性测试**
 
 ~~~ts
 expect(redactCandidate('token=ghp_abcdefghijklmnopqrstuvwxyz123456', roots).redacted)
@@ -182,45 +182,45 @@ expect(Object.isFrozen(packet)).toBe(true);
 expect(packet.packet_hash).toMatch(/^sha256:/);
 ~~~
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/security tests/extraction/packet.test.ts
+运行：npm test -- --run tests/security tests/extraction/packet.test.ts
 
-Expected: FAIL because packet and redaction modules are absent.
+预期：FAIL，因为 packet 和 redaction 模块缺失。
 
-- [ ] **Step 3: Implement conservative redaction and packet hashing**
+- [ ] **步骤 3：实现保守脱敏和 packet 哈希**
 
-Detect private key headers, common token prefixes, credential URLs, assignment-style secrets, and registered absolute roots. Preserve source locator, line range, content hash, and selected excerpt only. Canonicalize packet JSON before hashing and deep-freeze the returned packet.
+检测 private key headers、常见 token 前缀、credential URLs、赋值风格 secrets，以及已注册的绝对根路径。仅保留 source locator、line range、content hash 和 selected excerpt。哈希前规范化 packet JSON，并对返回的 packet 进行 deep-freeze。
 
-- [ ] **Step 4: Run focused and full tests**
+- [ ] **步骤 4：运行聚焦测试和完整测试**
 
-Run: npm test -- --run tests/security tests/extraction && npm run verify
+运行：npm test -- --run tests/security tests/extraction && npm run verify
 
-Expected: all pass and snapshots contain no fixture secrets or absolute paths.
+预期：全部通过，且 snapshots 不包含 fixture secrets 或绝对路径。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/security src/extraction tests/security tests/extraction
 git commit -m "feat: prepare redacted extraction packets"
 ~~~
 
-### Task 4: Validate Agent Proposals and Preview Knowledge Changes
+### 任务 4：验证 Agent 提案并预览知识变更
 
-**Files:**
-- Create: src/extraction/proposal.ts
-- Create: src/preview/store.ts
-- Create: src/commands/capture.ts
-- Modify: src/main.ts
-- Test: tests/extraction/proposal.test.ts
-- Test: tests/integration/capture-preview.test.ts
+**文件：**
+- 新建：src/extraction/proposal.ts
+- 新建：src/preview/store.ts
+- 新建：src/commands/capture.ts
+- 修改：src/main.ts
+- 测试：tests/extraction/proposal.test.ts
+- 测试：tests/integration/capture-preview.test.ts
 
-**Interfaces:**
-- Produces: prepareCapture(input: CaptureInput): Promise<ExtractionPacket>
-- Produces: previewCapture(packetId: string, proposal: unknown): Promise<CapturePreview>
-- Produces: CapturePreview with preview_id, packet_hash, context_head, creates, updates, archives, rejections, warnings
+**接口：**
+- 产出：prepareCapture(input: CaptureInput): Promise<ExtractionPacket>
+- 产出：previewCapture(packetId: string, proposal: unknown): Promise<CapturePreview>
+- 产出：带有 preview_id、packet_hash、context_head、creates、updates、archives、rejections、warnings 的 CapturePreview
 
-- [ ] **Step 1: Write failing dedupe and stale-proposal tests**
+- [ ] **步骤 1：编写失败的去重和过期提案测试**
 
 ~~~ts
 const preview = await previewCapture(packet.packet_id, proposal);
@@ -231,45 +231,45 @@ expect(preview.context_head).toBe(packet.context_head);
 expect(preview.packet_hash).toBe(packet.packet_hash);
 ~~~
 
-Also reject a proposal that references a source hash absent from its packet or attempts to share a candidate marked personal without explicit include_personal approval.
+同时拒绝引用其 packet 中不存在的 source hash 的提案，或在没有明确 include_personal 批准时尝试共享标记为 personal 的候选项的提案。
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/extraction/proposal.test.ts tests/integration/capture-preview.test.ts
+运行：npm test -- --run tests/extraction/proposal.test.ts tests/integration/capture-preview.test.ts
 
-Expected: FAIL because proposal previewing does not exist.
+预期：FAIL，因为 proposal previewing 尚不存在。
 
-- [ ] **Step 3: Implement proposal normalization and preview storage**
+- [ ] **步骤 3：实现提案规范化和预览存储**
 
-Use exact source hashes first, then normalized statement hashes for deterministic duplicate candidates. Never use model embeddings in MVP. Store previews under the local home with mode 0o600; bind packet hash, Context HEAD, proposed file bytes, and expiry of 24 hours. previewCapture writes no Context files. Add diff as a runtime dependency in this task and lock it in package-lock.json.
+先使用精确的 source hashes，再使用规范化的 statement hashes 来确定性识别重复候选项。MVP 中绝不使用 model embeddings。以 mode 0o600 将 previews 存储在 local home 下；绑定 packet hash、Context HEAD、proposed file bytes 和 24 小时过期时间。previewCapture 不写入任何 Context 文件。在此任务中将 diff 添加为 runtime dependency，并将其锁定到 package-lock.json。
 
-- [ ] **Step 4: Run focused and regression tests**
+- [ ] **步骤 4：运行聚焦测试和回归测试**
 
-Run: npm test -- --run tests/extraction tests/integration/capture-preview.test.ts && npm run verify
+运行：npm test -- --run tests/extraction tests/integration/capture-preview.test.ts && npm run verify
 
-Expected: all pass and Context Git remains clean after preview.
+预期：全部通过，且预览后 Context Git 保持 clean。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/extraction src/preview src/commands/capture.ts src/main.ts tests
 git commit -m "feat: preview agent knowledge proposals"
 ~~~
 
-### Task 5: Publish Approved Knowledge Safely
+### 任务 5：安全发布已批准知识
 
-**Files:**
-- Create: src/git/context-publisher.ts
-- Modify: src/commands/capture.ts
-- Test: tests/git/context-publisher.test.ts
-- Test: tests/integration/capture-apply.test.ts
+**文件：**
+- 新建：src/git/context-publisher.ts
+- 修改：src/commands/capture.ts
+- 测试：tests/git/context-publisher.test.ts
+- 测试：tests/integration/capture-apply.test.ts
 
-**Interfaces:**
-- Consumes: CapturePreview from Task 4 and KnowledgeStore from Task 2
-- Produces: applyCapture(previewId: string): Promise<PublishResult>
-- Produces: ContextRemoteState { head, upstream, ahead, behind, diverged }
+**接口：**
+- 消费：任务 4 的 CapturePreview 和任务 2 的 KnowledgeStore
+- 产出：applyCapture(previewId: string): Promise<PublishResult>
+- 产出：ContextRemoteState { head, upstream, ahead, behind, diverged }
 
-- [ ] **Step 1: Write failing fast-forward and race tests**
+- [ ] **步骤 1：编写失败的 fast-forward 和 race 测试**
 
 ~~~ts
 const result = await applyCapture(preview.preview_id);
@@ -283,44 +283,44 @@ await expect(applyCapture(otherPreview.preview_id)).rejects.toMatchObject({
 expect(await currentBranchWasForcePushed()).toBe(false);
 ~~~
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/git/context-publisher.test.ts tests/integration/capture-apply.test.ts
+运行：npm test -- --run tests/git/context-publisher.test.ts tests/integration/capture-apply.test.ts
 
-Expected: FAIL because publication is absent.
+预期：FAIL，因为 publication 缺失。
 
-- [ ] **Step 3: Implement fetch/preflight/write/commit/push**
+- [ ] **步骤 3：实现 fetch/preflight/write/commit/push**
 
-Fetch before writing. Fast-forward when behind-only, reject divergence, then recompute HEAD against preview. Write all knowledge files atomically, validate the whole graph, stage only workspace.yaml, repositories, knowledge, sources, and schema paths, create one semantic commit, and push without force. On push race, preserve the local commit and return REMOTE_CHANGED with recovery guidance.
+写入前先 fetch。仅 behind 时执行 fast-forward，拒绝 divergence，然后根据 preview 重新计算 HEAD。以原子方式写入所有知识文件，验证整个图，仅 stage workspace.yaml、repositories、knowledge、sources 和 schema paths，创建一个语义化 commit，并在不 force 的情况下 push。发生 push race 时，保留本地 commit，并返回 REMOTE_CHANGED 及恢复指导。
 
-- [ ] **Step 4: Run Git and full verification**
+- [ ] **步骤 4：运行 Git 和完整验证**
 
-Run: npm test -- --run tests/git tests/integration/capture-apply.test.ts && npm run verify
+运行：npm test -- --run tests/git tests/integration/capture-apply.test.ts && npm run verify
 
-Expected: all pass across ahead, behind, diverged, auth-error fixture, and push-race cases.
+预期：ahead、behind、diverged、auth-error fixture 和 push-race 场景全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/git src/commands/capture.ts tests/git tests/integration/capture-apply.test.ts
 git commit -m "feat: publish approved context knowledge"
 ~~~
 
-### Task 6: Select and Compile Applicable Knowledge
+### 任务 6：选择并编译适用知识
 
-**Files:**
-- Create: src/compiler/select.ts
-- Create: src/compiler/compile.ts
-- Create: src/compiler/conflicts.ts
-- Test: tests/compiler/select.test.ts
-- Test: tests/compiler/compile.test.ts
+**文件：**
+- 新建：src/compiler/select.ts
+- 新建：src/compiler/compile.ts
+- 新建：src/compiler/conflicts.ts
+- 测试：tests/compiler/select.test.ts
+- 测试：tests/compiler/compile.test.ts
 
-**Interfaces:**
-- Produces: selectKnowledge(input: SelectionInput): KnowledgeEntry[]
-- Produces: detectActiveConflicts(entries: KnowledgeEntry[]): CompileConflict[]
-- Produces: compileSections(input: CompileInput): CompiledContext
+**接口：**
+- 产出：selectKnowledge(input: SelectionInput): KnowledgeEntry[]
+- 产出：detectActiveConflicts(entries: KnowledgeEntry[]): CompileConflict[]
+- 产出：compileSections(input: CompileInput): CompiledContext
 
-- [ ] **Step 1: Write failing scope and conflict tests**
+- [ ] **步骤 1：编写失败的 scope 和 conflict 测试**
 
 ~~~ts
 const selected = selectKnowledge({
@@ -336,46 +336,46 @@ expect(() => compileSections({ entries: conflicting, target })).toThrowError(
 );
 ~~~
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/compiler
+运行：npm test -- --run tests/compiler
 
-Expected: FAIL because compiler modules do not exist.
+预期：FAIL，因为 compiler modules 尚不存在。
 
-- [ ] **Step 3: Implement deterministic selection and section ordering**
+- [ ] **步骤 3：实现确定性选择和 section 排序**
 
-Exclude non-active entries and target-agent mismatches. Match paths with repository-relative POSIX globs. Order Workspace, Repository, path-specific, Agent-specific, then active-work; within a section order by stable ID. Fail when active conflicts lack a supersedes resolution or point to disputed knowledge.
+排除非 active 条目和 target-agent 不匹配项。使用 repository-relative POSIX globs 匹配路径。排序顺序为 Workspace、Repository、path-specific、Agent-specific，然后 active-work；section 内按稳定 ID 排序。当 active conflicts 缺少 supersedes resolution 或指向 disputed knowledge 时失败。
 
-- [ ] **Step 4: Run compiler and full tests**
+- [ ] **步骤 4：运行 compiler 和完整测试**
 
-Run: npm test -- --run tests/compiler && npm run verify
+运行：npm test -- --run tests/compiler && npm run verify
 
-Expected: all pass and a 100-run determinism assertion produces one unique SHA-256.
+预期：全部通过，且 100-run determinism assertion 只产生一个唯一 SHA-256。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/compiler tests/compiler
 git commit -m "feat: compile scoped agent context"
 ~~~
 
-### Task 7: Render Native Claude and Codex Files
+### 任务 7：渲染原生 Claude 和 Codex 文件
 
-**Files:**
-- Create: src/adapters/claude/render.ts
-- Create: src/adapters/codex/render.ts
-- Modify: src/adapters/adapter.ts
-- Test: tests/adapters/claude-render.test.ts
-- Test: tests/adapters/codex-render.test.ts
-- Create: tests/fixtures/render-golden/
-- Create: tests/helpers/golden.ts
+**文件：**
+- 新建：src/adapters/claude/render.ts
+- 新建：src/adapters/codex/render.ts
+- 修改：src/adapters/adapter.ts
+- 测试：tests/adapters/claude-render.test.ts
+- 测试：tests/adapters/codex-render.test.ts
+- 新建：tests/fixtures/render-golden/
+- 新建：tests/helpers/golden.ts
 
-**Interfaces:**
-- Produces: render(input: RenderInput): RenderedFile[]
-- RenderedFile includes relativePath, bytes, sha256, sourceKnowledgeIds
-- Produces: goldenFiles(agent: 'claude' | 'codex'): Promise<RenderedFile[]>
+**接口：**
+- 产出：render(input: RenderInput): RenderedFile[]
+- RenderedFile 包含 relativePath、bytes、sha256、sourceKnowledgeIds
+- 产出：goldenFiles(agent: 'claude' | 'codex'): Promise<RenderedFile[]>
 
-- [ ] **Step 1: Write failing golden tests**
+- [ ] **步骤 1：编写失败的 golden 测试**
 
 ~~~ts
 expect(renderClaude(input)).toEqual(await goldenFiles('claude'));
@@ -384,49 +384,49 @@ expect(renderCodex(input)[0].bytes.byteLength).toBeLessThanOrEqual(32768);
 expect(decode(renderClaude(input)[0].bytes)).not.toContain('@AGENTS.md');
 ~~~
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/adapters/*-render.test.ts
+运行：npm test -- --run tests/adapters/*-render.test.ts
 
-Expected: FAIL because renderers do not exist.
+预期：FAIL，因为 renderers 尚不存在。
 
-- [ ] **Step 3: Implement full native rendering**
+- [ ] **步骤 3：实现完整原生渲染**
 
-Both root files include a generated warning, Workspace ID, Context commit, content hash, and concise sections. Never include source absolute paths. Codex splits path-scoped content into nested AGENTS.md when the root would exceed configured max bytes. Claude emits .claude/rules/<stable-scope-id>.md for path-scoped knowledge and keeps CLAUDE.md under 200 lines where possible. Do not make CLAUDE.md import AGENTS.md because both are complete projections.
+两个 root 文件都包含 generated warning、Workspace ID、Context commit、content hash 和简洁 sections。绝不包含 source absolute paths。当 root 超过配置的 max bytes 时，Codex 会将 path-scoped 内容拆分到嵌套的 AGENTS.md。Claude 会为 path-scoped knowledge 输出 .claude/rules/<stable-scope-id>.md，并尽可能将 CLAUDE.md 控制在 200 行以内。不要让 CLAUDE.md import AGENTS.md，因为两者都是完整投影。
 
-- [ ] **Step 4: Run golden and full tests**
+- [ ] **步骤 4：运行 golden 和完整测试**
 
-Run: npm test -- --run tests/adapters tests/compiler && npm run verify
+运行：npm test -- --run tests/adapters tests/compiler && npm run verify
 
-Expected: all pass and golden files have LF endings and one final newline.
+预期：全部通过，且 golden files 使用 LF 行尾并有一个最终换行。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/adapters tests/adapters tests/fixtures/render-golden
 git commit -m "feat: render native agent guidance"
 ~~~
 
-### Task 8: Preview and Atomically Apply Generated Files
+### 任务 8：预览并原子应用生成文件
 
-**Files:**
-- Create: src/apply/preview.ts
-- Create: src/apply/atomic-apply.ts
-- Create: src/apply/drift.ts
-- Create: src/commands/apply.ts
-- Create: src/commands/sync.ts
-- Modify: src/main.ts
-- Modify: skill/agent-context-sync/SKILL.md
-- Test: tests/integration/apply.test.ts
-- Test: tests/e2e/v02-sync.test.ts
+**文件：**
+- 新建：src/apply/preview.ts
+- 新建：src/apply/atomic-apply.ts
+- 新建：src/apply/drift.ts
+- 新建：src/commands/apply.ts
+- 新建：src/commands/sync.ts
+- 修改：src/main.ts
+- 修改：skill/agent-context-sync/SKILL.md
+- 测试：tests/integration/apply.test.ts
+- 测试：tests/e2e/v02-sync.test.ts
 
-**Interfaces:**
-- Produces: previewApply(input: ApplyInput): Promise<ApplyPreview>
-- Produces: applyRendered(previewId: string): Promise<ApplyResult>
-- Produces: syncPrepare(input: SyncInput): Promise<ExtractionPacket>
-- ApplyPreview includes Context HEAD, business HEADs, complete unified diffs, generated hashes, and drift candidates
+**接口：**
+- 产出：previewApply(input: ApplyInput): Promise<ApplyPreview>
+- 产出：applyRendered(previewId: string): Promise<ApplyResult>
+- 产出：syncPrepare(input: SyncInput): Promise<ExtractionPacket>
+- ApplyPreview 包含 Context HEAD、business HEADs、完整 unified diffs、generated hashes 和 drift candidates
 
-- [ ] **Step 1: Write failing drift and end-to-end tests**
+- [ ] **步骤 1：编写失败的 drift 和端到端测试**
 
 ~~~ts
 const preview = await previewApply({ workspaceId, agents: ['claude-code', 'codex'] });
@@ -439,36 +439,36 @@ await expect(applyRendered(preview.preview_id)).rejects.toMatchObject({ code: 'T
 expect(await businessGitLog()).toEqual(beforeLog);
 ~~~
 
-The e2e test must capture Claude knowledge, publish Context Git, join from a second home with one repository, render Codex, add Codex knowledge, publish, and render Claude back on the first home.
+e2e 测试必须捕获 Claude knowledge，发布 Context Git，从带有一个 repository 的第二个 home 加入，渲染 Codex，添加 Codex knowledge，发布，并在第一个 home 上重新渲染 Claude。
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/integration/apply.test.ts tests/e2e/v02-sync.test.ts
+运行：npm test -- --run tests/integration/apply.test.ts tests/e2e/v02-sync.test.ts
 
-Expected: FAIL because apply and sync are absent.
+预期：FAIL，因为 apply 和 sync 缺失。
 
-- [ ] **Step 3: Implement preview, atomic replacement, and Skill workflow**
+- [ ] **步骤 3：实现 preview、atomic replacement 和 Skill workflow**
 
-Compile all repositories into temporary directories before showing diff. Bind previews to Context HEAD, business HEAD, and current target hashes. If a target differs from its prior generated hash, return its diff as a capture candidate and refuse overwrite. On approval, write backups under local home, fsync temporary files, rename per repository, and stop after the first repository failure with completed/pending lists. Never run git add or commit in a business repository.
+显示 diff 前，将所有 repositories 编译到 temporary directories。将 previews 绑定到 Context HEAD、business HEAD 和当前 target hashes。如果某个 target 与其 prior generated hash 不同，则将其 diff 作为 capture candidate 返回，并拒绝覆盖。批准后，在 local home 下写入 backups，fsync temporary files，按 repository rename，并在第一个 repository failure 后停止，同时返回 completed/pending lists。绝不在业务仓库中运行 git add 或 commit。
 
-Update SKILL.md so sync executes prepare-capture, asks the Agent for schema JSON, previews capture, obtains approval, applies/pushes Context Git, previews render, obtains approval, then applies business files.
+更新 SKILL.md，使 sync 执行 prepare-capture，要求 Agent 提供 schema JSON，预览 capture，获得批准，应用并 push Context Git，预览 render，获得批准，然后应用 business files。
 
-- [ ] **Step 4: Run the v0.2 acceptance suite**
+- [ ] **步骤 4：运行 v0.2 验收套件**
 
-Run: npm run verify && npm test -- --run tests/e2e/v02-sync.test.ts
+运行：npm run verify && npm test -- --run tests/e2e/v02-sync.test.ts
 
-Expected: all tests pass; Context remote contains knowledge commits; both business repositories contain uncommitted tracked AGENTS.md and CLAUDE.md changes; neither business log changes.
+预期：所有测试通过；Context remote 包含 knowledge commits；两个业务仓库都包含未提交但受跟踪的 AGENTS.md 和 CLAUDE.md 变更；两个 business log 均无变化。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：Commit**
 
 ~~~bash
 git add src/apply src/commands src/main.ts skill tests/integration tests/e2e
 git commit -m "feat: deliver reviewed cross-agent context sync"
 ~~~
 
-## v0.2 Completion Gate
+## v0.2 完成门禁
 
-Run:
+运行：
 
 ~~~bash
 npm ci
@@ -477,10 +477,10 @@ npm test -- --run tests/e2e/v02-sync.test.ts
 git status --short
 ~~~
 
-Expected:
+预期：
 
-- All v0.1 and v0.2 tests pass.
-- Claude-to-Codex and Codex-to-Claude flows are proven with two homes and a bare Context remote.
-- Context writes and business file writes fail when their preview becomes stale.
-- Active conflicts and manually edited generated files are never silently overwritten.
-- Business repositories contain no tool-created commits.
+- 所有 v0.1 和 v0.2 测试通过。
+- Claude-to-Codex 和 Codex-to-Claude 流程已通过两个 homes 和一个 bare Context remote 验证。
+- 当 preview 过期时，Context writes 和 business file writes 会失败。
+- Active conflicts 和手动编辑过的 generated files 绝不会被静默覆盖。
+- 业务仓库不包含工具创建的 commits。

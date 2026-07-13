@@ -1,74 +1,74 @@
-# Agent Context Sync v0.1 Workspace and Discovery Implementation Plan
+# Agent Context Sync v0.1 Workspace 和发现功能实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
+> **面向智能体执行者：** 必须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务逐步实现本计划。步骤使用 checkbox（- [ ]）跟踪。
 
-**Goal:** Build a cross-agent Skill that creates or joins a stable virtual Workspace, maps repositories without moving them, and reports the context sources Claude Code and Codex are expected to load.
+**目标：** 构建一个跨智能体 Skill，用于创建或加入稳定的虚拟 Workspace，在不移动仓库的情况下映射仓库，并报告 Claude Code 和 Codex 预期会加载的上下文来源。
 
-**Architecture:** A portable Agent Skill invokes a TypeScript executable bundled in its scripts directory. Deterministic modules own manifests, Git/path identity, source discovery, and reports; the Agent only interprets reports and requests confirmation. Shared Workspace metadata lives in a dedicated Context Git repository while absolute paths remain in a local registry.
+**架构：** 一个可移植的 Agent Skill 调用打包在其 scripts 目录中的 TypeScript 可执行文件。确定性模块负责 manifests、Git/路径身份、来源发现和报告；Agent 只解读报告并请求确认。共享 Workspace 元数据保存在专用的 Context Git 仓库中，而绝对路径保留在本地 registry 中。
 
-**Tech Stack:** Node.js 20+, TypeScript 5.x in strict ESM mode, npm, Vitest, esbuild, Zod, YAML, fast-glob, minimatch, smol-toml, and Node child_process with argument arrays.
+**技术栈：** Node.js 20+、严格 ESM 模式下的 TypeScript 5.x、npm、Vitest、esbuild、Zod、YAML、fast-glob、minimatch、smol-toml，以及使用参数数组的 Node child_process。
 
-## Global Constraints
+## 全局约束
 
-- MVP supports Claude Code and Codex only.
-- The Skill is the recommended user entry; internal commands emit JSON and never ask interactive terminal questions.
-- Discovery is read-only and must report covered, partial, unknown, or inaccessible rather than claiming completeness.
-- Workspace identity is stable and independent of local directory layout or the set of cloned repositories.
-- Shared manifests contain no absolute local paths; local paths live under AGENT_CONTEXT_SYNC_HOME or ~/.agent-context-sync.
-- No command may commit, push, reset, clean, or force-update a business repository.
-- Use TDD, deterministic fixtures, atomic file writes, and frequent commits.
+- MVP 仅支持 Claude Code 和 Codex。
+- Skill 是推荐的用户入口；内部命令输出 JSON，且绝不提出交互式终端问题。
+- 发现过程是只读的，并且必须报告 covered、partial、unknown 或 inaccessible，而不是声称完整性。
+- Workspace 身份是稳定的，并且独立于本地目录布局或已克隆仓库集合。
+- 共享 manifests 不包含本地绝对路径；本地路径保存在 AGENT_CONTEXT_SYNC_HOME 或 ~/.agent-context-sync 下。
+- 任何命令都不得对业务仓库执行 commit、push、reset、clean 或强制更新。
+- 使用 TDD、确定性 fixtures、原子文件写入和频繁提交。
 
 ---
 
-## File Map
+## 文件映射
 
-- package.json: package metadata, scripts, runtime and development dependencies.
-- tsconfig.json: strict ESM type checking.
-- vitest.config.ts: test discovery and coverage thresholds.
-- src/domain/model.ts: shared domain types and discriminated result types.
-- src/domain/errors.ts: stable error codes exposed to the Skill.
-- src/schema/workspace.ts: Zod schemas for shared and local manifests.
-- src/fs/atomic-write.ts: atomic UTF-8 and YAML writes.
-- src/git/run-git.ts: safe Git subprocess wrapper using argument arrays.
-- src/workspace/repository-id.ts: remote normalization and stable repository IDs.
-- src/workspace/scanner.ts: bounded Git repository scanning with symlink resolution.
-- src/workspace/local-registry.ts: local path registry.
-- src/workspace/context-repository.ts: init/join and shared manifest validation.
-- src/adapters/adapter.ts: Adapter interface and coverage types.
-- src/adapters/claude/discover.ts: Claude Code known-source discovery.
-- src/adapters/codex/discover.ts: Codex known-source discovery.
-- src/adapters/registry.ts: Agent Adapter selection.
-- src/commands/init.ts, join.ts, add-repo.ts, inspect.ts, doctor.ts: command use cases.
-- src/main.ts: JSON command dispatcher.
-- skill/agent-context-sync/SKILL.md: cross-agent workflow instructions.
-- skill/agent-context-sync/scripts/acs.mjs: esbuild-bundled executable shipped inside the Skill.
-- tests/helpers/fs.ts, git.ts, and invoke.ts: reusable fixture and command helpers with no production dependencies.
-- tests: unit, contract, integration, and end-to-end fixtures.
+- package.json：package 元数据、脚本、运行时依赖和开发依赖。
+- tsconfig.json：严格 ESM 类型检查。
+- vitest.config.ts：测试发现和覆盖率阈值。
+- src/domain/model.ts：共享领域类型和判别式结果类型。
+- src/domain/errors.ts：暴露给 Skill 的稳定错误码。
+- src/schema/workspace.ts：共享和本地 manifests 的 Zod schemas。
+- src/fs/atomic-write.ts：原子的 UTF-8 和 YAML 写入。
+- src/git/run-git.ts：使用参数数组的安全 Git 子进程封装。
+- src/workspace/repository-id.ts：remote 规范化和稳定 repository IDs。
+- src/workspace/scanner.ts：带边界的 Git 仓库扫描和 symlink 解析。
+- src/workspace/local-registry.ts：本地路径 registry。
+- src/workspace/context-repository.ts：init/join 和共享 manifest 校验。
+- src/adapters/adapter.ts：Adapter 接口和覆盖范围类型。
+- src/adapters/claude/discover.ts：Claude Code 已知来源发现。
+- src/adapters/codex/discover.ts：Codex 已知来源发现。
+- src/adapters/registry.ts：Agent Adapter 选择。
+- src/commands/init.ts、join.ts、add-repo.ts、inspect.ts、doctor.ts：命令用例。
+- src/main.ts：JSON 命令调度器。
+- skill/agent-context-sync/SKILL.md：跨智能体工作流说明。
+- skill/agent-context-sync/scripts/acs.mjs：随 Skill 一起发布的 esbuild 打包可执行文件。
+- tests/helpers/fs.ts、git.ts 和 invoke.ts：无生产依赖的可复用 fixture 和命令 helper。
+- tests：unit、contract、integration 和 end-to-end fixtures。
 
-### Task 1: Bootstrap the Tested Skill Runtime
+### 任务 1：引导已测试的 Skill 运行时
 
-**Files:**
-- Create: package.json
-- Create: tsconfig.json
-- Create: vitest.config.ts
-- Create: src/main.ts
-- Create: tests/main.test.ts
-- Create: skill/agent-context-sync/SKILL.md
-- Create by build: skill/agent-context-sync/scripts/acs.mjs
-- Create: tests/helpers/fs.ts
-- Create: tests/helpers/git.ts
-- Create: tests/helpers/invoke.ts
+**文件：**
+- 创建：package.json
+- 创建：tsconfig.json
+- 创建：vitest.config.ts
+- 创建：src/main.ts
+- 创建：tests/main.test.ts
+- 创建：skill/agent-context-sync/SKILL.md
+- 由构建创建：skill/agent-context-sync/scripts/acs.mjs
+- 创建：tests/helpers/fs.ts
+- 创建：tests/helpers/git.ts
+- 创建：tests/helpers/invoke.ts
 
-**Interfaces:**
-- Produces: run(argv: string[], io: CommandIO): Promise<number>
-- Produces: JSON envelope { ok: boolean, command: string, data?: unknown, error?: AppError }
-- Produces: invoke(args: string[], env: NodeJS.ProcessEnv): Promise<{ exitCode: number; json: any; stderr: string }>
-- Produces: pathExists(path: string): Promise<boolean>
-- Produces: initFixtureRepository(path: string, remote?: string): Promise<void>
-- Produces: createBareRemote(path: string): Promise<string>
-- Produces: fixtureGit(path: string, args: readonly string[]): Promise<string>
+**接口：**
+- 产出：run(argv: string[], io: CommandIO): Promise<number>
+- 产出：JSON envelope { ok: boolean, command: string, data?: unknown, error?: AppError }
+- 产出：invoke(args: string[], env: NodeJS.ProcessEnv): Promise<{ exitCode: number; json: any; stderr: string }>
+- 产出：pathExists(path: string): Promise<boolean>
+- 产出：initFixtureRepository(path: string, remote?: string): Promise<void>
+- 产出：createBareRemote(path: string): Promise<string>
+- 产出：fixtureGit(path: string, args: readonly string[]): Promise<string>
 
-- [ ] **Step 1: Write the failing dispatcher test**
+- [ ] **步骤 1：编写失败的 dispatcher 测试**
 
 ~~~ts
 import { describe, expect, it, vi } from 'vitest';
@@ -89,17 +89,17 @@ describe('run', () => {
 });
 ~~~
 
-- [ ] **Step 2: Run the test and verify the expected failure**
+- [ ] **步骤 2：运行测试并验证预期失败**
 
-Run: npm test -- --run tests/main.test.ts
+运行：npm test -- --run tests/main.test.ts
 
-Expected: FAIL because src/main.ts and the package configuration do not exist.
+预期：FAIL，因为 src/main.ts 和 package configuration 不存在。
 
-- [ ] **Step 3: Add the minimal runtime and Skill contract**
+- [ ] **步骤 3：添加最小运行时和 Skill contract**
 
-package.json must set type to module, engines.node to >=20, and scripts build, test, typecheck, and verify. build uses esbuild to bundle src/main.ts and its runtime dependencies into skill/agent-context-sync/scripts/acs.mjs with platform=node and format=esm. Add runtime dependencies zod, yaml, fast-glob, minimatch, and smol-toml; add TypeScript, Vitest, esbuild, and @types/node as development dependencies.
+package.json 必须将 type 设置为 module，将 engines.node 设置为 >=20，并提供 build、test、typecheck 和 verify scripts。build 使用 esbuild 将 src/main.ts 及其运行时依赖打包到 skill/agent-context-sync/scripts/acs.mjs，platform=node，format=esm。添加运行时依赖 zod、yaml、fast-glob、minimatch 和 smol-toml；添加 TypeScript、Vitest、esbuild 和 @types/node 作为开发依赖。
 
-Implement:
+实现：
 
 ~~~ts
 export interface CommandIO {
@@ -122,38 +122,38 @@ export async function run(argv: string[], io: CommandIO): Promise<number> {
 }
 ~~~
 
-When src/main.ts is the process entry, it must call run(process.argv.slice(2), process-backed IO) and set process.exitCode. The bundled acs.mjs therefore has no dependency on the source checkout after the Skill directory is copied. Implement the listed test helpers with fs/promises and child_process argument arrays; helpers throw with stderr on fixture setup failure. SKILL.md must include name and description, state that all writes require preview then explicit user approval, and list init, join, add-repo, inspect, and doctor.
+当 src/main.ts 是 process entry 时，它必须调用 run(process.argv.slice(2), process-backed IO) 并设置 process.exitCode。因此，在复制 Skill 目录后，打包后的 acs.mjs 不依赖 source checkout。使用 fs/promises 和 child_process 参数数组实现列出的测试 helpers；fixture setup 失败时，helpers 会携带 stderr 抛出。SKILL.md 必须包含 name 和 description，声明所有写入都需要 preview 后再获得明确用户批准，并列出 init、join、add-repo、inspect 和 doctor。
 
-- [ ] **Step 4: Verify build, typecheck, and test**
+- [ ] **步骤 4：验证 build、typecheck 和 test**
 
-Run: npm install && npm run typecheck && npm test -- --run
+运行：npm install && npm run typecheck && npm test -- --run
 
-Expected: all commands exit 0 and the dispatcher test passes.
+预期：所有命令 exit 0，dispatcher 测试通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add package.json package-lock.json tsconfig.json vitest.config.ts src/main.ts tests/main.test.ts tests/helpers skill
 git commit -m "chore: bootstrap agent context sync skill runtime"
 ~~~
 
-### Task 2: Define Domain Errors and Manifest Schemas
+### 任务 2：定义 Domain Errors 和 Manifest Schemas
 
-**Files:**
-- Create: src/domain/model.ts
-- Create: src/domain/errors.ts
-- Create: src/domain/ids.ts
-- Create: src/schema/workspace.ts
-- Test: tests/schema/workspace.test.ts
-- Test: tests/domain/ids.test.ts
+**文件：**
+- 创建：src/domain/model.ts
+- 创建：src/domain/errors.ts
+- 创建：src/domain/ids.ts
+- 创建：src/schema/workspace.ts
+- 测试：tests/schema/workspace.test.ts
+- 测试：tests/domain/ids.test.ts
 
-**Interfaces:**
-- Produces: WorkspaceManifest, RepositoryManifest, LocalWorkspace, CoverageStatus, AppError
-- Produces: parseWorkspaceManifest(value: unknown): WorkspaceManifest
-- Produces: parseLocalWorkspace(value: unknown): LocalWorkspace
-- Produces: createId(prefix: 'ws' | 'preview' | 'packet' | 'kn'): string
+**接口：**
+- 产出：WorkspaceManifest、RepositoryManifest、LocalWorkspace、CoverageStatus、AppError
+- 产出：parseWorkspaceManifest(value: unknown): WorkspaceManifest
+- 产出：parseLocalWorkspace(value: unknown): LocalWorkspace
+- 产出：createId(prefix: 'ws' | 'preview' | 'packet' | 'kn'): string
 
-- [ ] **Step 1: Write failing schema tests**
+- [ ] **步骤 1：编写失败的 schema 测试**
 
 ~~~ts
 import { describe, expect, it } from 'vitest';
@@ -180,46 +180,46 @@ it('accepts absolute paths only in the local registry', () => {
 });
 ~~~
 
-- [ ] **Step 2: Run the tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/schema/workspace.test.ts
+运行：npm test -- --run tests/schema/workspace.test.ts
 
-Expected: FAIL because the schema module does not exist.
+预期：FAIL，因为 schema module 不存在。
 
-- [ ] **Step 3: Implement strict schemas and stable errors**
+- [ ] **步骤 3：实现严格 schemas 和稳定 errors**
 
-Define Zod strict objects. workspace_id must match /^ws_[0-9A-HJKMNP-TV-Z]{26}$/; repository IDs are normalized host/path strings; schema_version is literal 1. Local paths must satisfy path.isAbsolute. Define AppError as { code, message, details? } and appError(code, message, details?) without stack serialization. createId uses crypto.randomBytes and Crockford Base32 to produce 26 uppercase characters without adding an ID dependency.
+定义 Zod strict objects。workspace_id 必须匹配 /^ws_[0-9A-HJKMNP-TV-Z]{26}$/；repository IDs 是规范化的 host/path 字符串；schema_version 是 literal 1。Local paths 必须满足 path.isAbsolute。将 AppError 定义为 { code, message, details? }，并定义 appError(code, message, details?)，不序列化 stack。createId 使用 crypto.randomBytes 和 Crockford Base32 生成 26 个大写字符，且不添加 ID 依赖。
 
-- [ ] **Step 4: Run focused and full tests**
+- [ ] **步骤 4：运行聚焦测试和完整测试**
 
-Run: npm test -- --run tests/schema/workspace.test.ts && npm run typecheck && npm test -- --run
+运行：npm test -- --run tests/schema/workspace.test.ts && npm run typecheck && npm test -- --run
 
-Expected: all pass.
+预期：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/domain src/schema tests/schema tests/domain
 git commit -m "feat: define workspace manifest contracts"
 ~~~
 
-### Task 3: Normalize Repository Identity and Scan Workspace Roots
+### 任务 3：规范化 Repository Identity 并扫描 Workspace Roots
 
-**Files:**
-- Create: src/git/run-git.ts
-- Create: src/workspace/repository-id.ts
-- Create: src/workspace/scanner.ts
-- Test: tests/workspace/repository-id.test.ts
-- Test: tests/workspace/scanner.test.ts
-- Create: tests/fixtures/workspace-scan/
+**文件：**
+- 创建：src/git/run-git.ts
+- 创建：src/workspace/repository-id.ts
+- 创建：src/workspace/scanner.ts
+- 测试：tests/workspace/repository-id.test.ts
+- 测试：tests/workspace/scanner.test.ts
+- 创建：tests/fixtures/workspace-scan/
 
-**Interfaces:**
-- Produces: runGit(cwd: string, args: readonly string[]): Promise<{ stdout: string; stderr: string }>
-- Produces: normalizeRemote(remote: string): string
-- Produces: repositoryIdFromRemote(remote: string): string
-- Produces: scanRepositories(root: string, options: { maxDepth: number }): Promise<DiscoveredRepository[]>
+**接口：**
+- 产出：runGit(cwd: string, args: readonly string[]): Promise<{ stdout: string; stderr: string }>
+- 产出：normalizeRemote(remote: string): string
+- 产出：repositoryIdFromRemote(remote: string): string
+- 产出：scanRepositories(root: string, options: { maxDepth: number }): Promise<DiscoveredRepository[]>
 
-- [ ] **Step 1: Write identity and symlink scan tests**
+- [ ] **步骤 1：编写 identity 和 symlink scan 测试**
 
 ~~~ts
 expect(normalizeRemote('git@GitHub.com:Acme/API.git')).toBe('github.com/Acme/API');
@@ -230,46 +230,46 @@ expect(result.map((item) => item.realPath)).toEqual([realRepositoryPath]);
 expect(result[0].encounteredViaSymlink).toBe(true);
 ~~~
 
-Create the fixture repository during beforeEach with git init and git remote add origin. Create a directory symlink pointing to it; skip only the symlink assertion on Windows when creation is denied.
+在 beforeEach 中使用 git init 和 git remote add origin 创建 fixture repository。创建一个指向它的目录 symlink；仅当 Windows 上拒绝创建时才跳过 symlink 断言。
 
-- [ ] **Step 2: Run the tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/workspace/repository-id.test.ts tests/workspace/scanner.test.ts
+运行：npm test -- --run tests/workspace/repository-id.test.ts tests/workspace/scanner.test.ts
 
-Expected: FAIL because the functions do not exist.
+预期：FAIL，因为这些函数不存在。
 
-- [ ] **Step 3: Implement normalization and bounded scanning**
+- [ ] **步骤 3：实现规范化和有界扫描**
 
-Use new URL for URL remotes and a dedicated SCP-like parser for git@host:path. Remove credentials, .git, query, fragment, and trailing slash; lowercase only the host. Scanner follows a symlink once, records fs.realpath, de-duplicates by real path, stops at maxDepth, and never descends into .git, node_modules, or another discovered repository.
+对 URL remotes 使用 new URL，并为 git@host:path 使用专用的类 SCP parser。移除 credentials、.git、query、fragment 和 trailing slash；仅将 host 转为小写。Scanner 跟随 symlink 一次，记录 fs.realpath，按 real path 去重，在 maxDepth 停止，并且绝不进入 .git、node_modules 或另一个已发现的 repository。
 
-- [ ] **Step 4: Run focused and full verification**
+- [ ] **步骤 4：运行聚焦验证和完整验证**
 
-Run: npm test -- --run tests/workspace && npm run typecheck && npm test -- --run
+运行：npm test -- --run tests/workspace && npm run typecheck && npm test -- --run
 
-Expected: all pass on the current platform; Windows may report one explicit skipped symlink case.
+预期：在当前平台上全部通过；Windows 可能报告一个明确跳过的 symlink case。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/git src/workspace tests/workspace tests/fixtures
 git commit -m "feat: discover stable repository identities"
 ~~~
 
-### Task 4: Persist the Local Registry Atomically
+### 任务 4：原子化持久化 Local Registry
 
-**Files:**
-- Create: src/fs/atomic-write.ts
-- Create: src/workspace/local-registry.ts
-- Test: tests/workspace/local-registry.test.ts
+**文件：**
+- 创建：src/fs/atomic-write.ts
+- 创建：src/workspace/local-registry.ts
+- 测试：tests/workspace/local-registry.test.ts
 
-**Interfaces:**
-- Consumes: LocalWorkspace and parseLocalWorkspace from Task 2
-- Produces: registryPath(home: string, workspaceId: string): string
-- Produces: readLocalWorkspace(home: string, workspaceId: string): Promise<LocalWorkspace>
-- Produces: writeLocalWorkspace(home: string, value: LocalWorkspace): Promise<void>
-- Produces: bindRepositoryPath(local: LocalWorkspace, repoId: string, path: string): LocalWorkspace
+**接口：**
+- 使用：Task 2 中的 LocalWorkspace 和 parseLocalWorkspace
+- 产出：registryPath(home: string, workspaceId: string): string
+- 产出：readLocalWorkspace(home: string, workspaceId: string): Promise<LocalWorkspace>
+- 产出：writeLocalWorkspace(home: string, value: LocalWorkspace): Promise<void>
+- 产出：bindRepositoryPath(local: LocalWorkspace, repoId: string, path: string): LocalWorkspace
 
-- [ ] **Step 1: Write failing atomicity and privacy tests**
+- [ ] **步骤 1：编写失败的 atomicity 和 privacy 测试**
 
 ~~~ts
 await writeLocalWorkspace(home, local);
@@ -279,49 +279,49 @@ expect(await fs.readFile(registryFile, 'utf8')).not.toContain(contextRemote);
 expect((await fs.stat(registryFile)).mode & 0o077).toBe(0);
 ~~~
 
-Also inject a write adapter that throws before rename and assert the original registry remains byte-identical.
+另注入一个在 rename 前抛出的 write adapter，并断言原始 registry 保持 byte-identical。
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/workspace/local-registry.test.ts
+运行：npm test -- --run tests/workspace/local-registry.test.ts
 
-Expected: FAIL because persistence is absent.
+预期：FAIL，因为 persistence 缺失。
 
-- [ ] **Step 3: Implement atomic YAML persistence**
+- [ ] **步骤 3：实现原子 YAML 持久化**
 
-Write a sibling temporary file with mode 0o600, fsync it, rename it over the target, and fsync the parent directory where supported. Resolve repository paths with realpath before binding. Reject non-existent and non-absolute paths.
+写入一个 sibling temporary file，mode 为 0o600，对其 fsync，然后 rename 覆盖目标，并在支持的情况下 fsync parent directory。绑定前用 realpath 解析 repository paths。拒绝不存在和非绝对路径。
 
-- [ ] **Step 4: Run focused and full tests**
+- [ ] **步骤 4：运行聚焦测试和完整测试**
 
-Run: npm test -- --run tests/workspace/local-registry.test.ts && npm run verify
+运行：npm test -- --run tests/workspace/local-registry.test.ts && npm run verify
 
-Expected: all pass and no temporary files remain.
+预期：全部通过，并且没有 temporary files 残留。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/fs src/workspace/local-registry.ts tests/workspace/local-registry.test.ts
 git commit -m "feat: persist private workspace path mappings"
 ~~~
 
-### Task 5: Implement Context Repository init, join, and add-repo
+### 任务 5：实现 Context Repository init、join 和 add-repo
 
-**Files:**
-- Create: src/workspace/context-repository.ts
-- Create: src/commands/init.ts
-- Create: src/commands/join.ts
-- Create: src/commands/add-repo.ts
-- Modify: src/main.ts
-- Test: tests/integration/workspace-commands.test.ts
+**文件：**
+- 创建：src/workspace/context-repository.ts
+- 创建：src/commands/init.ts
+- 创建：src/commands/join.ts
+- 创建：src/commands/add-repo.ts
+- 修改：src/main.ts
+- 测试：tests/integration/workspace-commands.test.ts
 
-**Interfaces:**
-- Produces: initWorkspace(input: InitInput): Promise<WorkspacePreview>
-- Produces: applyInit(preview: WorkspacePreview): Promise<WorkspaceResult>
-- Produces: joinWorkspace(input: JoinInput): Promise<WorkspacePreview>
-- Produces: addRepository(input: AddRepositoryInput): Promise<WorkspacePreview>
-- Preview includes preview_id, input_hash, files_to_write, repositories, warnings
+**接口：**
+- 产出：initWorkspace(input: InitInput): Promise<WorkspacePreview>
+- 产出：applyInit(preview: WorkspacePreview): Promise<WorkspaceResult>
+- 产出：joinWorkspace(input: JoinInput): Promise<WorkspacePreview>
+- 产出：addRepository(input: AddRepositoryInput): Promise<WorkspacePreview>
+- Preview 包含 preview_id、input_hash、files_to_write、repositories、warnings
 
-- [ ] **Step 1: Write failing command integration tests**
+- [ ] **步骤 1：编写失败的 command integration 测试**
 
 ~~~ts
 const preview = await initWorkspace({
@@ -339,47 +339,47 @@ expect(result.workspace.workspace_id).toMatch(/^ws_/);
 expect(await gitRemote(result.local.context_path)).toBe(bareRemote);
 ~~~
 
-Add join coverage where only one of two shared repositories exists locally, and add-repo coverage for a repository outside scanRoot.
+添加 join 覆盖：两个共享 repositories 中只有一个在本地存在；并添加 add-repo 覆盖：repository 位于 scanRoot 外部。
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/integration/workspace-commands.test.ts
+运行：npm test -- --run tests/integration/workspace-commands.test.ts
 
-Expected: FAIL because the commands do not exist.
+预期：FAIL，因为 commands 不存在。
 
-- [ ] **Step 3: Implement preview/apply command use cases**
+- [ ] **步骤 3：实现 preview/apply 命令用例**
 
-init clones an empty remote or initializes a local Context checkout, writes workspace.yaml and repository manifests only during apply, creates one Context commit, and pushes only after apply. join clones and validates an existing Context repository without writing it. add-repo updates the shared manifest only after preview approval and never changes the business repository.
+init 克隆空 remote 或初始化本地 Context checkout，仅在 apply 期间写入 workspace.yaml 和 repository manifests，创建一个 Context commit，并且只在 apply 后 push。join 克隆并校验已有 Context repository，不写入它。add-repo 仅在 preview approval 后更新共享 manifest，并且绝不更改 business repository。
 
-preview_id is a ULID-like random ID; input_hash covers normalized inputs plus current Context HEAD. apply must reject STALE_PREVIEW when HEAD or inputs changed.
+preview_id 是类 ULID 的随机 ID；input_hash 覆盖规范化输入以及当前 Context HEAD。当 HEAD 或 inputs 发生变化时，apply 必须拒绝 STALE_PREVIEW。
 
-- [ ] **Step 4: Run integration and full verification**
+- [ ] **步骤 4：运行 integration 和完整验证**
 
-Run: npm test -- --run tests/integration/workspace-commands.test.ts && npm run verify
+运行：npm test -- --run tests/integration/workspace-commands.test.ts && npm run verify
 
-Expected: all pass; git log in the bare Context remote contains the init commit and business repository logs are unchanged.
+预期：全部通过；bare Context remote 中的 git log 包含 init commit，business repository logs 保持不变。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/workspace/context-repository.ts src/commands src/main.ts tests/integration
 git commit -m "feat: initialize and join virtual workspaces"
 ~~~
 
-### Task 6: Implement Claude Code Discovery Contract
+### 任务 6：实现 Claude Code Discovery Contract
 
-**Files:**
-- Create: src/adapters/adapter.ts
-- Create: src/adapters/claude/discover.ts
-- Create: tests/adapters/claude.test.ts
-- Create: tests/fixtures/claude-home/
-- Create: tests/fixtures/claude-repo/
+**文件：**
+- 创建：src/adapters/adapter.ts
+- 创建：src/adapters/claude/discover.ts
+- 创建：tests/adapters/claude.test.ts
+- 创建：tests/fixtures/claude-home/
+- 创建：tests/fixtures/claude-repo/
 
-**Interfaces:**
-- Produces: ContextSource, CoverageItem, CoverageReport, LoadOrder
-- Produces: ClaudeAdapter.discover(input: DiscoveryInput): Promise<CoverageReport>
+**接口：**
+- 产出：ContextSource、CoverageItem、CoverageReport、LoadOrder
+- 产出：ClaudeAdapter.discover(input: DiscoveryInput): Promise<CoverageReport>
 
-- [ ] **Step 1: Write failing fixture tests**
+- [ ] **步骤 1：编写失败的 fixture 测试**
 
 ~~~ts
 const report = await adapter.discover(input);
@@ -397,46 +397,46 @@ expect(report.coverage.every((item) => ['covered', 'partial', 'unknown', 'inacce
   .toBe(true);
 ~~~
 
-Fixtures must include parent and nested CLAUDE.md files, .claude/rules with paths, a recursive @ import, claudeMdExcludes, and a memory directory override.
+Fixtures 必须包含父级和嵌套的 CLAUDE.md 文件、带 paths 的 .claude/rules、递归 @ import、claudeMdExcludes，以及 memory directory override。
 
-- [ ] **Step 2: Run the contract test and verify failure**
+- [ ] **步骤 2：运行 contract test 并验证失败**
 
-Run: npm test -- --run tests/adapters/claude.test.ts
+运行：npm test -- --run tests/adapters/claude.test.ts
 
-Expected: FAIL because ClaudeAdapter is absent.
+预期：FAIL，因为 ClaudeAdapter 缺失。
 
-- [ ] **Step 3: Implement known-source discovery**
+- [ ] **步骤 3：实现已知来源发现**
 
-Parse settings from managed, user, project, local, and explicit settings paths without importing organization-managed content. Walk ancestors and repository descendants according to documented Claude behavior. Parse @ imports outside code spans/fences with maximum four hops and cycle detection. Report excluded or unreadable paths instead of throwing. Resolve autoMemoryDirectory and otherwise derive the repository memory locator from the installed Claude layout; if derivation cannot be confirmed, report partial.
+解析来自 managed、user、project、local 和 explicit settings paths 的 settings，但不导入 organization-managed content。根据已文档化的 Claude 行为遍历 ancestors 和 repository descendants。在 code spans/fences 外解析 @ imports，最多四跳并检测循环。报告 excluded 或 unreadable paths，而不是抛出。解析 autoMemoryDirectory，否则从已安装 Claude layout 推导 repository memory locator；如果无法确认推导结果，则报告 partial。
 
-- [ ] **Step 4: Run Adapter and full tests**
+- [ ] **步骤 4：运行 Adapter 和完整测试**
 
-Run: npm test -- --run tests/adapters/claude.test.ts && npm run verify
+运行：npm test -- --run tests/adapters/claude.test.ts && npm run verify
 
-Expected: all pass and fixture ordering is deterministic across repeated runs.
+预期：全部通过，且 fixture ordering 在重复运行之间保持确定性。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/adapters tests/adapters tests/fixtures/claude-*
 git commit -m "feat: discover claude code context sources"
 ~~~
 
-### Task 7: Implement Codex Discovery Contract
+### 任务 7：实现 Codex Discovery Contract
 
-**Files:**
-- Create: src/adapters/codex/discover.ts
-- Create: src/adapters/registry.ts
-- Test: tests/adapters/codex.test.ts
-- Create: tests/fixtures/codex-home/
-- Create: tests/fixtures/codex-repo/
+**文件：**
+- 创建：src/adapters/codex/discover.ts
+- 创建：src/adapters/registry.ts
+- 测试：tests/adapters/codex.test.ts
+- 创建：tests/fixtures/codex-home/
+- 创建：tests/fixtures/codex-repo/
 
-**Interfaces:**
-- Consumes: Adapter types from Task 6
-- Produces: CodexAdapter.discover(input: DiscoveryInput): Promise<CoverageReport>
-- Produces: adapterFor(name: 'claude-code' | 'codex'): AgentAdapter
+**接口：**
+- 使用：Task 6 中的 Adapter types
+- 产出：CodexAdapter.discover(input: DiscoveryInput): Promise<CoverageReport>
+- 产出：adapterFor(name: 'claude-code' | 'codex'): AgentAdapter
 
-- [ ] **Step 1: Write failing precedence and size-limit tests**
+- [ ] **步骤 1：编写失败的 precedence 和 size-limit 测试**
 
 ~~~ts
 const report = await adapter.discover(input);
@@ -451,48 +451,48 @@ expect(report.sources.find((source) => source.sourceType === 'local-memory')?.sh
   .toBe('personal');
 ~~~
 
-Fixtures must cover AGENTS.override.md, fallback filenames, project_doc_max_bytes, CODEX_HOME, and memories with and without a repository locator.
+Fixtures 必须覆盖 AGENTS.override.md、fallback filenames、project_doc_max_bytes、CODEX_HOME，以及带有和不带 repository locator 的 memories。
 
-- [ ] **Step 2: Run the test and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/adapters/codex.test.ts
+运行：npm test -- --run tests/adapters/codex.test.ts
 
-Expected: FAIL because CodexAdapter is absent.
+预期：FAIL，因为 CodexAdapter 缺失。
 
-- [ ] **Step 3: Implement Codex discovery**
+- [ ] **步骤 3：实现 Codex discovery**
 
-Parse config.toml using smol-toml. At global scope select the first non-empty override/base file. At each directory from project root to cwd select at most one override/base/fallback file. Accumulate UTF-8 bytes until project_doc_max_bytes and report truncation. Inspect local memory metadata only when it can be associated with a registered repository; never classify unrelated memories as team candidates.
+使用 smol-toml 解析 config.toml。在 global scope 选择第一个非空的 override/base file。在从 project root 到 cwd 的每个 directory 中，最多选择一个 override/base/fallback file。累计 UTF-8 bytes，直到 project_doc_max_bytes，并报告 truncation。仅当 local memory metadata 可关联到已注册 repository 时才检查它；绝不将无关 memories 分类为 team candidates。
 
-- [ ] **Step 4: Run Adapter and full tests**
+- [ ] **步骤 4：运行 Adapter 和完整测试**
 
-Run: npm test -- --run tests/adapters/codex.test.ts && npm run verify
+运行：npm test -- --run tests/adapters/codex.test.ts && npm run verify
 
-Expected: all pass and load order matches the official precedence fixture.
+预期：全部通过，load order 与官方 precedence fixture 匹配。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/adapters tests/adapters tests/fixtures/codex-*
 git commit -m "feat: discover codex context sources"
 ~~~
 
-### Task 8: Expose inspect and doctor Through the Skill
+### 任务 8：通过 Skill 暴露 inspect 和 doctor
 
-**Files:**
-- Create: src/commands/inspect.ts
-- Create: src/commands/doctor.ts
-- Modify: src/main.ts
-- Modify: skill/agent-context-sync/SKILL.md
-- Test: tests/integration/inspect-doctor.test.ts
-- Test: tests/e2e/v01-skill.test.ts
-- Create: README.md
+**文件：**
+- 创建：src/commands/inspect.ts
+- 创建：src/commands/doctor.ts
+- 修改：src/main.ts
+- 修改：skill/agent-context-sync/SKILL.md
+- 测试：tests/integration/inspect-doctor.test.ts
+- 测试：tests/e2e/v01-skill.test.ts
+- 创建：README.md
 
-**Interfaces:**
-- Consumes: adapterFor, local registry, and Workspace manifest
-- Produces: inspect(input: InspectInput): Promise<CoverageReport[]>
-- Produces: doctor(input: DoctorInput): Promise<DoctorReport>
+**接口：**
+- 使用：adapterFor、local registry 和 Workspace manifest
+- 产出：inspect(input: InspectInput): Promise<CoverageReport[]>
+- 产出：doctor(input: DoctorInput): Promise<DoctorReport>
 
-- [ ] **Step 1: Write failing end-to-end tests**
+- [ ] **步骤 1：编写失败的 end-to-end 测试**
 
 ~~~ts
 const inspectResult = await invoke(['inspect', '--workspace', workspaceId, '--agent', 'codex'], env);
@@ -508,34 +508,34 @@ expect(doctorResult.json.data.checks).toEqual(expect.arrayContaining([
 ]));
 ~~~
 
-- [ ] **Step 2: Run tests and verify failure**
+- [ ] **步骤 2：运行测试并验证失败**
 
-Run: npm test -- --run tests/integration/inspect-doctor.test.ts tests/e2e/v01-skill.test.ts
+运行：npm test -- --run tests/integration/inspect-doctor.test.ts tests/e2e/v01-skill.test.ts
 
-Expected: FAIL because inspect and doctor are not dispatched.
+预期：FAIL，因为 inspect 和 doctor 尚未 dispatch。
 
-- [ ] **Step 3: Implement reports and Skill instructions**
+- [ ] **步骤 3：实现 reports 和 Skill instructions**
 
-inspect must be read-only and return one report per requested repository. doctor checks Node version, Git availability, Context remote reachability, registry validity, repository path drift, Adapter version support, and permissions. Update SKILL.md with exact preview/apply invocations, one-question-at-a-time approval language, and explicit prohibition on interpreting unknown coverage as complete.
+inspect 必须是只读的，并为每个请求的 repository 返回一份 report。doctor 检查 Node version、Git availability、Context remote reachability、registry validity、repository path drift、Adapter version support 和 permissions。更新 SKILL.md，加入精确的 preview/apply invocations、一次只问一个问题的 approval language，以及明确禁止将 unknown coverage 解读为 complete。
 
-README must document installation into ~/.codex/skills/agent-context-sync and ~/.claude/skills/agent-context-sync, the virtual Workspace model, supported Agents, and the v0.1 command examples.
+README 必须记录如何安装到 ~/.codex/skills/agent-context-sync 和 ~/.claude/skills/agent-context-sync、virtual Workspace model、supported Agents，以及 v0.1 command examples。
 
-- [ ] **Step 4: Run the v0.1 acceptance suite**
+- [ ] **步骤 4：运行 v0.1 acceptance suite**
 
-Run: npm run verify && npm test -- --run tests/e2e/v01-skill.test.ts
+运行：npm run verify && npm test -- --run tests/e2e/v01-skill.test.ts
 
-Expected: typecheck and all tests pass; the end-to-end fixture initializes a two-repository Workspace, joins with one repository present, and emits Claude and Codex coverage reports without modifying either business repository.
+预期：typecheck 和所有测试通过；end-to-end fixture 会初始化一个双 repository Workspace，在仅有一个 repository 存在的情况下 join，并在不修改任一 business repository 的情况下输出 Claude 和 Codex coverage reports。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ~~~bash
 git add src/commands src/main.ts skill README.md tests/integration tests/e2e
 git commit -m "feat: deliver workspace discovery skill"
 ~~~
 
-## v0.1 Completion Gate
+## v0.1 完成门槛
 
-Run:
+运行：
 
 ~~~bash
 npm ci
@@ -543,9 +543,9 @@ npm run verify
 git status --short
 ~~~
 
-Expected:
+预期：
 
-- Build, typecheck, unit, Adapter contract, integration, and v0.1 end-to-end tests pass.
-- git status is clean except for intentionally ignored local test artifacts.
-- init, join, add-repo, inspect, and doctor are documented and callable through the Skill launcher.
-- No business repository commit or file content changes during the acceptance test.
+- Build、typecheck、unit、Adapter contract、integration 和 v0.1 end-to-end tests 通过。
+- git status 是 clean，除了有意忽略的本地测试 artifacts。
+- init、join、add-repo、inspect 和 doctor 已文档化，并可通过 Skill launcher 调用。
+- acceptance test 期间没有 business repository commit 或文件内容变化。
