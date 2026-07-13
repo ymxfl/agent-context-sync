@@ -11,6 +11,9 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __commonJS = (cb, mod) => function __require2() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
@@ -112,17 +115,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path27) {
-      const ctrl = callVisitor(key, node, visitor, path27);
+    function visit_(key, node, visitor, path29) {
+      const ctrl = callVisitor(key, node, visitor, path29);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path27, ctrl);
-        return visit_(key, ctrl, visitor, path27);
+        replaceNode(key, path29, ctrl);
+        return visit_(key, ctrl, visitor, path29);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path27 = Object.freeze(path27.concat(node));
+          path29 = Object.freeze(path29.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path27);
+            const ci = visit_(i, node.items[i], visitor, path29);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -133,13 +136,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path27 = Object.freeze(path27.concat(node));
-          const ck = visit_("key", node.key, visitor, path27);
+          path29 = Object.freeze(path29.concat(node));
+          const ck = visit_("key", node.key, visitor, path29);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path27);
+          const cv = visit_("value", node.value, visitor, path29);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -160,17 +163,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path27) {
-      const ctrl = await callVisitor(key, node, visitor, path27);
+    async function visitAsync_(key, node, visitor, path29) {
+      const ctrl = await callVisitor(key, node, visitor, path29);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path27, ctrl);
-        return visitAsync_(key, ctrl, visitor, path27);
+        replaceNode(key, path29, ctrl);
+        return visitAsync_(key, ctrl, visitor, path29);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path27 = Object.freeze(path27.concat(node));
+          path29 = Object.freeze(path29.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path27);
+            const ci = await visitAsync_(i, node.items[i], visitor, path29);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -181,13 +184,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path27 = Object.freeze(path27.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path27);
+          path29 = Object.freeze(path29.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path29);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path27);
+          const cv = await visitAsync_("value", node.value, visitor, path29);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -214,23 +217,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path27) {
+    function callVisitor(key, node, visitor, path29) {
       if (typeof visitor === "function")
-        return visitor(key, node, path27);
+        return visitor(key, node, path29);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path27);
+        return visitor.Map?.(key, node, path29);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path27);
+        return visitor.Seq?.(key, node, path29);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path27);
+        return visitor.Pair?.(key, node, path29);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path27);
+        return visitor.Scalar?.(key, node, path29);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path27);
+        return visitor.Alias?.(key, node, path29);
       return void 0;
     }
-    function replaceNode(key, path27, node) {
-      const parent = path27[path27.length - 1];
+    function replaceNode(key, path29, node) {
+      const parent = path29[path29.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -840,10 +843,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path27, value) {
+    function collectionFromPath(schema, path29, value) {
       let v = value;
-      for (let i = path27.length - 1; i >= 0; --i) {
-        const k = path27[i];
+      for (let i = path29.length - 1; i >= 0; --i) {
+        const k = path29[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -862,7 +865,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path27) => path27 == null || typeof path27 === "object" && !!path27[Symbol.iterator]().next().done;
+    var isEmptyPath = (path29) => path29 == null || typeof path29 === "object" && !!path29[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -892,11 +895,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path27, value) {
-        if (isEmptyPath(path27))
+      addIn(path29, value) {
+        if (isEmptyPath(path29))
           this.add(value);
         else {
-          const [key, ...rest] = path27;
+          const [key, ...rest] = path29;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -910,8 +913,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path27) {
-        const [key, ...rest] = path27;
+      deleteIn(path29) {
+        const [key, ...rest] = path29;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -925,8 +928,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path27, keepScalar) {
-        const [key, ...rest] = path27;
+      getIn(path29, keepScalar) {
+        const [key, ...rest] = path29;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -944,8 +947,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path27) {
-        const [key, ...rest] = path27;
+      hasIn(path29) {
+        const [key, ...rest] = path29;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -955,8 +958,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path27, value) {
-        const [key, ...rest] = path27;
+      setIn(path29, value) {
+        const [key, ...rest] = path29;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3471,9 +3474,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path27, value) {
+      addIn(path29, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path27, value);
+          this.contents.addIn(path29, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3548,14 +3551,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path27) {
-        if (Collection.isEmptyPath(path27)) {
+      deleteIn(path29) {
+        if (Collection.isEmptyPath(path29)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path27) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path29) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3570,10 +3573,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path27, keepScalar) {
-        if (Collection.isEmptyPath(path27))
+      getIn(path29, keepScalar) {
+        if (Collection.isEmptyPath(path29))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path27, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path29, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3584,10 +3587,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path27) {
-        if (Collection.isEmptyPath(path27))
+      hasIn(path29) {
+        if (Collection.isEmptyPath(path29))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path27) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path29) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3604,13 +3607,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path27, value) {
-        if (Collection.isEmptyPath(path27)) {
+      setIn(path29, value) {
+        if (Collection.isEmptyPath(path29)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path27), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path29), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path27, value);
+          this.contents.setIn(path29, value);
         }
       }
       /**
@@ -5570,9 +5573,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path27) => {
+    visit.itemAtPath = (cst, path29) => {
       let item = cst;
-      for (const [field, index] of path27) {
+      for (const [field, index] of path29) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5581,23 +5584,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path27) => {
-      const parent = visit.itemAtPath(cst, path27.slice(0, -1));
-      const field = path27[path27.length - 1][0];
+    visit.parentCollection = (cst, path29) => {
+      const parent = visit.itemAtPath(cst, path29.slice(0, -1));
+      const field = path29[path29.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path27, item, visitor) {
-      let ctrl = visitor(item, path27);
+    function _visit(path29, item, visitor) {
+      let ctrl = visitor(item, path29);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path27.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path29.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5608,10 +5611,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path27);
+            ctrl = ctrl(item, path29);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path27) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path29) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6913,14 +6916,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs24 = this.flowScalar(this.type);
+              const fs26 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map2.items.push({ start, key: fs24, sep: [] });
+                map2.items.push({ start, key: fs26, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs24);
+                this.stack.push(fs26);
               } else {
-                Object.assign(it, { key: fs24, sep: [] });
+                Object.assign(it, { key: fs26, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7048,13 +7051,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs24 = this.flowScalar(this.type);
+              const fs26 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs24, sep: [] });
+                fc.items.push({ start: [], key: fs26, sep: [] });
               else if (it.sep)
-                this.stack.push(fs24);
+                this.stack.push(fs26);
               else
-                Object.assign(it, { key: fs24, sep: [] });
+                Object.assign(it, { key: fs26, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7362,11 +7365,365 @@ var require_dist = __commonJS({
   }
 });
 
+// src/tracing/macos-fs-usage.ts
+var macos_fs_usage_exports = {};
+__export(macos_fs_usage_exports, {
+  MacOsFsUsageProvider: () => MacOsFsUsageProvider,
+  parseFsUsage: () => parseFsUsage
+});
+import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
+import * as fs23 from "node:fs/promises";
+import { tmpdir as tmpdir2 } from "node:os";
+import path26 from "node:path";
+function parseFsUsage(text) {
+  const events = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    if (line.length === 0) continue;
+    const match2 = FS_USAGE_LINE.exec(line);
+    if (match2?.groups === void 0) continue;
+    const operation = match2.groups.operation ?? "";
+    if (!isPathOperation(operation)) continue;
+    const rest = match2.groups.rest ?? "";
+    const pathMatch = PATH_IN_REST.exec(rest);
+    if (pathMatch === null) continue;
+    const filePath = pathMatch[1];
+    const processToken = pathMatch[2];
+    const pidMatch = PID_FROM_PROCESS.exec(processToken);
+    const pid = pidMatch === null ? 0 : Number(pidMatch[1]);
+    events.push({
+      timestamp: match2.groups.timestamp,
+      pid: Number.isSafeInteger(pid) ? pid : 0,
+      operation,
+      path: filePath
+    });
+    if (events.length >= TRACE_MAX_EVENTS) break;
+  }
+  return events;
+}
+var FS_USAGE_LINE, PATH_IN_REST, PID_FROM_PROCESS, MacOsFsUsageProvider;
+var init_macos_fs_usage = __esm({
+  "src/tracing/macos-fs-usage.ts"() {
+    "use strict";
+    init_provider();
+    FS_USAGE_LINE = /^(?<timestamp>\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(?<operation>[A-Za-z0-9_]+)\b(?<rest>.*)$/;
+    PATH_IN_REST = /(?:^|\s)(\/(?:[^\s]+))\s+(?:\d+\.\d+)\s+(\S+)\s*$/;
+    PID_FROM_PROCESS = /\.(\d+)\s*$/;
+    MacOsFsUsageProvider = class {
+      name = "macos-fs-usage";
+      reason = "macOS fs_usage provider has not been checked yet.";
+      child;
+      target;
+      outputPath;
+      runtimeTimer;
+      collecting = false;
+      unavailableReason() {
+        return this.reason;
+      }
+      async isAvailable() {
+        if (process.platform !== "darwin") {
+          this.reason = "fs_usage is unavailable: not running on macOS.";
+          return false;
+        }
+        try {
+          await fs23.access("/usr/bin/fs_usage");
+        } catch {
+          this.reason = "fs_usage is unavailable: /usr/bin/fs_usage is not installed.";
+          return false;
+        }
+        this.reason = "fs_usage is available on macOS (may require authorization at runtime).";
+        return true;
+      }
+      async start(command, args) {
+        if (this.collecting) {
+          throw new Error("fs_usage tracing is already running");
+        }
+        if (!await this.isAvailable()) {
+          throw new Error(this.reason);
+        }
+        this.outputPath = path26.join(
+          tmpdir2(),
+          `acs-fs-usage-${process.pid}-${Date.now()}.log`
+        );
+        const out = createWriteStream(this.outputPath);
+        await new Promise((resolve3, reject) => {
+          out.once("ready", () => resolve3());
+          out.once("error", reject);
+        });
+        this.target = spawn(command, [...args], {
+          stdio: ["ignore", "ignore", "ignore"]
+        });
+        const targetPid = this.target.pid;
+        if (targetPid === void 0) {
+          out.close();
+          throw new Error("Failed to launch traced command");
+        }
+        this.child = spawn("fs_usage", ["-w", "-f", "pathname", String(targetPid)], {
+          stdio: ["ignore", "pipe", "pipe"]
+        });
+        this.child.stdout?.pipe(out);
+        this.child.stderr?.resume();
+        this.collecting = true;
+        this.runtimeTimer = setTimeout(() => {
+          this.child?.kill("SIGTERM");
+          this.target?.kill("SIGTERM");
+        }, TRACE_MAX_RUNTIME_MS);
+      }
+      async stop() {
+        if (!this.collecting || this.outputPath === void 0) {
+          throw new Error("fs_usage tracing is not running");
+        }
+        if (this.runtimeTimer !== void 0) {
+          clearTimeout(this.runtimeTimer);
+          this.runtimeTimer = void 0;
+        }
+        const target = this.target;
+        const child = this.child;
+        this.target = void 0;
+        this.child = void 0;
+        this.collecting = false;
+        if (target !== void 0 && target.exitCode === null && !target.killed) {
+          await new Promise((resolve3) => {
+            target.once("exit", () => resolve3());
+            target.kill("SIGTERM");
+            setTimeout(() => {
+              if (target.exitCode === null) target.kill("SIGKILL");
+            }, 1e3);
+          });
+        }
+        child?.kill("SIGTERM");
+        await new Promise((resolve3) => {
+          if (child === void 0 || child.exitCode !== null) {
+            resolve3();
+            return;
+          }
+          child.once("exit", () => resolve3());
+          setTimeout(() => {
+            if (child.exitCode === null) child.kill("SIGKILL");
+            resolve3();
+          }, 1e3);
+        });
+        const text = await fs23.readFile(this.outputPath, "utf8").catch(() => "");
+        await fs23.rm(this.outputPath, { force: true }).catch(() => void 0);
+        this.outputPath = void 0;
+        return capTraceEvents(parseFsUsage(text));
+      }
+    };
+  }
+});
+
+// src/tracing/linux-strace.ts
+var linux_strace_exports = {};
+__export(linux_strace_exports, {
+  LinuxStraceProvider: () => LinuxStraceProvider,
+  parseStrace: () => parseStrace
+});
+import { spawn as spawn2 } from "node:child_process";
+import * as fs24 from "node:fs/promises";
+import { tmpdir as tmpdir3 } from "node:os";
+import path27 from "node:path";
+function parseStrace(text) {
+  const events = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0) continue;
+    const match2 = STRACE_LINE.exec(line);
+    if (match2?.groups === void 0) continue;
+    const operation = match2.groups.operation ?? "";
+    if (!isPathOperation(operation)) continue;
+    const args = match2.groups.args ?? "";
+    const pathMatch = QUOTED_PATH.exec(args);
+    if (pathMatch === null) continue;
+    const filePath = (pathMatch[1] ?? pathMatch[2] ?? "").replace(/\\"/g, '"').replace(/\\'/g, "'");
+    if (!filePath.startsWith("/")) continue;
+    const pidToken = match2.groups.pid ?? match2.groups.bracketPid ?? "0";
+    const pid = Number(pidToken);
+    events.push({
+      timestamp: match2.groups.timestamp,
+      pid: Number.isSafeInteger(pid) ? pid : 0,
+      operation,
+      path: filePath
+    });
+    if (events.length >= TRACE_MAX_EVENTS) break;
+  }
+  return events;
+}
+async function commandExists(binary) {
+  const searchPath = process.env.PATH ?? "";
+  for (const dir of searchPath.split(path27.delimiter)) {
+    if (dir.length === 0) continue;
+    try {
+      await fs24.access(path27.join(dir, binary));
+      return true;
+    } catch {
+    }
+  }
+  return false;
+}
+async function ptraceAllowed() {
+  try {
+    const scope = (await fs24.readFile("/proc/sys/kernel/yama/ptrace_scope", "utf8")).trim();
+    if (scope === "0" || scope === "1") {
+      return { ok: true, detail: `ptrace_scope=${scope}` };
+    }
+    return {
+      ok: false,
+      detail: `ptrace is restricted (ptrace_scope=${scope}); strace cannot attach`
+    };
+  } catch {
+    return { ok: true, detail: "ptrace_scope unavailable; assuming classic ptrace permissions" };
+  }
+}
+var STRACE_LINE, QUOTED_PATH, LinuxStraceProvider;
+var init_linux_strace = __esm({
+  "src/tracing/linux-strace.ts"() {
+    "use strict";
+    init_provider();
+    STRACE_LINE = /^(?:\[pid\s+(?<bracketPid>\d+)\]\s+)?(?:(?<pid>\d+)\s+)?(?<timestamp>\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(?<operation>[a-z0-9_]+)\((?<args>.*)\)\s*=/i;
+    QUOTED_PATH = /(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')/;
+    LinuxStraceProvider = class {
+      name = "linux-strace";
+      reason = "Linux strace provider has not been checked yet.";
+      child;
+      outputPath;
+      runtimeTimer;
+      collecting = false;
+      unavailableReason() {
+        return this.reason;
+      }
+      async isAvailable() {
+        if (process.platform !== "linux") {
+          this.reason = "strace is unavailable: not running on Linux.";
+          return false;
+        }
+        if (!await commandExists("strace")) {
+          this.reason = "strace is unavailable: strace is not installed.";
+          return false;
+        }
+        const ptrace = await ptraceAllowed();
+        if (!ptrace.ok) {
+          this.reason = `strace is unavailable: ${ptrace.detail}.`;
+          return false;
+        }
+        this.reason = `strace is available on Linux (${ptrace.detail}).`;
+        return true;
+      }
+      async start(command, args) {
+        if (this.collecting) {
+          throw new Error("strace tracing is already running");
+        }
+        if (!await this.isAvailable()) {
+          throw new Error(this.reason);
+        }
+        this.outputPath = path27.join(
+          tmpdir3(),
+          `acs-strace-${process.pid}-${Date.now()}.log`
+        );
+        this.child = spawn2("strace", [
+          "-f",
+          "-tt",
+          "-e",
+          "trace=open,openat,stat,lstat,fstatat,newfstatat,statx,readlink,readlinkat,access,faccessat",
+          "-o",
+          this.outputPath,
+          command,
+          ...args
+        ], {
+          stdio: ["ignore", "ignore", "pipe"]
+        });
+        this.child.stderr?.resume();
+        this.collecting = true;
+        this.runtimeTimer = setTimeout(() => {
+          this.child?.kill("SIGTERM");
+        }, TRACE_MAX_RUNTIME_MS);
+      }
+      async stop() {
+        if (!this.collecting || this.outputPath === void 0) {
+          throw new Error("strace tracing is not running");
+        }
+        if (this.runtimeTimer !== void 0) {
+          clearTimeout(this.runtimeTimer);
+          this.runtimeTimer = void 0;
+        }
+        const child = this.child;
+        const outputPath = this.outputPath;
+        this.child = void 0;
+        this.outputPath = void 0;
+        this.collecting = false;
+        if (child !== void 0) {
+          await new Promise((resolve3) => {
+            if (child.exitCode !== null) {
+              resolve3();
+              return;
+            }
+            const forceKill = setTimeout(() => {
+              if (child.exitCode === null) child.kill("SIGTERM");
+              setTimeout(() => {
+                if (child.exitCode === null) child.kill("SIGKILL");
+              }, 500);
+            }, 2e3);
+            child.once("exit", () => {
+              clearTimeout(forceKill);
+              resolve3();
+            });
+          });
+        }
+        const text = await fs24.readFile(outputPath, "utf8").catch(() => "");
+        await fs24.rm(outputPath, { force: true }).catch(() => void 0);
+        return capTraceEvents(parseStrace(text));
+      }
+    };
+  }
+});
+
+// src/tracing/provider.ts
+function isPathOperation(operation) {
+  const normalized = operation.toLowerCase().replace(/_$/, "");
+  return PATH_OPERATIONS.has(normalized) || PATH_OPERATIONS.has(operation);
+}
+function capTraceEvents(events) {
+  return events.slice(0, TRACE_MAX_EVENTS);
+}
+async function resolveTraceProvider(platform = process.platform) {
+  if (platform === "darwin") {
+    const { MacOsFsUsageProvider: MacOsFsUsageProvider2 } = await Promise.resolve().then(() => (init_macos_fs_usage(), macos_fs_usage_exports));
+    return new MacOsFsUsageProvider2();
+  }
+  if (platform === "linux") {
+    const { LinuxStraceProvider: LinuxStraceProvider2 } = await Promise.resolve().then(() => (init_linux_strace(), linux_strace_exports));
+    return new LinuxStraceProvider2();
+  }
+  return void 0;
+}
+var TRACE_MAX_RUNTIME_MS, TRACE_MAX_EVENTS, PATH_OPERATIONS;
+var init_provider = __esm({
+  "src/tracing/provider.ts"() {
+    "use strict";
+    TRACE_MAX_RUNTIME_MS = 3e4;
+    TRACE_MAX_EVENTS = 1e3;
+    PATH_OPERATIONS = /* @__PURE__ */ new Set([
+      "open",
+      "openat",
+      "stat",
+      "stat64",
+      "lstat",
+      "lstat64",
+      "fstatat",
+      "newfstatat",
+      "readlink",
+      "readlinkat",
+      "access",
+      "faccessat"
+    ]);
+  }
+});
+
 // src/main.ts
 import { homedir as homedir2 } from "node:os";
-import path26 from "node:path";
+import path28 from "node:path";
 import { pathToFileURL } from "node:url";
-import * as fs23 from "node:fs/promises";
+import * as fs25 from "node:fs/promises";
 
 // src/domain/compare.ts
 function compareCodeUnits(left, right) {
@@ -8193,10 +8550,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path27) {
-  if (!path27)
+function getElementAtPath(obj, path29) {
+  if (!path29)
     return obj;
-  return path27.reduce((acc, key) => acc?.[key], obj);
+  return path29.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8605,11 +8962,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path27, issues) {
+function prefixIssues(path29, issues) {
   return issues.map((iss) => {
     var _a4;
     (_a4 = iss).path ?? (_a4.path = []);
-    iss.path.unshift(path27);
+    iss.path.unshift(path29);
     return iss;
   });
 }
@@ -8756,16 +9113,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path27 = []) => {
+  const processError = (error52, path29 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path27, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path29, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
       } else {
-        const fullpath = [...path27, ...issue2.path];
+        const fullpath = [...path29, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8792,17 +9149,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path27 = []) => {
+  const processError = (error52, path29 = []) => {
     var _a4, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path27, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path29, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path27, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path29, ...issue2.path]);
       } else {
-        const fullpath = [...path27, ...issue2.path];
+        const fullpath = [...path29, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8834,8 +9191,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path27 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path27) {
+  const path29 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path29) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -21527,13 +21884,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path27 = ref.slice(1).split("/").filter(Boolean);
-  if (path27.length === 0) {
+  const path29 = ref.slice(1).split("/").filter(Boolean);
+  if (path29.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path27[0] === defsKey) {
-    const key = path27[1];
+  if (path29[0] === defsKey) {
+    const key = path29[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -23888,16 +24245,16 @@ var Diff = class {
       }
     }
   }
-  addToPath(path27, added, removed, oldPosInc, options) {
-    const last = path27.lastComponent;
+  addToPath(path29, added, removed, oldPosInc, options) {
+    const last = path29.lastComponent;
     if (last && !options.oneChangePerToken && last.added === added && last.removed === removed) {
       return {
-        oldPos: path27.oldPos + oldPosInc,
+        oldPos: path29.oldPos + oldPosInc,
         lastComponent: { count: last.count + 1, added, removed, previousComponent: last.previousComponent }
       };
     } else {
       return {
-        oldPos: path27.oldPos + oldPosInc,
+        oldPos: path29.oldPos + oldPosInc,
         lastComponent: { count: 1, added, removed, previousComponent: last }
       };
     }
@@ -24306,7 +24663,7 @@ var ROOT = "CLAUDE.md";
 var DEFAULT_MAX_ROOT_LINES = 200;
 function renderRuleFile(paths, entries, header) {
   const scopeId = stableScopeId(paths);
-  const yamlPaths = [...paths].sort(compareCodeUnits).map((path27) => `  - ${path27}`).join("\n");
+  const yamlPaths = [...paths].sort(compareCodeUnits).map((path29) => `  - ${path29}`).join("\n");
   const body = [
     "---",
     "paths:",
@@ -24364,7 +24721,7 @@ function renderClaude(input) {
   if (rulePaths2.length > 0) {
     pathNote = [
       "Path-scoped rules are loaded from `.claude/rules/` (complete projection; do not import AGENTS.md).",
-      ...rulePaths2.sort(compareCodeUnits).map((path27) => `- ${path27}`)
+      ...rulePaths2.sort(compareCodeUnits).map((path29) => `- ${path29}`)
     ].join("\n");
   }
   let rootBody = [
@@ -24464,7 +24821,7 @@ function renderCodex(input) {
   const rootEntries = compiled.sections.filter((section) => section.id !== "path").flatMap((section) => section.entries);
   const pathNote = [
     "Path-scoped guidance lives in nested AGENTS.md files nearest those paths.",
-    ...nestedPaths.sort(compareCodeUnits).map((path27) => `- ${path27}`)
+    ...nestedPaths.sort(compareCodeUnits).map((path29) => `- ${path29}`)
   ].join("\n");
   let root = toRenderedFile(
     ROOT2,
@@ -27951,10 +28308,10 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep as sep2 } from "node:path";
 var import_yaml4 = __toESM(require_dist(), 1);
 var defaultFileSystem = {
-  readFile: (path27) => nodeReadFile(path27, "utf8"),
-  readdir: (path27, options) => nodeReaddir(path27, options),
-  realpath: (path27) => nodeRealpath(path27),
-  stat: (path27) => nodeStat(path27)
+  readFile: (path29) => nodeReadFile(path29, "utf8"),
+  readdir: (path29, options) => nodeReaddir(path29, options),
+  realpath: (path29) => nodeRealpath(path29),
+  stat: (path29) => nodeStat(path29)
 };
 var AGENT = "claude-code";
 function isInside(parent, child) {
@@ -27967,23 +28324,23 @@ function uniqueSorted(values) {
 function coverage(id, status, detail, locator) {
   return { id, status, detail, ...locator === void 0 ? {} : { locator } };
 }
-async function readableFile(fs24, path27) {
+async function readableFile(fs26, path29) {
   try {
-    if (!(await fs24.stat(path27)).isFile()) return "missing";
-    await fs24.readFile(path27);
+    if (!(await fs26.stat(path29)).isFile()) return "missing";
+    await fs26.readFile(path29);
     return "file";
   } catch (error51) {
     return error51.code === "ENOENT" ? "missing" : "inaccessible";
   }
 }
-async function walkMarkdown(fs24, root) {
+async function walkMarkdown(fs26, root) {
   const files = [];
   const inaccessible = [];
   const escapes = [];
   const visited = /* @__PURE__ */ new Set();
   let canonicalRoot;
   try {
-    canonicalRoot = await fs24.realpath(root);
+    canonicalRoot = await fs26.realpath(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
     return { files, inaccessible, escapes };
@@ -27991,7 +28348,7 @@ async function walkMarkdown(fs24, root) {
   async function visit(directory) {
     let canonical;
     try {
-      canonical = await fs24.realpath(directory);
+      canonical = await fs26.realpath(directory);
     } catch {
       inaccessible.push(directory);
       return;
@@ -28004,7 +28361,7 @@ async function walkMarkdown(fs24, root) {
     visited.add(canonical);
     let entries;
     try {
-      entries = await fs24.readdir(directory, { withFileTypes: true });
+      entries = await fs26.readdir(directory, { withFileTypes: true });
     } catch {
       inaccessible.push(directory);
       return;
@@ -28012,32 +28369,32 @@ async function walkMarkdown(fs24, root) {
     entries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of entries) {
       if (entry.name === ".git" || entry.name === "node_modules") continue;
-      const path27 = join(directory, entry.name);
+      const path29 = join(directory, entry.name);
       if (entry.isDirectory() || entry.isSymbolicLink()) {
         let target;
         try {
-          target = await fs24.stat(path27);
+          target = await fs26.stat(path29);
         } catch {
-          inaccessible.push(path27);
+          inaccessible.push(path29);
           continue;
         }
-        if (target.isDirectory()) await visit(path27);
+        if (target.isDirectory()) await visit(path29);
         else if (target.isFile() && entry.name.endsWith(".md")) {
           try {
-            const canonicalFile = await fs24.realpath(path27);
-            if (isInside(canonicalRoot, canonicalFile)) files.push(path27);
-            else escapes.push(path27);
+            const canonicalFile = await fs26.realpath(path29);
+            if (isInside(canonicalRoot, canonicalFile)) files.push(path29);
+            else escapes.push(path29);
           } catch {
-            inaccessible.push(path27);
+            inaccessible.push(path29);
           }
         }
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        files.push(path27);
+        files.push(path29);
       }
     }
   }
   try {
-    if ((await fs24.stat(root)).isDirectory()) await visit(root);
+    if ((await fs26.stat(root)).isDirectory()) await visit(root);
   } catch (error51) {
     if (error51.code !== "ENOENT") inaccessible.push(root);
   }
@@ -28107,8 +28464,8 @@ function importedPaths(markdown) {
   }
   return imports;
 }
-function resolveTilde(path27, homeDir) {
-  return path27 === "~" ? homeDir : path27.startsWith(`~${sep2}`) || path27.startsWith("~/") ? join(homeDir, path27.slice(2)) : path27;
+function resolveTilde(path29, homeDir) {
+  return path29 === "~" ? homeDir : path29.startsWith(`~${sep2}`) || path29.startsWith("~/") ? join(homeDir, path29.slice(2)) : path29;
 }
 function rulePaths(markdown) {
   const match2 = markdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -28132,8 +28489,8 @@ var ClaudeAdapter = class {
     supported: true
   };
   fs;
-  constructor(fs24 = {}) {
-    this.fs = { ...defaultFileSystem, ...fs24 };
+  constructor(fs26 = {}) {
+    this.fs = { ...defaultFileSystem, ...fs26 };
   }
   render(input) {
     return renderClaude(input);
@@ -28172,10 +28529,10 @@ var ClaudeAdapter = class {
         repositoryRoot
       ));
     }
-    const safeShareability = async (path27, intended) => {
+    const safeShareability = async (path29, intended) => {
       if (intended !== "team") return intended;
       try {
-        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path27)) ? "team" : "personal";
+        return isInside(canonicalRepositoryRoot, await this.fs.realpath(path29)) ? "team" : "personal";
       } catch {
         return "personal";
       }
@@ -28217,14 +28574,14 @@ var ClaudeAdapter = class {
     const excludes = uniqueSorted(parsedLayers.flatMap(
       ({ settings }) => Array.isArray(settings.claudeMdExcludes) ? settings.claudeMdExcludes.filter((item) => typeof item === "string") : []
     ));
-    const isExcluded = (path27) => excludes.some(
-      (pattern) => minimatch(path27, resolveTilde(pattern, homeDir), { dot: true })
+    const isExcluded = (path29) => excludes.some(
+      (pattern) => minimatch(path29, resolveTilde(pattern, homeDir), { dot: true })
     );
-    for (const path27 of uniqueSorted(input.managedInstructionPaths ?? [])) {
-      const status = await readableFile(this.fs, path27);
+    for (const path29 of uniqueSorted(input.managedInstructionPaths ?? [])) {
+      const status = await readableFile(this.fs, path29);
       if (status === "file") {
         foundInstructions.push({
-          locator: path27,
+          locator: path29,
           sourceType: "managed-instructions",
           shareability: "managed",
           loading: "reported-only"
@@ -28234,7 +28591,7 @@ var ClaudeAdapter = class {
           "claude-managed-inaccessible",
           status === "inaccessible" ? "inaccessible" : "unknown",
           status === "inaccessible" ? "Managed instructions are unreadable." : "Managed instructions do not exist.",
-          path27
+          path29
         ));
       }
     }
@@ -28299,33 +28656,33 @@ var ClaudeAdapter = class {
       }
     }
     const descendants = await walkMarkdown(this.fs, repositoryRoot);
-    for (const path27 of descendants.files) {
-      const name = path27.slice(path27.lastIndexOf(sep2) + 1);
+    for (const path29 of descendants.files) {
+      const name = path29.slice(path29.lastIndexOf(sep2) + 1);
       if (name !== "CLAUDE.md" && name !== "CLAUDE.local.md") continue;
-      if (path27.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path27) || path27 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
-      if (isExcluded(path27)) {
-        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path27));
+      if (path29.includes(`${sep2}.claude${sep2}rules${sep2}`) || eager.has(path29) || path29 === join(repositoryRoot, ".claude/CLAUDE.md")) continue;
+      if (isExcluded(path29)) {
+        coverageItems.push(coverage("claude-excluded", "partial", "Instruction file matched claudeMdExcludes.", path29));
         continue;
       }
-      const descendantStatus = await readableFile(this.fs, path27);
+      const descendantStatus = await readableFile(this.fs, path29);
       if (descendantStatus !== "file") {
-        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path27));
+        coverageItems.push(coverage("claude-instruction-inaccessible", "inaccessible", "Instruction file is unreadable.", path29));
         continue;
       }
       foundInstructions.push({
-        locator: path27,
+        locator: path29,
         sourceType: name === "CLAUDE.local.md" ? "local-instructions" : "project-instructions",
         shareability: name === "CLAUDE.local.md" ? "personal" : "team",
         loading: "on-demand"
       });
     }
-    for (const path27 of descendants.inaccessible) {
-      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path27));
+    for (const path29 of descendants.inaccessible) {
+      coverageItems.push(coverage("claude-path-inaccessible", "inaccessible", "A repository path could not be inspected.", path29));
     }
-    for (const path27 of descendants.escapes) {
-      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path27));
+    for (const path29 of descendants.escapes) {
+      coverageItems.push(coverage("claude-root-escape", "partial", "A repository symlink resolves outside the repository root.", path29));
     }
-    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path27) => resolve(path27)));
+    const additionalDirectories = uniqueSorted((input.additionalDirectories ?? []).map((path29) => resolve(path29)));
     if (additionalDirectories.length > 0 && !input.includeAdditionalDirectoryInstructions) {
       coverageItems.push(coverage(
         "claude-additional-directories-disabled",
@@ -28371,46 +28728,46 @@ var ClaudeAdapter = class {
     ];
     for (const ruleRoot of ruleRoots) {
       const walked = await walkMarkdown(this.fs, ruleRoot.path);
-      for (const path27 of walked.files) {
-        if (isExcluded(path27)) {
-          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path27));
+      for (const path29 of walked.files) {
+        if (isExcluded(path29)) {
+          coverageItems.push(coverage("claude-excluded", "partial", "Rule matched claudeMdExcludes.", path29));
           continue;
         }
         let paths;
         try {
-          paths = rulePaths(await this.fs.readFile(path27));
+          paths = rulePaths(await this.fs.readFile(path29));
         } catch {
-          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path27));
+          coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule could not be read.", path29));
           continue;
         }
         sources.push({
           agent: AGENT,
           sourceType: ruleRoot.sourceType,
-          locator: path27,
-          shareability: await safeShareability(path27, ruleRoot.shareability),
+          locator: path29,
+          shareability: await safeShareability(path29, ruleRoot.shareability),
           status: "available",
           ...paths === void 0 ? {} : { pathScope: paths }
         });
       }
-      for (const path27 of walked.inaccessible) {
-        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path27));
+      for (const path29 of walked.inaccessible) {
+        coverageItems.push(coverage("claude-rule-inaccessible", "inaccessible", "Rule path could not be inspected.", path29));
       }
-      for (const path27 of walked.escapes) {
-        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path27));
+      for (const path29 of walked.escapes) {
+        coverageItems.push(coverage("claude-root-escape", "partial", "A rule symlink resolves outside its explicit rule root.", path29));
       }
     }
     const instructionSourcePaths = foundInstructions.filter((item) => item.loading !== "reported-only").map((item) => item.locator);
     const importSources = /* @__PURE__ */ new Map();
-    const visitImports = async (path27, depth, ancestors, inheritedShareability) => {
+    const visitImports = async (path29, depth, ancestors, inheritedShareability) => {
       let canonicalPath;
       try {
-        canonicalPath = await this.fs.realpath(path27);
+        canonicalPath = await this.fs.realpath(path29);
       } catch (error51) {
         coverageItems.push(coverage(
           "claude-import-inaccessible",
           error51.code === "ENOENT" ? "unknown" : "inaccessible",
           "Import source could not be canonicalized.",
-          path27
+          path29
         ));
         return;
       }
@@ -28422,7 +28779,7 @@ var ClaudeAdapter = class {
         return;
       }
       for (const imported of importedPaths(text)) {
-        const candidate = resolve(dirname(path27), resolveTilde(imported, homeDir));
+        const candidate = resolve(dirname(path29), resolveTilde(imported, homeDir));
         if (depth >= 4) {
           coverageItems.push(coverage("claude-import-depth", "partial", "Import exceeds the maximum depth of four hops.", candidate));
           continue;
@@ -29260,9 +29617,9 @@ var AGENT2 = "codex";
 var DEFAULT_MAX_BYTES2 = 32 * 1024;
 var DEFAULT_FALLBACK_FILENAMES = [];
 var defaultFileSystem2 = {
-  readFile: (path27) => nodeReadFile2(path27, "utf8"),
-  readdir: (path27, options) => nodeReaddir2(path27, options),
-  realpath: (path27) => nodeRealpath2(path27)
+  readFile: (path29) => nodeReadFile2(path29, "utf8"),
+  readdir: (path29, options) => nodeReaddir2(path29, options),
+  realpath: (path29) => nodeRealpath2(path29)
 };
 function isInside2(parent, child) {
   const pathFromParent = relative2(parent, child);
@@ -29314,8 +29671,8 @@ var CodexAdapter = class {
   fs;
   env;
   constructor(options = {}) {
-    const { env, ...fs24 } = options;
-    this.fs = { ...defaultFileSystem2, ...fs24 };
+    const { env, ...fs26 } = options;
+    this.fs = { ...defaultFileSystem2, ...fs26 };
     this.env = env ?? process.env;
   }
   render(input) {
@@ -33387,7 +33744,212 @@ async function syncPrepare(input) {
   return prepareCapture(input);
 }
 
+// src/tracing/classify.ts
+var CODE_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".py",
+  ".rb",
+  ".go",
+  ".rs",
+  ".java",
+  ".kt",
+  ".c",
+  ".cc",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".swift",
+  ".m",
+  ".mm",
+  ".cs",
+  ".fs",
+  ".php",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".wasm",
+  ".so",
+  ".dylib",
+  ".dll",
+  ".o",
+  ".a",
+  ".class",
+  ".jar"
+]);
+var CONTEXT_BASENAMES = /* @__PURE__ */ new Set([
+  "agents.md",
+  "claude.md",
+  "claude.local.md",
+  "codex.md",
+  ".cursorrules",
+  "rules.md",
+  "rule.md",
+  "instructions.md"
+]);
+var CONTEXT_SUFFIXES = [
+  ".rules",
+  ".mdc",
+  "agents.md",
+  "claude.md"
+];
+function explainedPaths(report) {
+  const paths = /* @__PURE__ */ new Set();
+  for (const source of report.sources) {
+    paths.add(source.locator);
+  }
+  for (const item of report.coverage) {
+    if (item.locator !== void 0) paths.add(item.locator);
+  }
+  for (const step of report.loadPlan) {
+    paths.add(step.locator);
+  }
+  return paths;
+}
+function extensionOf(filePath) {
+  const base = filePath.includes("/") ? filePath.slice(filePath.lastIndexOf("/") + 1) : filePath;
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return "";
+  return base.slice(dot).toLowerCase();
+}
+function basenameOf(filePath) {
+  const parts = filePath.split("/");
+  return (parts[parts.length - 1] ?? filePath).toLowerCase();
+}
+function isSystemLibraryPath(filePath) {
+  return filePath.startsWith("/usr/") || filePath.startsWith("/lib/") || filePath.startsWith("/lib64/") || filePath.startsWith("/System/") || filePath.startsWith("/Applications/") || filePath.includes("/node_modules/") || filePath.includes("/.node/") || basenameOf(filePath) === "hosts";
+}
+function looksLikeCodePath(filePath) {
+  return CODE_EXTENSIONS.has(extensionOf(filePath));
+}
+function looksLikeContextPath(filePath) {
+  const base = basenameOf(filePath);
+  if (CONTEXT_BASENAMES.has(base)) return true;
+  if (CONTEXT_SUFFIXES.some((suffix) => base.endsWith(suffix))) return true;
+  if (filePath.includes("/.claude/") || filePath.includes("/.codex/") || filePath.includes("/.cursor/")) {
+    return true;
+  }
+  if (base.endsWith(".md") && !looksLikeCodePath(filePath)) return true;
+  if (base.endsWith(".rules") || base.endsWith(".rule")) return true;
+  return false;
+}
+function classifyTrace(events, stableReport) {
+  const explained = explainedPaths(stableReport);
+  const seen = /* @__PURE__ */ new Set();
+  const candidates = [];
+  for (const event of events) {
+    const filePath = event.path;
+    if (filePath.length === 0) continue;
+    if (seen.has(filePath)) continue;
+    seen.add(filePath);
+    if (explained.has(filePath)) continue;
+    if (isSystemLibraryPath(filePath)) continue;
+    if (looksLikeCodePath(filePath)) continue;
+    if (!looksLikeContextPath(filePath)) continue;
+    candidates.push({
+      path: filePath,
+      operation: event.operation,
+      reason: "unknown-context-path",
+      pid: event.pid,
+      timestamp: event.timestamp
+    });
+  }
+  return candidates;
+}
+
+// src/commands/trace.ts
+init_provider();
+function mergeCoverageReports2(reports) {
+  if (reports.length === 0) {
+    return {
+      agent: "claude-code",
+      sources: [],
+      coverage: [],
+      loadPlan: []
+    };
+  }
+  const first = reports[0];
+  if (reports.length === 1) return first;
+  return {
+    agent: first.agent,
+    sources: reports.flatMap((report) => report.sources),
+    coverage: reports.flatMap((report) => report.coverage),
+    loadPlan: reports.flatMap((report) => report.loadPlan)
+  };
+}
+async function traceRun(input) {
+  if (!input.experimental || !input.consentPathMetadata) {
+    throw appError(
+      "TRACE_CONSENT_REQUIRED",
+      "Experimental tracing requires --experimental and --consent-path-metadata",
+      {
+        experimental: input.experimental,
+        consent_path_metadata: input.consentPathMetadata
+      }
+    );
+  }
+  const provider = input.provider ?? await resolveTraceProvider();
+  if (provider === void 0) {
+    return {
+      provider: "none",
+      available: false,
+      unavailable_reason: "Runtime tracing is unavailable on this platform in v0.3 (Windows and unknown OS).",
+      events_captured: 0,
+      candidates: []
+    };
+  }
+  const available = await provider.isAvailable();
+  if (!available) {
+    return {
+      provider: provider.name,
+      available: false,
+      unavailable_reason: provider.unavailableReason(),
+      events_captured: 0,
+      candidates: []
+    };
+  }
+  const repositoryReports = await inspect({
+    workspaceId: input.workspaceId,
+    agent: input.agent,
+    home: input.home,
+    homeDir: input.homeDir,
+    adapterRegistry: input.adapterRegistry ?? defaultAdapterRegistry,
+    ...input.repositories === void 0 ? {} : { repositories: input.repositories },
+    ...input.cwd === void 0 ? {} : { cwd: input.cwd }
+  });
+  const stableReport = mergeCoverageReports2(repositoryReports.map((item) => item.report));
+  await provider.start(input.command, input.commandArgs ?? []);
+  let events;
+  try {
+    events = await provider.stop();
+  } catch (error51) {
+    return {
+      provider: provider.name,
+      available: true,
+      unavailable_reason: error51 instanceof Error ? error51.message : "Tracing failed during stop()",
+      events_captured: 0,
+      candidates: []
+    };
+  }
+  const candidates = classifyTrace(events, stableReport);
+  return {
+    provider: provider.name,
+    available: true,
+    events_captured: events.length,
+    candidates
+  };
+}
+
 // src/main.ts
+var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
+  "experimental",
+  "consent-path-metadata",
+  "include-personal"
+]);
 function parseArguments(argv) {
   const positionals = [];
   const options = /* @__PURE__ */ new Map();
@@ -33400,10 +33962,15 @@ function parseArguments(argv) {
     const name = token.slice(2);
     if (name.length === 0) throw new Error("Invalid empty option");
     const value = argv[index + 1];
+    const existing = options.get(name) ?? [];
+    if (BOOLEAN_FLAGS.has(name) && (value === void 0 || value.startsWith("--"))) {
+      existing.push("true");
+      options.set(name, existing);
+      continue;
+    }
     if (value === void 0 || value.startsWith("--")) {
       throw new Error(`Option --${name} requires a value`);
     }
-    const existing = options.get(name) ?? [];
     existing.push(value);
     options.set(name, existing);
     index += 1;
@@ -33452,9 +34019,9 @@ function nonNegativeInteger(value, name) {
   return parsed;
 }
 function homePaths() {
-  const homeDir = path26.resolve(process.env.HOME ?? homedir2());
+  const homeDir = path28.resolve(process.env.HOME ?? homedir2());
   return {
-    home: path26.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path26.join(homeDir, ".agent-context-sync")),
+    home: path28.resolve(process.env.AGENT_CONTEXT_SYNC_HOME ?? path28.join(homeDir, ".agent-context-sync")),
     homeDir
   };
 }
@@ -33467,7 +34034,7 @@ function parseBooleanOption(args, name) {
 }
 async function readProposalArgument(value) {
   try {
-    const contents = await fs23.readFile(value, "utf8");
+    const contents = await fs25.readFile(value, "utf8");
     try {
       return JSON.parse(contents);
     } catch {
@@ -33496,12 +34063,61 @@ async function dispatch(command, argv) {
         "check",
         "reconcile",
         "apply",
-        "sync"
+        "sync",
+        "trace"
       ]
     };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
+  if (command === "trace") {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || phase !== "run") {
+      throw new Error("trace requires exactly one phase: run");
+    }
+    assertOptions(args, [
+      "workspace",
+      "agent",
+      "command",
+      "arg",
+      "experimental",
+      "consent-path-metadata",
+      "repository",
+      "cwd"
+    ]);
+    const agent = one(args, "agent");
+    if (agent !== "claude-code" && agent !== "codex") {
+      throw new Error("Option --agent must be claude-code or codex");
+    }
+    if (!args.options.has("experimental") || !parseBooleanOption(args, "experimental")) {
+      throw Object.assign(
+        new Error("Experimental tracing requires --experimental and --consent-path-metadata"),
+        { code: "TRACE_CONSENT_REQUIRED" }
+      );
+    }
+    if (!args.options.has("consent-path-metadata") || !parseBooleanOption(args, "consent-path-metadata")) {
+      throw Object.assign(
+        new Error("Experimental tracing requires --experimental and --consent-path-metadata"),
+        { code: "TRACE_CONSENT_REQUIRED" }
+      );
+    }
+    const repositories = many(args, "repository");
+    const commandArgs = many(args, "arg");
+    return {
+      result: await traceRun({
+        workspaceId: one(args, "workspace"),
+        agent,
+        home,
+        homeDir,
+        command: one(args, "command"),
+        experimental: true,
+        consentPathMetadata: true,
+        ...commandArgs.length === 0 ? {} : { commandArgs },
+        ...repositories.length === 0 ? {} : { repositories },
+        ...args.options.has("cwd") ? { cwd: one(args, "cwd") } : {}
+      })
+    };
+  }
   if (command === "reconcile") {
     const phase = args.positionals[0];
     if (args.positionals.length !== 1 || phase !== "prepare" && phase !== "preview" && phase !== "apply") {
@@ -33746,7 +34362,8 @@ export {
   previewCheck,
   previewReconcile,
   run,
-  syncPrepare
+  syncPrepare,
+  traceRun
 };
 /*! Bundled license information:
 

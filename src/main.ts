@@ -16,6 +16,7 @@ import { inspect } from './commands/inspect.js';
 import { applyJoin, joinWorkspace } from './commands/join.js';
 import { prepareReconcile, previewReconcile, applyReconcile } from './commands/reconcile.js';
 import { syncPrepare } from './commands/sync.js';
+import { traceRun } from './commands/trace.js';
 
 export { addRepository, applyAddRepository } from './commands/add-repo.js';
 export { applyRendered, previewApply } from './commands/apply.js';
@@ -27,6 +28,7 @@ export { inspect } from './commands/inspect.js';
 export { applyJoin, joinWorkspace } from './commands/join.js';
 export { prepareReconcile, previewReconcile, applyReconcile } from './commands/reconcile.js';
 export { syncPrepare } from './commands/sync.js';
+export { traceRun } from './commands/trace.js';
 
 export interface CommandIO {
   stdout(line: string): void;
@@ -51,6 +53,13 @@ interface ParsedArguments {
   options: Map<string, string[]>;
 }
 
+/** Options that may appear as bare flags (`--experimental`) or with an explicit boolean value. */
+const BOOLEAN_FLAGS = new Set([
+  'experimental',
+  'consent-path-metadata',
+  'include-personal',
+]);
+
 function parseArguments(argv: readonly string[]): ParsedArguments {
   const positionals: string[] = [];
   const options = new Map<string, string[]>();
@@ -63,10 +72,15 @@ function parseArguments(argv: readonly string[]): ParsedArguments {
     const name = token.slice(2);
     if (name.length === 0) throw new Error('Invalid empty option');
     const value = argv[index + 1];
+    const existing = options.get(name) ?? [];
+    if (BOOLEAN_FLAGS.has(name) && (value === undefined || value.startsWith('--'))) {
+      existing.push('true');
+      options.set(name, existing);
+      continue;
+    }
     if (value === undefined || value.startsWith('--')) {
       throw new Error(`Option --${name} requires a value`);
     }
-    const existing = options.get(name) ?? [];
     existing.push(value);
     options.set(name, existing);
     index += 1;
@@ -169,11 +183,63 @@ async function dispatch(command: string, argv: readonly string[]): Promise<unkno
         'reconcile',
         'apply',
         'sync',
+        'trace',
       ],
     };
   }
   const args = parseArguments(argv);
   const { home, homeDir } = homePaths();
+  if (command === 'trace') {
+    const phase = args.positionals[0];
+    if (args.positionals.length !== 1 || phase !== 'run') {
+      throw new Error('trace requires exactly one phase: run');
+    }
+    assertOptions(args, [
+      'workspace',
+      'agent',
+      'command',
+      'arg',
+      'experimental',
+      'consent-path-metadata',
+      'repository',
+      'cwd',
+    ]);
+    const agent = one(args, 'agent');
+    if (agent !== 'claude-code' && agent !== 'codex') {
+      throw new Error('Option --agent must be claude-code or codex');
+    }
+    if (!args.options.has('experimental') || !parseBooleanOption(args, 'experimental')) {
+      throw Object.assign(
+        new Error('Experimental tracing requires --experimental and --consent-path-metadata'),
+        { code: 'TRACE_CONSENT_REQUIRED' },
+      );
+    }
+    if (
+      !args.options.has('consent-path-metadata')
+      || !parseBooleanOption(args, 'consent-path-metadata')
+    ) {
+      throw Object.assign(
+        new Error('Experimental tracing requires --experimental and --consent-path-metadata'),
+        { code: 'TRACE_CONSENT_REQUIRED' },
+      );
+    }
+    const repositories = many(args, 'repository');
+    const commandArgs = many(args, 'arg');
+    return {
+      result: await traceRun({
+        workspaceId: one(args, 'workspace'),
+        agent: agent as AgentName,
+        home,
+        homeDir,
+        command: one(args, 'command'),
+        experimental: true,
+        consentPathMetadata: true,
+        ...(commandArgs.length === 0 ? {} : { commandArgs }),
+        ...(repositories.length === 0 ? {} : { repositories }),
+        ...(args.options.has('cwd') ? { cwd: one(args, 'cwd') } : {}),
+      }),
+    };
+  }
   if (command === 'reconcile') {
     const phase = args.positionals[0];
     if (args.positionals.length !== 1 || (phase !== 'prepare' && phase !== 'preview' && phase !== 'apply')) {

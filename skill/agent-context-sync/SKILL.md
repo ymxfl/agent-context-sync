@@ -146,5 +146,20 @@ one or both explicitly.
 node "$SKILL_DIR/scripts/acs.mjs" sync prepare --workspace ws_01J00000000000000000000000 --agent claude-code
 ```
 
+### Experimental runtime tracing (opt-in)
+
+Discover unknown context file paths by tracing Agent process file access.
+Requires both `--experimental` and `--consent-path-metadata`. Records path
+metadata only (open/stat/readlink-style events); never reads file contents.
+Unavailable providers are reported without failing stable discovery. Windows is
+unavailable in v0.3.
+
+```sh
+node "$SKILL_DIR/scripts/acs.mjs" trace run --experimental --consent-path-metadata --workspace ws_01J00000000000000000000000 --agent claude-code --command /usr/bin/true
+```
+
+Repeat `--arg` for command arguments. Candidates are hints for a later stable
+`inspect` / `capture` — tracing never mutates Adapter coverage.
+
 Report failed JSON envelopes without inventing a repair. If a repair would
 write, return to the relevant preview/approval/apply workflow.
